@@ -213,7 +213,21 @@ internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () ->
                                 color = Subtle, fontSize = 11.sp
                             )
                         }
-                        Pill("${attempt.score}%  •  +${attempt.earnedXp} XP", PaleGreen, Good)
+                        Pill(
+                            "${attempt.score}%  •  +${attempt.earnedXp} XP",
+                            when {
+                                attempt.score >= 90 -> PaleGreen
+                                attempt.score >= 75 -> PaleBlue
+                                attempt.score >= 60 -> PaleGold
+                                else -> Color(0xFFFFE7EA)
+                            },
+                            when {
+                                attempt.score >= 90 -> Good
+                                attempt.score >= 75 -> NavyLight
+                                attempt.score >= 60 -> Color(0xFFA06C13)
+                                else -> Bad
+                            }
+                        )
                     }
                     TextButton(onClick = { onReview(attempt) }) {
                         Text("Lihat jawaban dan pembahasan →", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp)
