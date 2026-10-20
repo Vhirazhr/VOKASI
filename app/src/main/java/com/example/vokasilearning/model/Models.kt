@@ -37,7 +37,10 @@ internal data class Attempt(
     val score: Int, val earnedXp: Int, val secondsSpent: Int,
     val review: List<AnswerReview> = emptyList(),
     val sessionKey: String = "",
-    val practiceCategory: String? = null
+    val practiceCategory: String? = null,
+    val studentNameSnapshot: String = "",
+    val classSnapshot: String = "",
+    val majorSnapshot: String = ""
 )
 
 internal enum class AnswerStatus { BENAR, SALAH, TIMEOUT, TIDAK_DIJAWAB }
