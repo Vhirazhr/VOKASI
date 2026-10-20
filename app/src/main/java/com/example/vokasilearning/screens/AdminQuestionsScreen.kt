@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,107 +30,136 @@ internal fun AdminQuestionsScreen(
     var visibleCount by remember { mutableIntStateOf(15) }
     var deleteId by remember { mutableStateOf<Int?>(null) }
     var expandedId by remember { mutableStateOf<Int?>(null) }
-    val categories = listOf("Semua") +
-        listOf("Perkalian", "Pembagian", "Penjumlahan", "Konversi Satuan")
-    val filtered = questions.filter {
-        (category == "Semua" || it.category == category) &&
-            (search.isBlank() || it.question.contains(search.trim(), ignoreCase = true) ||
-                it.difficultyCode.contains(search.trim(), ignoreCase = true) ||
-                it.id.toString() == search.trim())
+    val categories = listOf("Semua", "Perkalian", "Pembagian", "Penjumlahan", "Konversi Satuan")
+    val found = questions.filter { q ->
+        (category == "Semua" || q.category == category) &&
+            (search.isBlank() || q.question.contains(search.trim(), true) ||
+                q.difficultyCode.contains(search.trim(), true) ||
+                q.id.toString() == search.trim())
     }.sortedBy { it.id }
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
-        contentPadding = PaddingValues(18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(bottom = 26.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item { VokasiTitle("Bank Soal", "500 soal bawaan dijaga; tambahan tersimpan di perangkat.") }
         item {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("${questions.size} soal tersedia",
-                        color = Ink, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("${questions.count { it.id !in bundledIds }} soal tambahan",
-                        color = Subtle, fontSize = 11.sp)
-                }
-                Button(
-                    onClick = onAdd,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Navy)
-                ) { Text("Tambah Soal", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
-            }
-        }
-        item {
-            OutlinedTextField(
-                value = search,
-                onValueChange = { search = it; visibleCount = 15 },
-                placeholder = { Text("Cari soal, ID, atau kode") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            )
-        }
-        item {
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                categories.forEach { value ->
-                    FilterChip(
-                        selected = category == value,
-                        onClick = { category = value; visibleCount = 15 },
-                        label = { Text(value, fontSize = 11.sp) }
-                    )
-                }
-            }
-        }
-        item { Text("${filtered.size} soal ditemukan", color = Subtle, fontSize = 11.sp) }
-        if (filtered.isEmpty()) {
-            item { WhiteCard(Modifier.fillMaxWidth()) { Text("Tidak ada soal yang cocok.", color = Subtle) } }
-        } else {
-            items(filtered.take(visibleCount), key = { it.id }) { q ->
-                val editable = q.id !in bundledIds
-                WhiteCard(Modifier.fillMaxWidth()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Pill("${q.difficultyCode} • ${q.timeLimitSeconds} dtk", PaleBlue, Navy)
-                        Spacer(Modifier.weight(1f))
-                        if (editable) {
-                            TextButton(onClick = { deleteId = q.id }) {
-                                Text("Hapus", color = Bad, fontSize = 12.sp)
+            Box(Modifier.fillMaxWidth()) {
+                AdminHero("Bank Soal", "Kelola soal dan kunci jawaban", compact = true)
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = 18.dp).padding(top = 167.dp),
+                    shape = RoundedCornerShape(25.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(5.dp)
+                ) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("BANK SOAL", color = NavyLight,
+                                    fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                                Text("${questions.size} soal tersedia", color = Ink,
+                                    fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                                Text("${questions.count { it.id !in bundledIds }} soal tambahan lokal",
+                                    color = Subtle, fontSize = 11.sp)
                             }
-                        } else {
-                            Text("Bawaan", color = Subtle, fontSize = 11.sp)
                         }
+                        VokasiButton("Tambah Soal", onClick = onAdd, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(
+                            value = search,
+                            onValueChange = { search = it; visibleCount = 15 },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("Cari soal, ID, atau kode") },
+                            singleLine = true, shape = RoundedCornerShape(13.dp)
+                        )
                     }
-                    Text(q.question, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        item {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                AdminSectionTitle("Materi", "Daftar soal")
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    categories.forEach { value ->
+                        FilterChip(
+                            selected = value == category,
+                            onClick = { category = value; visibleCount = 15 },
+                            label = { Text(value, fontSize = 12.sp) }
+                        )
+                    }
+                }
+                Text("${found.size} soal ditemukan • Soal bawaan tidak dapat dihapus",
+                    color = Subtle, fontSize = 11.sp)
+            }
+        }
+        if (found.isEmpty()) {
+            item {
+                WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                    Text("Tidak ada soal yang cocok.", color = Subtle, fontSize = 12.sp)
+                }
+            }
+        } else {
+            items(found.take(visibleCount), key = { it.id }) { q ->
+                val extra = q.id !in bundledIds
+                WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("SOAL #${q.id}", color = NavyLight,
+                            fontWeight = FontWeight.ExtraBold, fontSize = 11.sp,
+                            modifier = Modifier.weight(1f))
+                        Pill("${q.difficultyCode} · ${q.timeLimitSeconds} dtk", PaleBlue, Navy)
+                    }
+                    Text(q.question, color = Ink, fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(q.category, color = Subtle, fontSize = 11.sp,
                             modifier = Modifier.weight(1f))
-                        TextButton(onClick = { expandedId = if (expandedId == q.id) null else q.id }) {
-                            Text(if (expandedId == q.id) "Tutup" else "Lihat Detail",
-                                fontSize = 12.sp, color = Navy)
+                        Text(if (extra) "Tambahan" else "Bawaan",
+                            fontSize = 11.sp,
+                            color = if (extra) Good else Subtle)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(
+                            onClick = { expandedId = if (expandedId == q.id) null else q.id },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(if (expandedId == q.id) "Tutup Detail" else "Lihat Detail",
+                                color = Navy, fontSize = 12.sp)
+                        }
+                        if (extra) {
+                            Spacer(Modifier.width(8.dp))
+                            TextButton(onClick = { deleteId = q.id }) {
+                                Text("Hapus", color = Bad, fontSize = 12.sp)
+                            }
                         }
                     }
                     if (expandedId == q.id) {
                         HorizontalDivider(color = Border)
                         q.options.forEachIndexed { index, option ->
                             Text("${'A' + index}. $option",
-                                color = if (index == q.answerIndex) Good else Subtle,
+                                color = if (index == q.answerIndex) Good else Ink,
                                 fontSize = 12.sp,
-                                fontWeight = if (index == q.answerIndex) FontWeight.Bold else FontWeight.Normal)
+                                fontWeight = if (index == q.answerIndex) FontWeight.Bold
+                                    else FontWeight.Normal)
                         }
                         if (q.explanation.isNotBlank()) {
-                            Text("Pembahasan: ${q.explanation}", color = Ink, fontSize = 12.sp)
+                            Text("Pembahasan: ${q.explanation}", color = Subtle, fontSize = 12.sp)
                         }
                     }
                 }
             }
-            if (filtered.size > visibleCount) {
+            if (found.size > visibleCount) {
                 item {
-                    TextButton(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { visibleCount += 15 }
-                    ) { Text("Muat 15 lagi", color = Navy, fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = { visibleCount += 15 },
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text("Muat 15 lagi", color = Navy, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -137,8 +167,8 @@ internal fun AdminQuestionsScreen(
     deleteId?.let { id ->
         AlertDialog(
             onDismissRequest = { deleteId = null },
-            title = { Text("Hapus soal tambahan?", fontWeight = FontWeight.Bold) },
-            text = { Text("Soal ini akan dihapus dari bank lokal di perangkat ini.") },
+            title = { Text("Hapus soal tambahan?", fontWeight = FontWeight.ExtraBold) },
+            text = { Text("Soal ini akan dihapus dari penyimpanan lokal.") },
             confirmButton = {
                 TextButton(onClick = { onDelete(id); deleteId = null; expandedId = null }) {
                     Text("Hapus", color = Bad)
