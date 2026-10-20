@@ -27,11 +27,8 @@ internal fun AdminHome(
     onStudents: (String) -> Unit,
     onMonitoring: (String, String, String) -> Unit,
     onExcelExport: (String, String, String) -> Unit,
-    onLog: () -> Unit,
-    onProfile: () -> Unit,
     adminName: String,
-    schoolName: String,
-    onLogout: () -> Unit
+    schoolName: String
 ) {
     val majors = students.map { it.classroom.major }.distinct().sorted()
     var major by remember { mutableStateOf(majors.firstOrNull().orEmpty()) }
@@ -39,7 +36,6 @@ internal fun AdminHome(
         .map { it.classroom.label }.distinct().sorted()
     var classroom by remember(major) { mutableStateOf(classOptions.firstOrNull().orEmpty()) }
     var date by remember { mutableStateOf(dayKey(System.currentTimeMillis())) }
-    var confirmLogout by remember { mutableStateOf(false) }
     var statsMajor by remember { mutableStateOf("") }
     var statsGrade by remember { mutableStateOf("") }
     var statsClass by remember { mutableStateOf("") }
@@ -150,10 +146,15 @@ internal fun AdminHome(
                             Text("Rekap latihan wajib per bulan",
                                 color = Subtle, fontSize = 11.sp)
                         }
-                        TextButton(onClick = { showScopeFilters = !showScopeFilters }) {
+                        OutlinedButton(
+                            onClick = { showScopeFilters = !showScopeFilters },
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
                             Text(if (showScopeFilters) "Tutup filter" else "Filter jurusan",
-                                color = Navy, fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold)
+                                color = Navy, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (showScopeFilters) "⌃" else "⌄", color = Navy, fontSize = 14.sp)
                         }
                     }
                     if (showScopeFilters) {
@@ -237,42 +238,6 @@ internal fun AdminHome(
                 }
             }
         }
-        item {
-            WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                AdminSectionTitle("Administrasi", "Pengaturan Panel")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = onLog, modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    ) { Text("Log Aktivitas", fontSize = 12.sp, color = Navy) }
-                    OutlinedButton(
-                        onClick = onProfile, modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    ) { Text("Profil Admin", fontSize = 12.sp, color = Navy) }
-                }
-            }
-        }
-        item {
-            TextButton(onClick = { confirmLogout = true },
-                modifier = Modifier.fillMaxWidth()) {
-                Text("Keluar Akun", color = Subtle)
-            }
-        }
-    }
-
-    if (confirmLogout) {
-        AlertDialog(
-            onDismissRequest = { confirmLogout = false },
-            title = { Text("Keluar akun admin?") },
-            confirmButton = {
-                TextButton(onClick = { confirmLogout = false; onLogout() }) {
-                    Text("Keluar", color = Bad)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmLogout = false }) { Text("Batal") }
-            }
-        )
     }
 }
 

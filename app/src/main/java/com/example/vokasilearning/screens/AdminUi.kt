@@ -104,6 +104,11 @@ internal fun AdminSelect(
     modifier: Modifier = Modifier
 ) {
     var open by remember { mutableStateOf(false) }
+    var search by remember(open) { mutableStateOf("") }
+    val searchable = label.contains("jurusan", ignoreCase = true)
+    val visibleOptions = if (searchable) options.filter {
+        it.isBlank() || it.contains(search.trim(), ignoreCase = true)
+    } else options
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, fontSize = 11.sp, color = Subtle, fontWeight = FontWeight.Bold)
         Box(Modifier.fillMaxWidth()) {
@@ -119,8 +124,28 @@ internal fun AdminSelect(
                     overflow = TextOverflow.Ellipsis)
                 Text("⌄", color = Navy)
             }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                options.forEach { option ->
+            DropdownMenu(
+                expanded = open,
+                onDismissRequest = { open = false },
+                modifier = Modifier.heightIn(max = 360.dp)
+            ) {
+                if (searchable) {
+                    OutlinedTextField(
+                        value = search,
+                        onValueChange = { search = it },
+                        placeholder = { Text("Cari jurusan", fontSize = 12.sp) },
+                        singleLine = true,
+                        modifier = Modifier.width(260.dp).padding(horizontal = 8.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+                if (visibleOptions.isEmpty()) {
+                    DropdownMenuItem(
+                        text = { Text("Jurusan tidak ditemukan", fontSize = 12.sp) },
+                        onClick = {}, enabled = false
+                    )
+                }
+                visibleOptions.forEach { option ->
                     DropdownMenuItem(
                         text = { Text(option.ifBlank { "Semua" }, fontSize = 13.sp) },
                         onClick = { onChange(option); open = false }

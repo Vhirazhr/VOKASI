@@ -19,7 +19,8 @@ internal data class Student(
     val photo: ImageBitmap? = null,
     val seedXp: Int = 0,
     val seedStreak: Int = 0,
-    val seedScore: Int = 0
+    val seedScore: Int = 0,
+    val admissionYear: Int = 0
 )
 
 internal data class Question(

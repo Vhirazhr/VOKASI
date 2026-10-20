@@ -147,6 +147,20 @@ internal fun AdminStudentsScreen(
                             singleLine = true,
                             shape = RoundedCornerShape(13.dp)
                         )
+                        AdminSelect(
+                            label = "Filter jurusan",
+                            value = major.orEmpty(),
+                            options = listOf("") + majors.keys.toList(),
+                            onChange = { selected ->
+                                major = selected.ifBlank { null }
+                                grade = null
+                                classroom = null
+                                selectedStudent = null
+                                query = ""
+                                page = 0
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                         Text("${students.size} siswa • ${majors.size} jurusan • Data lokal",
                             color = Subtle, fontSize = 11.sp)
                     }
@@ -209,6 +223,10 @@ internal fun AdminStudentsScreen(
                             Text(student.classroom.major, color = Subtle, fontSize = 11.sp)
                             Text(student.classroom.label + " • @" + student.username,
                                 color = Subtle, fontSize = 11.sp)
+                            if (student.admissionYear > 0) {
+                                Text("Angkatan ${student.admissionYear}",
+                                    color = Subtle, fontSize = 11.sp)
+                            }
                         }
                     }
                     val latest = latestCompulsory[student.username]

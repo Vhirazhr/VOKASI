@@ -143,7 +143,7 @@ private fun MonochromeNavIcon(target: Page, active: Boolean) {
                 move(12f, 14f); line(12f, 19f)
                 move(8f, 20f); line(16f, 20f)
             }
-            Page.PROFILE, Page.ADMIN_STUDENTS -> {
+            Page.PROFILE, Page.ADMIN_STUDENTS, Page.ADMIN_PROFILE -> {
                 move(12f, 3f); line(13f, 3f)
                 move(6f, 21f); line(6f, 18f); line(9f, 15f)
                 line(15f, 15f); line(18f, 18f); line(18f, 21f); line(6f, 21f)
@@ -171,7 +171,7 @@ private fun MonochromeNavIcon(target: Page, active: Boolean) {
                 join = StrokeJoin.Round
             )
         )
-        if (target == Page.PROFILE || target == Page.ADMIN_STUDENTS) {
+        if (target == Page.PROFILE || target == Page.ADMIN_STUDENTS || target == Page.ADMIN_PROFILE) {
             drawCircle(
                 color = tint, radius = 4.3f * scale,
                 center = Offset(12f * scale, 8f * scale),

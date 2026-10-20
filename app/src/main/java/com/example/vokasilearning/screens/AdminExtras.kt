@@ -98,6 +98,7 @@ internal fun AdminProfileScreen(
     config: AdminPreferences,
     onSave: (AdminPreferences) -> Boolean,
     onBack: () -> Unit,
+    onLog: () -> Unit,
     onLogout: () -> Unit
 ) {
     var name by remember(config) { mutableStateOf(config.displayName) }
@@ -133,6 +134,11 @@ internal fun AdminProfileScreen(
             WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                 Text("Pengaturan tampilan", color = Ink, fontSize = 17.sp,
                     fontWeight = FontWeight.ExtraBold)
+                OutlinedButton(
+                    onClick = onLog,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Lihat Log Aktivitas", color = Navy, fontSize = 12.sp) }
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it; result = null },

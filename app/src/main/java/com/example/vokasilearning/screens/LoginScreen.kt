@@ -38,9 +38,6 @@ internal fun LoginScreen(
                     .padding(horizontal = 22.dp, vertical = 25.dp),
                 verticalArrangement = Arrangement.spacedBy(13.dp)
             ) {
-                Text("Masuk ke VOKASI", fontSize = 23.sp,
-                    fontWeight = FontWeight.ExtraBold, color = Ink)
-                Spacer(Modifier.height(4.dp))
                 Text("Username", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Ink)
                 OutlinedTextField(
                     value = username,
