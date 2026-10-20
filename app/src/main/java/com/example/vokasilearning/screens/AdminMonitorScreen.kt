@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -40,7 +41,11 @@ internal fun AdminMonitorScreen(
     }
     var search by remember { mutableStateOf("") }
     var onlyMissing by remember { mutableStateOf(false) }
-    var visibleCount by remember(major, classroom, date) { mutableIntStateOf(15) }
+    var page by remember(major, classroom, date, search, onlyMissing) {
+        mutableIntStateOf(0)
+    }
+    var pagingActivated by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
     var reviewing by remember { mutableStateOf<Attempt?>(null) }
 
     val summary = AdminAnalytics.classSummary(classroom, students, attempts, date, major)
@@ -53,9 +58,17 @@ internal fun AdminMonitorScreen(
         .sortedWith(
             compareBy<Student> { if (latest[it.username] == null) 1 else 0 }.thenBy { it.name }
         )
+    val pageSize = 15
+    val pageCount = AdminPagination.count(members.size, pageSize)
+    val activePage = AdminPagination.active(page, members.size, pageSize)
+    val visibleMembers = AdminPagination.slice(members, activePage, pageSize)
+    LaunchedEffect(activePage, pagingActivated) {
+        if (pagingActivated) listState.scrollToItem(1)
+    }
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
+        state = listState,
         contentPadding = PaddingValues(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -108,7 +121,7 @@ internal fun AdminMonitorScreen(
                 verticalArrangement = Arrangement.spacedBy(11.dp)) {
                 AdminSectionTitle("Hasil terbaru", "Daftar nilai siswa")
                 OutlinedTextField(
-                    value = search, onValueChange = { search = it; visibleCount = 15 },
+                    value = search, onValueChange = { search = it; pagingActivated = false },
                     placeholder = { Text("Cari nama atau username") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
@@ -117,13 +130,13 @@ internal fun AdminMonitorScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     FilterChip(
                         selected = !onlyMissing,
-                        onClick = { onlyMissing = false; visibleCount = 15 },
+                        onClick = { onlyMissing = false; pagingActivated = false },
                         label = { Text("Semua", fontSize = 12.sp) }
                     )
                     Spacer(Modifier.width(8.dp))
                     FilterChip(
                         selected = onlyMissing,
-                        onClick = { onlyMissing = true; visibleCount = 15 },
+                        onClick = { onlyMissing = true; pagingActivated = false },
                         label = { Text("Belum mengerjakan", fontSize = 12.sp) }
                     )
                     Spacer(Modifier.weight(1f))
@@ -138,7 +151,7 @@ internal fun AdminMonitorScreen(
                 }
             }
         } else {
-            items(members.take(visibleCount), key = { it.username }) { student ->
+            items(visibleMembers, key = { it.username }) { student ->
                 val result = latest[student.username]
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically,
@@ -177,11 +190,32 @@ internal fun AdminMonitorScreen(
                     }
                 }
             }
-            if (members.size > visibleCount) {
-                item {
-                    TextButton(onClick = { visibleCount += 15 },
-                        modifier = Modifier.fillMaxWidth()) {
-                        Text("Muat 15 lagi", color = Navy, fontWeight = FontWeight.Bold)
+            item {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "Siswa ${activePage * pageSize + 1}–${activePage * pageSize + visibleMembers.size} dari ${members.size}",
+                        fontSize = 11.sp, color = Subtle
+                    )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            enabled = activePage > 0,
+                            onClick = { page = activePage - 1; pagingActivated = true },
+                            shape = RoundedCornerShape(12.dp)
+                        ) { Text("Sebelumnya", fontSize = 12.sp) }
+                        Text("${activePage + 1}/$pageCount",
+                            color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        OutlinedButton(
+                            enabled = activePage < pageCount - 1,
+                            onClick = { page = activePage + 1; pagingActivated = true },
+                            shape = RoundedCornerShape(12.dp)
+                        ) { Text("Berikutnya", fontSize = 12.sp) }
                     }
                 }
             }
