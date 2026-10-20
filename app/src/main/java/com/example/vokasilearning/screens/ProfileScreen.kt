@@ -130,7 +130,7 @@ internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () ->
                 StudentSectionHeading("KONSISTENSI", "Streak mingguan")
                 WhiteCard(Modifier.fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("🔥 $streak hari berturut-turut", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("$streak hari berturut-turut", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
                     }
                     Text("Aktivitas latihan 7 hari terakhir", color = Subtle, fontSize = 11.sp)
                     Row(
