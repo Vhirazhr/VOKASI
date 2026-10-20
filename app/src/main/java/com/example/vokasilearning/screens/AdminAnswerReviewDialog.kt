@@ -3,6 +3,7 @@ package com.example.vokasilearning.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,23 +14,44 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.model.AnswerStatus
 import com.example.vokasilearning.model.Attempt
+import com.example.vokasilearning.logic.AdminPagination
 import com.example.vokasilearning.ui.*
 
 /** Exactly ten answer rows at a time, even for 100-question sessions. */
 @Composable
-internal fun AdminAnswerReviewDialog(attempt: Attempt, onClose: () -> Unit) {
+internal fun AdminAnswerReviewDialog(
+    attempt: Attempt,
+    studentName: String,
+    classroom: String,
+    onClose: () -> Unit
+) {
     var page by remember(attempt.sessionKey) { mutableIntStateOf(0) }
     var onlyWrong by remember(attempt.sessionKey) { mutableStateOf(false) }
     val selected = attempt.review.withIndex().filter {
         !onlyWrong || it.value.status != AnswerStatus.BENAR
     }
-    val count = maxOf(1, (selected.size + 9) / 10)
-    val current = page.coerceIn(0, count - 1)
-    val visible = selected.drop(current * 10).take(10)
+    val count = AdminPagination.count(selected.size, 10)
+    val current = AdminPagination.active(page, selected.size, 10)
+    val visible = AdminPagination.slice(selected, current, 10)
+    val reviewListState = rememberLazyListState()
+    LaunchedEffect(current, onlyWrong, attempt.sessionKey) {
+        reviewListState.scrollToItem(0)
+    }
 
     AlertDialog(
         onDismissRequest = onClose,
-        title = { Text("Pembahasan Siswa", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp) },
+        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Pembahasan Siswa", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                Text(studentName.ifBlank { "Nama siswa tidak tersedia" },
+                    color = Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                    maxLines = 2)
+                Text(
+                    "${classroom.ifBlank { "Kelas tidak tersedia" }} • Nilai ${attempt.score}/100 • ${attempt.correct}/${attempt.questionCount} benar",
+                    color = Subtle, fontSize = 11.sp
+                )
+            }
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -47,6 +69,7 @@ internal fun AdminAnswerReviewDialog(attempt: Attempt, onClose: () -> Unit) {
                 Text("${selected.size} soal • ${current + 1}/$count", color = Subtle, fontSize = 11.sp)
                 LazyColumn(
                     Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                    state = reviewListState,
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     itemsIndexed(visible) { _, indexed ->
