@@ -24,7 +24,9 @@ internal fun AdminQuestionsScreen(
     questions: List<Question>,
     bundledIds: Set<Int>,
     onAdd: () -> Unit,
-    onDelete: (Int) -> Unit
+    onDelete: (Int) -> Boolean,
+    notice: String?,
+    onDismissNotice: () -> Unit
 ) {
     var category by remember { mutableStateOf("Semua") }
     var search by remember { mutableStateOf("") }
@@ -32,6 +34,7 @@ internal fun AdminQuestionsScreen(
     var pagingActivated by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     var deleteId by remember { mutableStateOf<Int?>(null) }
+    var localNotice by remember { mutableStateOf<String?>(null) }
     var expandedId by remember { mutableStateOf<Int?>(null) }
     val categories = listOf("Semua", "Perkalian", "Pembagian", "Penjumlahan", "Konversi Satuan")
     val found = questions.filter { q ->
@@ -198,11 +201,37 @@ internal fun AdminQuestionsScreen(
             title = { Text("Hapus soal tambahan?", fontWeight = FontWeight.ExtraBold) },
             text = { Text("Soal ini akan dihapus dari penyimpanan lokal.") },
             confirmButton = {
-                TextButton(onClick = { onDelete(id); deleteId = null; expandedId = null }) {
+                TextButton(onClick = {
+                    val success = onDelete(id)
+                    localNotice = if (success) "Soal tambahan berhasil dihapus."
+                        else "Soal gagal dihapus. Coba lagi."
+                    if (success) expandedId = null
+                    deleteId = null
+                }) {
                     Text("Hapus", color = Bad)
                 }
             },
             dismissButton = { TextButton(onClick = { deleteId = null }) { Text("Batal") } }
         )
     }
+    val alertText = localNotice ?: notice
+    if (alertText != null) {
+        AlertDialog(
+            onDismissRequest = {
+                localNotice = null
+                if (notice != null) onDismissNotice()
+            },
+            title = { Text(if (alertText.contains("berhasil", ignoreCase = true))
+                "Bank Soal Diperbarui" else "Tindakan Gagal",
+                fontWeight = FontWeight.ExtraBold) },
+            text = { Text(alertText) },
+            confirmButton = {
+                TextButton(onClick = {
+                    localNotice = null
+                    if (notice != null) onDismissNotice()
+                }) { Text("Oke", color = Navy, fontWeight = FontWeight.Bold) }
+            }
+        )
+    }
+
 }
