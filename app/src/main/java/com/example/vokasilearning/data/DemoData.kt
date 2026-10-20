@@ -1,6 +1,11 @@
 package com.example.vokasilearning.data
 
-import com.example.vokasilearning.domain.*
+import com.example.vokasilearning.*
+import com.example.vokasilearning.data.*
+import com.example.vokasilearning.logic.*
+import com.example.vokasilearning.model.*
+import com.example.vokasilearning.screens.*
+import com.example.vokasilearning.ui.*
 
 internal val demoClasses = listOf(
     Classroom("X TPM 1", "Teknik Pemesinan"),
