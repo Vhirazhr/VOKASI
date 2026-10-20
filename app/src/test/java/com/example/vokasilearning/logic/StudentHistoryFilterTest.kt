@@ -84,4 +84,36 @@ class StudentHistoryFilterTest {
             selection.copy(period = HistoryPeriod.THIS_MONTH), now
         ))
     }
+    @Test fun dateRangeInclusiveAndTypeFilterWorks() {
+        val before = attempt("2026-09-30 23:59")
+        val first = attempt("2026-10-01 00:00", "Perkalian")
+        val inside = attempt("2026-10-15 13:20")
+        val last = attempt("2026-10-20 23:59", "Pembagian")
+        val after = attempt("2026-10-21 00:01", "Perkalian")
+        val items = listOf(before, first, inside, last, after)
+        val selection = HistorySelection(
+            fromDate = "2026-10-01",
+            toDate = "2026-10-20"
+        )
+        assertEquals(listOf(last, inside, first),
+            StudentHistoryFilter.filter(items, selection))
+        assertEquals(listOf(last, first),
+            StudentHistoryFilter.filter(items, selection.copy(type = HistoryType.PRACTICE)))
+        assertEquals(listOf(inside),
+            StudentHistoryFilter.filter(items, selection.copy(type = HistoryType.REQUIRED)))
+    }
+
+    @Test fun openEndedDateRangesWork() {
+        val older = attempt("2025-12-31 23:00")
+        val middle = attempt("2026-01-01 12:00")
+        val newer = attempt("2026-10-21 08:00")
+        val all = listOf(older, middle, newer)
+        assertEquals(listOf(newer, middle), StudentHistoryFilter.filter(
+            all, HistorySelection(fromDate = "2026-01-01")
+        ))
+        assertEquals(listOf(middle, older), StudentHistoryFilter.filter(
+            all, HistorySelection(toDate = "2026-09-30")
+        ))
+    }
+
 }
