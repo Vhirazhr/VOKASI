@@ -80,8 +80,8 @@ internal fun VokasiApp(activity: ComponentActivity) {
     val me = students.firstOrNull { it.username == currentId }
 
     fun logout() { currentId = null; isAdmin = false; page = Page.LOGIN }
-    fun startQuiz() {
-        if (quizSession.start(questions.toList())) page = Page.QUIZ
+    fun startQuiz(category: String? = null) {
+        if (quizSession.start(questions.toList(), category)) page = Page.QUIZ
     }
     fun finishQuiz() {
         val student = students.firstOrNull { it.username == currentId } ?: return
@@ -90,7 +90,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
         attempts.add(attempt)
         LocalAttemptStore.save(activity, attempts.toList())
         currentAttempt = attempt
-        showResultPopup = true
+        showResultPopup = false
         page = Page.RESULT
     }
 
@@ -187,15 +187,17 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     )
                     Page.HOME -> if (me != null) StudentHome(
                         me, students.toList(), attempts.toList(), questions.size,
-                        onStart = { startQuiz() }, onRanking = { page = Page.LEADERBOARD }
+                        onStart = { startQuiz() }, onRanking = { page = Page.LEADERBOARD },
+                        onPractice = { category -> startQuiz(category) }
                     )
                     Page.QUIZ -> QuizScreen(
                         questions = quizSession.questions, index = quizSession.index,
                         selectedIndex = quizSession.selectedIndex,
                         seconds = quizSession.remainingSeconds,
                         totalSeconds = quizSession.totalRemainingSeconds,
+                        feedback = quizSession.feedback,
                         onPick = { selection -> quizSession.choose(selection) },
-                        onSubmit = { if (quizSession.submit()) finishQuiz() },
+                        onSubmit = { quizSession.submit() },
                         onQuit = { quitDialog = true }
                     )
                     Page.RESULT -> if (me != null && currentAttempt != null) ResultPage(
@@ -203,7 +205,8 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         onRanking = { showResultPopup = false; page = Page.LEADERBOARD }
                     )
                     Page.LEADERBOARD -> if (me != null) LeaderboardScreen(me, students.toList(), attempts.toList())
-                    Page.PROFILE -> if (me != null) ProfileScreen(me, attempts.toList(), onLogout = { logout() })
+                    Page.PROFILE -> if (me != null) ProfileScreen(me, attempts.toList(), onLogout = { logout() },
+                        onReview = { attempt -> currentAttempt = attempt; page = Page.RESULT })
                     Page.ADMIN_HOME -> AdminHome(
                         students.toList(), questions.toList(), attempts.toList(),
                         onQuestions = { page = Page.ADMIN_QUESTIONS }, onMonitoring = { page = Page.ADMIN_MONITOR },
