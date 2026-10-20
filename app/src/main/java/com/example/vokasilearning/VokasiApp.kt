@@ -285,15 +285,50 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         students = students.toList(), attempts = attempts.toList()
                     )
                     Page.ADMIN_QUESTIONS -> AdminQuestionsScreen(
-                        questions.toList(), onAdd = { page = Page.ADMIN_ADD },
-                        onDelete = { id -> questions.removeAll { it.id == id } }
+                        questions = questions.toList(), bundledIds = bundledIds,
+                        onAdd = { page = Page.ADMIN_ADD },
+                        onDelete = { id ->
+                            if (id !in bundledIds) {
+                                val removed = questions.firstOrNull { it.id == id }
+                                if (removed != null) {
+                                    questions.remove(removed)
+                                    try {
+                                        LocalAdminQuestionStore.save(
+                                            activity, questions.filter { it.id !in bundledIds }
+                                        )
+                                    } catch (_: Exception) {
+                                        questions.add(removed)
+                                    }
+                                }
+                            }
+                        }
                     )
                     Page.ADMIN_ADD -> AdminAddQuestionScreen(
                         onBack = { page = Page.ADMIN_QUESTIONS },
-                        onSave = { cat, prm, opts, corr ->
-                            val id = (questions.maxOfOrNull { it.id } ?: 0) + 1
-                            questions.add(Question(id, cat, prm, opts, corr))
-                            page = Page.ADMIN_QUESTIONS
+                        onSave = { category, prompt, options, correct, difficulty, explanation ->
+                            val seconds = BankPolicy.secondsByCode[difficulty]
+                            if (seconds == null || correct !in options.indices) {
+                                false
+                            } else {
+                                val id = (questions.maxOfOrNull { it.id } ?: 0) + 1
+                                val newQuestion = Question(
+                                    id = id, category = category, question = prompt,
+                                    options = options, answerIndex = correct,
+                                    difficultyCode = difficulty, timeLimitSeconds = seconds,
+                                    explanation = explanation, correctAnswer = options[correct]
+                                )
+                                try {
+                                    BankPolicy.validateBank(questions.toList() + newQuestion,
+                                        requireExactly500 = false)
+                                    LocalAdminQuestionStore.save(activity,
+                                        questions.filter { it.id !in bundledIds } + newQuestion)
+                                    questions.add(newQuestion)
+                                    page = Page.ADMIN_QUESTIONS
+                                    true
+                                } catch (_: Exception) {
+                                    false
+                                }
+                            }
                         }
                     )
                     Page.ADMIN_MONITOR -> AdminMonitorScreen(students.toList(), attempts.toList())
