@@ -19,7 +19,7 @@ import com.example.vokasilearning.ui.*
 internal fun AdminLogScreen(events: List<AdminLogEvent>, onBack: () -> Unit) {
     var type by remember { mutableStateOf("Semua") }
     var page by remember(type) { mutableIntStateOf(0) }
-    val types = listOf("Semua", "Masuk", "Soal", "Laporan", "Profil")
+    val types = listOf("Semua", "Masuk", "Nilai", "Soal", "Laporan", "Profil")
     val selected = events.filter { type == "Semua" || it.type == type }
         .sortedByDescending { it.timestamp }
     val pages = maxOf(1, (selected.size + 9) / 10)
