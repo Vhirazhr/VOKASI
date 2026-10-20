@@ -60,4 +60,26 @@ class AdminAnalyticsTest {
         assertEquals(listOf("X TE 1", "X TPM 1"), overview.map { it.classroom })
         assertEquals(listOf(1, 2), overview.map { it.studentCount })
     }
+    @Test fun duplicateClassLabelsFromDifferentMajorsAreNeverCombined() {
+        val a = Student("ti", "demo", "Tina", Classroom("X 1", "Teknik Industri"))
+        val b = Student("ak", "demo", "Andra", Classroom("X 1", "Akuntansi"))
+        val dated = listOf(
+            attempt("ti", "2026-10-21 09:00", 90),
+            attempt("ak", "2026-10-21 10:00", 50),
+            attempt("ak", "2026-10-21 11:00", 100, "Perkalian")
+        )
+        val classes = AdminAnalytics.allClasses(listOf(a, b), dated, "2026-10-21")
+        assertEquals(2, classes.size)
+        val industrial = classes.single { it.major == "Teknik Industri" }
+        val accounting = classes.single { it.major == "Akuntansi" }
+        assertEquals(1, industrial.studentCount)
+        assertEquals(90, industrial.averageScore)
+        assertEquals(1, accounting.studentCount)
+        assertEquals(50, accounting.averageScore)
+        assertEquals(1, accounting.sessions)
+        assertEquals(50, AdminAnalytics.classSummary(
+            "X 1", listOf(a, b), dated, "2026-10-21", major = "Akuntansi"
+        ).averageScore)
+    }
+
 }
