@@ -53,7 +53,8 @@ internal object LocalAttemptStore {
                     earnedXp = item.getInt("earnedXp"),
                     secondsSpent = item.getInt("secondsSpent"),
                     review = review,
-                    sessionKey = item.optString("sessionKey", "")
+                    sessionKey = item.optString("sessionKey", ""),
+                    practiceCategory = if (item.isNull("practiceCategory") || !item.has("practiceCategory")) null else item.getString("practiceCategory")
                 )
             }
         }
@@ -77,6 +78,7 @@ internal object LocalAttemptStore {
                 .put("earnedXp", item.earnedXp)
                 .put("secondsSpent", item.secondsSpent)
                 .put("sessionKey", item.sessionKey)
+                .put("practiceCategory", item.practiceCategory ?: JSONObject.NULL)
             val reviews = JSONArray()
             item.review.forEach { record ->
                 val q = record.question
