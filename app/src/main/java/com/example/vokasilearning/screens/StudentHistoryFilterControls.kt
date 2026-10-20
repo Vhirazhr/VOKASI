@@ -159,8 +159,9 @@ internal fun StudentHistoryFilterControls(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = {
-                        draft = applied.copy(type = HistoryType.ALL, period = HistoryPeriod.ALL)
-                        onApply(draft)
+                        val reset = applied.copy(type = HistoryType.ALL, period = HistoryPeriod.ALL)
+                        draft = reset
+                        onApply(reset)
                         expanded = false
                     }) { Text("Reset", color = Subtle) }
                     Spacer(Modifier.width(8.dp))
