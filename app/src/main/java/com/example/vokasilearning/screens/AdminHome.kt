@@ -45,6 +45,7 @@ internal fun AdminHome(
     val byMajor = allClasses.groupBy { it.major }.toSortedMap()
     val classGrades = classMembers.mapNotNull { byStudent[it.username]?.score }
     val classStrong = classGrades.count { it >= 75 }
+    val classMiddle = classGrades.count { it in 60..74 }
     val classPracticeNeeded = classGrades.count { it < 60 }
     val majorClasses = byMajor[major].orEmpty()
     val majorStudents = students.filter { it.classroom.major == major }
@@ -188,9 +189,9 @@ internal fun AdminHome(
                         color = Good, trackColor = PaleGreen
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AdminStatChip("Nilai ≥75", "$classStrong", Good, Modifier.weight(1f))
-                        AdminStatChip("Nilai <60", "$classPracticeNeeded", Bad, Modifier.weight(1f))
-                        AdminStatChip("Belum", "${summary.missingCount}", Warning, Modifier.weight(1f))
+                        AdminStatChip("75–100", "$classStrong", Good, Modifier.weight(1f))
+                        AdminStatChip("60–74", "$classMiddle", Warning, Modifier.weight(1f))
+                        AdminStatChip("0–59", "$classPracticeNeeded", Bad, Modifier.weight(1f))
                     }
                     Text(
                         "Distribusi memakai nilai wajib terbaru per siswa pada $date.",
