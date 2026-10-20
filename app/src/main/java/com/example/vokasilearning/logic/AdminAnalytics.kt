@@ -3,15 +3,16 @@ package com.example.vokasilearning.logic
 import com.example.vokasilearning.model.Attempt
 import com.example.vokasilearning.model.Student
 
-/** Local-only school admin metrics. Optional subject drills never become compulsory grades. */
+/** Aggregate compulsory submissions, never optional 10-question drills. */
 internal data class ClassDailySummary(
     val classroom: String,
     val studentCount: Int,
     val completedCount: Int,
     val averageScore: Int?,
-    val sessions: Int
+    val sessions: Int,
+    val major: String = ""
 ) {
-    val missingCount: Int get() = studentCount - completedCount
+    val missingCount: Int get() = (studentCount - completedCount).coerceAtLeast(0)
 }
 
 internal object AdminAnalytics {
@@ -30,26 +31,30 @@ internal object AdminAnalytics {
         classroom: String,
         students: List<Student>,
         attempts: List<Attempt>,
-        date: String
+        date: String,
+        major: String? = null
     ): ClassDailySummary {
-        val members = students.filter { it.classroom.label == classroom }
-        val completed = latestCompulsoryByStudent(attempts, date)
-            .filterKeys { id -> members.any { it.username == id } }
+        val members = students.filter {
+            it.classroom.label == classroom && (major == null || it.classroom.major == major)
+        }
+        val ids = members.mapTo(HashSet()) { it.username }
+        val latest = latestCompulsoryByStudent(attempts, date).filterKeys { it in ids }
         return ClassDailySummary(
             classroom = classroom,
             studentCount = members.size,
-            completedCount = completed.size,
-            averageScore = completed.values.takeIf { it.isNotEmpty() }
-                ?.let { records -> records.sumOf { it.score } / records.size },
-            sessions = compulsoryOnDate(attempts, date).count { session ->
-                members.any { it.username == session.studentId }
-            }
+            completedCount = latest.size,
+            averageScore = latest.values.takeIf { it.isNotEmpty() }
+                ?.let { results -> results.sumOf { it.score } / results.size },
+            sessions = compulsoryOnDate(attempts, date).count { it.studentId in ids },
+            major = major ?: members.firstOrNull()?.classroom?.major.orEmpty()
         )
     }
 
     fun allClasses(
         students: List<Student>, attempts: List<Attempt>, date: String
     ): List<ClassDailySummary> =
-        students.map { it.classroom.label }.distinct().sorted()
-            .map { classSummary(it, students, attempts, date) }
+        students.map { it.classroom.major to it.classroom.label }
+            .distinct()
+            .sortedWith(compareBy<Pair<String, String>> { it.first }.thenBy { it.second })
+            .map { (major, classroom) -> classSummary(classroom, students, attempts, date, major) }
 }
