@@ -23,7 +23,7 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" --channel=3 "platforms;android-37.0" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v4
-      - name: Unit tests and debug APK
+      - name: Unit tests, debug APK, and UI-test APK compilation
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest assembleDebug --no-configuration-cache
+          ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest --no-configuration-cache
