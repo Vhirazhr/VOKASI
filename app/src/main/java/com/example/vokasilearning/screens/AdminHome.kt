@@ -22,7 +22,7 @@ import com.example.vokasilearning.ui.*
 internal fun AdminHome(
     students: List<Student>, questions: List<Question>, attempts: List<Attempt>,
     onStudents: () -> Unit,
-    onMonitoring: (String, String) -> Unit,
+    onMonitoring: (String, String, String) -> Unit,
     onLogout: () -> Unit
 ) {
     val majors = students.map { it.classroom.major }.distinct().sorted()
@@ -100,7 +100,7 @@ internal fun AdminHome(
                         )
                         VokasiButton(
                             text = "Lihat Hasil Siswa",
-                            onClick = { onMonitoring(major, classroom) },
+                            onClick = { onMonitoring(major, classroom, date) },
                             enabled = classroom.isNotBlank(),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -150,7 +150,7 @@ internal fun AdminHome(
                         }
                     }
                     TextButton(
-                        onClick = { onMonitoring(major, classroom) },
+                        onClick = { onMonitoring(major, classroom, date) },
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("Lihat semua nilai", color = Navy, fontWeight = FontWeight.Bold) }
                 }
@@ -201,7 +201,7 @@ internal fun AdminHome(
                                         color = Subtle, fontSize = 11.sp)
                                 }
                                 TextButton(
-                                    onClick = { onMonitoring(majorName, cls.classroom) }
+                                    onClick = { onMonitoring(majorName, cls.classroom, date) }
                                 ) { Text("Nilai", color = Navy, fontSize = 12.sp) }
                             }
                         }
