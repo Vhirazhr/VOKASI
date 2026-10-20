@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -26,8 +27,29 @@ import java.util.Calendar
 import kotlin.math.max
 
 @Composable
-internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () -> Unit, onReview: (Attempt) -> Unit, onAllHistory: () -> Unit) {
+internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () -> Unit, onReview: (Attempt) -> Unit) {
     val mine = attempts.filter { it.studentId == me.username }.sortedByDescending { it.timeMillis }
+    val wibToday = wibCalendar()
+    val initialHistorySelection = remember(me.username) {
+        HistorySelection(
+            date = dayKey(System.currentTimeMillis()),
+            month = wibToday.get(Calendar.MONTH) + 1,
+            year = wibToday.get(Calendar.YEAR)
+        )
+    }
+    var historySelection by remember(me.username) { mutableStateOf(initialHistorySelection) }
+    var historyShown by remember(me.username) { mutableIntStateOf(5) }
+    val filteredHistory = StudentHistoryFilter.filter(mine, historySelection)
+    val shownHistory = filteredHistory.take(historyShown)
+    val historyYears = (
+        mine.map { dayKey(it.timeMillis).take(4).toInt() } +
+            wibToday.get(Calendar.YEAR)
+        ).distinct().sortedDescending()
+    val historyDateFormat = remember {
+        java.text.SimpleDateFormat("dd MMM yyyy • HH:mm", java.util.Locale("id", "ID")).apply {
+            timeZone = java.util.TimeZone.getTimeZone("Asia/Jakarta")
+        }
+    }
     val totalXp = lifetimeXp(me, attempts)
     val seasonXp = studentSeasonXp(me, attempts)
     val level = levelFor(totalXp)
@@ -189,32 +211,50 @@ internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () ->
             }
         }
         item {
-            StudentSectionHeading(
-                "AKTIVITAS",
-                "Riwayat nilai",
-                Modifier.padding(horizontal = 18.dp)
+            StudentHistoryFilterControls(
+                applied = historySelection,
+                availableYears = historyYears,
+                onApply = { selection ->
+                    historySelection = selection
+                    historyShown = 5
+                }
             )
         }
-        if (mine.isEmpty()) {
+        item {
+            Text(
+                "${filteredHistory.size} sesi • Terbaru lebih dulu",
+                color = Subtle, fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 18.dp)
+            )
+        }
+        if (shownHistory.isEmpty()) {
             item {
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                    Text("Belum ada latihan yang diselesaikan.", color = Subtle, fontSize = 13.sp)
-                    Text("Selesaikan sesi latihan agar nilai dan XP muncul di sini.", color = Subtle, fontSize = 11.sp)
+                    Text(
+                        if (mine.isEmpty()) "Belum ada riwayat latihan."
+                        else "Tidak ada riwayat untuk filter ini.",
+                        color = Subtle, fontSize = 13.sp
+                    )
                 }
             }
         } else {
-            items(mine.take(5), key = { it.signature + "_" + it.timeMillis }) { attempt ->
+            itemsIndexed(shownHistory, key = { position, attempt ->
+                attempt.sessionKey.ifBlank { "${attempt.signature}_${attempt.timeMillis}_$position" }
+            }) { _, attempt ->
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(attempt.practiceCategory?.let { "Latihan $it" } ?: "Latihan Wajib", color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             Text(
-                                "${dayKey(attempt.timeMillis)} • ${attempt.correct}/${attempt.questionCount} benar",
+                                attempt.practiceCategory?.let { "Latihan $it" } ?: "Latihan Wajib",
+                                color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "${historyDateFormat.format(java.util.Date(attempt.timeMillis))} WIB • ${attempt.correct}/${attempt.questionCount} benar",
                                 color = Subtle, fontSize = 11.sp
                             )
                         }
                         Pill(
-                            "${attempt.score}%  •  +${attempt.earnedXp} XP",
+                            "${attempt.score}%",
                             when {
                                 attempt.score >= 90 -> PaleGreen
                                 attempt.score >= 75 -> PaleBlue
@@ -230,24 +270,22 @@ internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () ->
                         )
                     }
                     TextButton(onClick = { onReview(attempt) }) {
-                        Text("Lihat jawaban dan pembahasan →", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("Lihat Hasil →", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
             }
-        }
-        if (mine.size > 5) {
-            item {
-                TextButton(
-                    onClick = onAllHistory,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
-                ) { Text("Lihat semua ${mine.size} riwayat →", color = Navy, fontWeight = FontWeight.Bold) }
-            }
-        } else if (mine.isNotEmpty()) {
-            item {
-                TextButton(
-                    onClick = onAllHistory,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
-                ) { Text("Filter riwayat →", color = Navy, fontWeight = FontWeight.Bold) }
+            if (historyShown < filteredHistory.size) {
+                item {
+                    TextButton(
+                        onClick = { historyShown += 5 },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
+                    ) {
+                        Text(
+                            "Muat 5 lagi (${filteredHistory.size - shownHistory.size} tersisa)",
+                            color = Navy, fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
         }
         item {
