@@ -1,39 +1,19 @@
 package com.example.vokasilearning.screens
 
 import android.graphics.BitmapFactory
-import android.os.Bundle
-import android.view.WindowManager
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -41,25 +21,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import kotlinx.coroutines.delay
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
-import kotlin.math.max
-import com.example.vokasilearning.*
-import com.example.vokasilearning.data.*
-import com.example.vokasilearning.logic.*
-import com.example.vokasilearning.model.*
-import com.example.vokasilearning.screens.*
+import com.example.vokasilearning.data.demoClasses
+import com.example.vokasilearning.model.Classroom
 import com.example.vokasilearning.ui.*
 
 @Composable
@@ -71,63 +38,148 @@ internal fun RegisterScreen(
     var name by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var joinCode by remember { mutableStateOf("") }
-    var chosen by remember { mutableStateOf(demoClasses.first()) }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var selectedMajor by remember { mutableStateOf(demoClasses.first().major) }
+    var selectedClass by remember { mutableStateOf(demoClasses.first()) }
+    var majorMenu by remember { mutableStateOf(false) }
+    var classMenu by remember { mutableStateOf(false) }
     var image by remember { mutableStateOf<ImageBitmap?>(null) }
-    var openClasses by remember { mutableStateOf(false) }
     var duplicate by remember { mutableStateOf(false) }
 
-    val chooser = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val majors = remember { demoClasses.map { it.major }.distinct().sorted() }
+    val availableClasses = demoClasses.filter { it.major == selectedMajor }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
             try {
-                val bitmap = context.contentResolver.openInputStream(it)?.use { stream -> BitmapFactory.decodeStream(stream) }
+                val bitmap = context.contentResolver.openInputStream(it)?.use { stream ->
+                    BitmapFactory.decodeStream(stream)
+                }
                 if (bitmap != null) image = bitmap.asImageBitmap()
             } catch (_: Exception) { }
         }
     }
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { TextButton(onClick = onBack) { Text("‹ Kembali ke login", color = Navy) } }
-        item { VokasiTitle("Daftar siswa", "Isi identitas singkat untuk mengatur kelas dan peringkatmu.") }
-
+    LazyColumn(
+        Modifier.fillMaxSize().background(Color.White),
+        contentPadding = PaddingValues(bottom = 30.dp)
+    ) {
+        item { AuthHero("Daftar Siswa", "Lengkapi akun dan identitas kelasmu.") }
         item {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (image == null) Avatar(null, 72.dp) else Image(image!!, null, Modifier.size(72.dp).clip(CircleShape), contentScale = ContentScale.Crop)
-                Column {
-                    Text("Foto profil (opsional)", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    TextButton(onClick = { chooser.launch("image/*") }) { Text("Pilih dari galeri", color = Navy) }
+            Column(
+                Modifier.fillMaxWidth().offset(y = (-18).dp)
+                    .background(Color.White, RoundedCornerShape(topStart = 25.dp, topEnd = 25.dp))
+                    .padding(horizontal = 22.dp, vertical = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                TextButton(onClick = onBack, contentPadding = PaddingValues(0.dp)) {
+                    Text("‹ Kembali ke Login", color = Navy, fontSize = 12.sp)
                 }
-            }
-        }
-
-        item { OutlinedTextField(name, { name = it }, label = { Text("Nama lengkap") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) }
-        item { OutlinedTextField(username, { username = it.trim() }, label = { Text("Username") }, supportingText = { Text("Tanpa spasi, minimal 3 karakter") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) }
-        item { OutlinedTextField(password, { password = it }, label = { Text("Password (min. 6 karakter)") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) }
-
-        item {
-            Text("Jurusan & kelas (contoh)", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Box {
-                OutlinedButton(onClick = { openClasses = true }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(12.dp)) {
-                    Text("${chosen.label} • ${chosen.major}", maxLines = 1, overflow = TextOverflow.Ellipsis, color = Ink)
-                }
-                DropdownMenu(expanded = openClasses, onDismissRequest = { openClasses = false }) {
-                    demoClasses.forEach { classroom ->
-                        DropdownMenuItem(text = { Text("${classroom.label} — ${classroom.major}") }, onClick = { chosen = classroom; openClasses = false })
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (image == null) Avatar(null, 62.dp)
+                    else Image(
+                        image!!, contentDescription = "Foto profil",
+                        modifier = Modifier.size(62.dp).clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                    Column {
+                        Text("Foto profil", color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        TextButton(onClick = { photoPicker.launch("image/*") },
+                            contentPadding = PaddingValues(0.dp)) {
+                            Text(if (image == null) "Tambah foto (opsional)" else "Ganti foto",
+                                color = Navy, fontSize = 12.sp)
+                        }
                     }
                 }
+                Text("Nama lengkap", color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                OutlinedTextField(
+                    value = name, onValueChange = { name = it; duplicate = false },
+                    placeholder = { Text("Nama sesuai identitas") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    shape = RoundedCornerShape(13.dp), colors = authFieldColors()
+                )
+                Text("Username", color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it.trim(); duplicate = false },
+                    placeholder = { Text("Minimal 3 karakter") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    shape = RoundedCornerShape(13.dp), colors = authFieldColors()
+                )
+                Text("Password", color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                OutlinedTextField(
+                    value = password, onValueChange = { password = it; duplicate = false },
+                    placeholder = { Text("Minimal 6 karakter") },
+                    visualTransformation = if (passwordVisible) VisualTransformation.None
+                        else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            PasswordEyeIcon(passwordVisible)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    shape = RoundedCornerShape(13.dp), colors = authFieldColors()
+                )
+                HorizontalDivider(color = Border)
+                Text("Jurusan", color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Box(Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { majorMenu = true },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                        shape = RoundedCornerShape(13.dp),
+                        contentPadding = PaddingValues(horizontal = 13.dp)
+                    ) {
+                        Text(selectedMajor, modifier = Modifier.weight(1f),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, color = Ink)
+                        Text("⌄", color = Navy)
+                    }
+                    DropdownMenu(
+                        expanded = majorMenu,
+                        onDismissRequest = { majorMenu = false }
+                    ) {
+                        majors.forEach { major ->
+                            DropdownMenuItem(text = { Text(major) }, onClick = {
+                                selectedMajor = major
+                                selectedClass = demoClasses.first { it.major == major }
+                                majorMenu = false
+                            })
+                        }
+                    }
+                }
+                Text("Kelas", color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Box(Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { classMenu = true },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(13.dp),
+                        contentPadding = PaddingValues(horizontal = 13.dp)
+                    ) {
+                        Text(selectedClass.label, modifier = Modifier.weight(1f), color = Ink)
+                        Text("⌄", color = Navy)
+                    }
+                    DropdownMenu(
+                        expanded = classMenu,
+                        onDismissRequest = { classMenu = false }
+                    ) {
+                        availableClasses.forEach { classroom ->
+                            DropdownMenuItem(
+                                text = { Text(classroom.label) },
+                                onClick = { selectedClass = classroom; classMenu = false }
+                            )
+                        }
+                    }
+                }
+                if (duplicate) Text("Username sudah digunakan.", color = Bad, fontSize = 12.sp)
+                Spacer(Modifier.height(3.dp))
+                VokasiButton(
+                    text = "Daftar",
+                    onClick = { duplicate = !onRegister(name.trim(), username.trim(), password, selectedClass, image) },
+                    enabled = name.isNotBlank() &&
+                        username.matches(Regex("[A-Za-z0-9._]{3,}")) &&
+                        password.length >= 6,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-        }
-        item { OutlinedTextField(joinCode, { joinCode = it }, label = { Text("Kode kelas (opsional)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) }
-
-        if (duplicate) item { Text("Username sudah dipakai.", color = Bad, fontSize = 13.sp) }
-
-        item {
-            VokasiButton(
-                text = "Buat Akun & Masuk",
-                onClick = { duplicate = !onRegister(name.trim(), username.trim(), password, chosen, image) },
-                enabled = name.trim().isNotEmpty() && username.matches(Regex("[A-Za-z0-9._]{3,}")) && password.length >= 6,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 }
