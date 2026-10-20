@@ -202,19 +202,25 @@ internal fun VokasiApp(activity: ComponentActivity) {
             ) { targetPage ->
                 when (targetPage) {
                     Page.LOGIN -> LoginScreen(
-                        onStudentLogin = { u, p ->
-                            val found = students.firstOrNull { it.username.equals(u.trim(), true) && it.password == p }
-                            if (found != null) {
-                                currentId = found.username
-                                isAdmin = false
-                                page = if (restoreQuiz(found.username)) Page.QUIZ else Page.HOME
+                        onLogin = { u, p ->
+                            val username = u.trim()
+                            // Demo-only role detection. Production authentication must be server-side.
+                            if (username == "admin.demo" && p == "admin123") {
+                                currentId = null
+                                isAdmin = true
+                                page = Page.ADMIN_HOME
                                 true
-                            } else false
-                        },
-                        onAdminLogin = { u, p ->
-                            val good = u.trim() == "admin.demo" && p == "admin123"
-                            if (good) { currentId = null; isAdmin = true; page = Page.ADMIN_HOME }
-                            good
+                            } else {
+                                val found = students.firstOrNull {
+                                    it.username.equals(username, true) && it.password == p
+                                }
+                                if (found != null) {
+                                    currentId = found.username
+                                    isAdmin = false
+                                    page = if (restoreQuiz(found.username)) Page.QUIZ else Page.HOME
+                                    true
+                                } else false
+                            }
                         },
                         onRegister = { page = Page.REGISTER }
                     )
