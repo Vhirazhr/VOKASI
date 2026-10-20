@@ -1,0 +1,248 @@
+package com.example.vokasilearning.app
+
+import android.graphics.BitmapFactory
+import android.os.Bundle
+import android.view.WindowManager
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
+import kotlin.math.max
+import com.example.vokasilearning.app.*
+import com.example.vokasilearning.navigation.*
+import com.example.vokasilearning.domain.*
+import com.example.vokasilearning.data.*
+import com.example.vokasilearning.features.auth.*
+import com.example.vokasilearning.features.student.*
+import com.example.vokasilearning.features.admin.*
+import com.example.vokasilearning.ui.components.*
+import com.example.vokasilearning.ui.theme.*
+import com.example.vokasilearning.ui.adaptive.*
+import com.example.vokasilearning.ui.security.*
+
+@Composable
+internal fun VokasiApp(activity: ComponentActivity) {
+    val students = remember { mutableStateListOf<Student>().apply { addAll(initialStudents()) } }
+    val questions = remember { mutableStateListOf<Question>().apply { addAll(initialQuestions()) } }
+    val attempts = remember { mutableStateListOf<Attempt>() }
+
+    var page by remember { mutableStateOf(Page.LOGIN) }
+    var currentId by remember { mutableStateOf<String?>(null) }
+    var isAdmin by remember { mutableStateOf(false) }
+
+    val quizSession = rememberQuizSession()
+
+    var currentAttempt by remember { mutableStateOf<Attempt?>(null) }
+    var showResultPopup by remember { mutableStateOf(false) }
+    var quitDialog by remember { mutableStateOf(false) }
+    val me = students.firstOrNull { it.username == currentId }
+
+    fun logout() { currentId = null; isAdmin = false; page = Page.LOGIN }
+    fun startQuiz() {
+        if (quizSession.start(questions.toList())) page = Page.QUIZ
+    }
+    fun finishQuiz() {
+        val student = students.firstOrNull { it.username == currentId } ?: return
+        if (page != Page.QUIZ) return
+        val attempt = quizSession.finish(student, attempts.toList())
+        attempts.add(attempt)
+        currentAttempt = attempt
+        showResultPopup = true
+        page = Page.RESULT
+    }
+
+    QuizScreenProtection(activity = activity, enabled = page == Page.QUIZ)
+
+    LaunchedEffect(page, quizSession.sessionId) {
+        if (page == Page.QUIZ) {
+            while (page == Page.QUIZ && quizSession.remainingSeconds > 0) {
+                delay(1000L)
+                if (page == Page.QUIZ) quizSession.remainingSeconds--
+            }
+            if (page == Page.QUIZ && quizSession.remainingSeconds <= 0) finishQuiz()
+        }
+    }
+
+    BackHandler(enabled = page == Page.QUIZ) { quitDialog = true }
+    BackHandler(enabled = page != Page.LOGIN && page != Page.QUIZ && page != Page.HOME && page != Page.ADMIN_HOME) {
+        page = when (page) {
+            Page.REGISTER -> Page.LOGIN
+            Page.ADMIN_ADD -> Page.ADMIN_QUESTIONS
+            else -> if (isAdmin) Page.ADMIN_HOME else Page.HOME
+        }
+    }
+
+    if (quitDialog) {
+        AlertDialog(
+            onDismissRequest = { quitDialog = false },
+            title = { Text("Keluar dari latihan?", fontWeight = FontWeight.Bold) },
+            text = { Text("Jawaban sesi ini tidak dinilai dan XP tidak akan diberikan.") },
+            confirmButton = { TextButton(onClick = { quitDialog = false; page = Page.HOME }) { Text("Keluar", color = Bad) } },
+            dismissButton = { TextButton(onClick = { quitDialog = false }) { Text("Lanjut") } }
+        )
+    }
+
+    val studentTabs = page == Page.HOME || page == Page.LEADERBOARD || page == Page.PROFILE
+    val adminTabs = page == Page.ADMIN_HOME || page == Page.ADMIN_QUESTIONS || page == Page.ADMIN_MONITOR
+
+    AdaptiveAppFrame {
+    Scaffold(
+        containerColor = Canvas,
+        bottomBar = {
+            AnimatedVisibility(
+                visible = studentTabs || adminTabs,
+                enter = slideInVertically(initialOffsetY = { it }),
+                exit = slideOutVertically(targetOffsetY = { it })
+            ) {
+                if (studentTabs) {
+                    VokasiBottomNav(
+                        items = listOf(Triple(Page.HOME, "Beranda", "⌂"), Triple(Page.LEADERBOARD, "Peringkat", "🏆"), Triple(Page.PROFILE, "Profil", "◉")),
+                        currentPage = page,
+                        onNavigate = { page = it }
+                    )
+                } else if (adminTabs) {
+                    VokasiBottomNav(
+                        items = listOf(Triple(Page.ADMIN_HOME, "Ringkasan", "⌂"), Triple(Page.ADMIN_QUESTIONS, "Soal", "▤"), Triple(Page.ADMIN_MONITOR, "Monitoring", "◫")),
+                        currentPage = page,
+                        onNavigate = { page = it }
+                    )
+                }
+            }
+        }
+    ) { scaffoldPadding ->
+        Box(Modifier.fillMaxSize().padding(scaffoldPadding)) {
+            // Animated Screen Transitions
+            AnimatedContent(
+                targetState = page,
+                transitionSpec = {
+                    (fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { it / 10 }))
+                        .togetherWith(fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -it / 10 }))
+                },
+                label = "ScreenTransition"
+            ) { targetPage ->
+                when (targetPage) {
+                    Page.LOGIN -> LoginScreen(
+                        onStudentLogin = { u, p ->
+                            val found = students.firstOrNull { it.username.equals(u.trim(), true) && it.password == p }
+                            if (found != null) { currentId = found.username; isAdmin = false; page = Page.HOME; true } else false
+                        },
+                        onAdminLogin = { u, p ->
+                            val good = u.trim() == "admin.demo" && p == "admin123"
+                            if (good) { currentId = null; isAdmin = true; page = Page.ADMIN_HOME }
+                            good
+                        },
+                        onRegister = { page = Page.REGISTER }
+                    )
+                    Page.REGISTER -> RegisterScreen(
+                        onBack = { page = Page.LOGIN },
+                        onRegister = { n, u, p, c, ph ->
+                            if (students.any { it.username.equals(u, true) }) false else {
+                                students.add(Student(u, p, n, c, ph))
+                                currentId = u; isAdmin = false; page = Page.HOME; true
+                            }
+                        }
+                    )
+                    Page.HOME -> if (me != null) StudentHome(
+                        me, students.toList(), attempts.toList(), questions.size,
+                        onStart = { startQuiz() }, onRanking = { page = Page.LEADERBOARD }
+                    )
+                    Page.QUIZ -> QuizScreen(
+                        questions = quizSession.questions, index = quizSession.index, quizSession.answers = quizSession.answers,
+                        seconds = quizSession.remainingSeconds, onPick = { id, selection -> quizSession.answers[id] = selection },
+                        onNext = { if (quizSession.index < quizSession.questions.lastIndex) quizSession.index++ },
+                        onPrevious = { if (quizSession.index > 0) quizSession.index-- },
+                        onFinish = { finishQuiz() }, onQuit = { quitDialog = true }
+                    )
+                    Page.RESULT -> if (me != null && currentAttempt != null) ResultPage(
+                        currentAttempt!!, onHome = { showResultPopup = false; page = Page.HOME },
+                        onRanking = { showResultPopup = false; page = Page.LEADERBOARD }
+                    )
+                    Page.LEADERBOARD -> if (me != null) LeaderboardScreen(me, students.toList(), attempts.toList())
+                    Page.PROFILE -> if (me != null) ProfileScreen(me, attempts.toList(), onLogout = { logout() })
+                    Page.ADMIN_HOME -> AdminHome(
+                        students.toList(), questions.toList(), attempts.toList(),
+                        onQuestions = { page = Page.ADMIN_QUESTIONS }, onMonitoring = { page = Page.ADMIN_MONITOR },
+                        onLogout = { logout() }
+                    )
+                    Page.ADMIN_QUESTIONS -> AdminQuestionsScreen(
+                        questions.toList(), onAdd = { page = Page.ADMIN_ADD },
+                        onDelete = { id -> questions.removeAll { it.id == id } }
+                    )
+                    Page.ADMIN_ADD -> AdminAddQuestionScreen(
+                        onBack = { page = Page.ADMIN_QUESTIONS },
+                        onSave = { cat, prm, opts, corr ->
+                            val id = (questions.maxOfOrNull { it.id } ?: 0) + 1
+                            questions.add(Question(id, cat, prm, opts, corr))
+                            page = Page.ADMIN_QUESTIONS
+                        }
+                    )
+                    Page.ADMIN_MONITOR -> AdminMonitorScreen(students.toList(), attempts.toList())
+                }
+            }
+        }
+    }
+
+    }
+
+    // Result Popup Overlay
+    AnimatedVisibility(
+        visible = showResultPopup && me != null && currentAttempt != null,
+        enter = fadeIn() + scaleIn(initialScale = 0.9f),
+        exit = fadeOut() + scaleOut(targetScale = 0.9f)
+    ) {
+        if (me != null && currentAttempt != null) {
+            ResultPopup(
+                me, students.toList(), attempts.toList(), currentAttempt!!,
+                onClose = { showResultPopup = false; page = Page.HOME },
+                onAllRanking = { showResultPopup = false; page = Page.LEADERBOARD }
+            )
+        }
+    }
+}
