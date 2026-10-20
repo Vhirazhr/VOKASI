@@ -68,34 +68,45 @@ internal fun VokasiBottomNav(
     currentPage: Page,
     onNavigate: (Page) -> Unit
 ) {
-    NavigationBar(
-        containerColor = Color.White,
-        tonalElevation = 8.dp,
-        modifier = Modifier.shadow(16.dp, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)).clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
+        color = Color.White,
+        shadowElevation = 12.dp,
+        tonalElevation = 2.dp
     ) {
-        items.forEach { (target, label, symbol) ->
-            val selected = currentPage == target
-            NavigationBarItem(
-                selected = selected,
-                onClick = { onNavigate(target) },
-                icon = {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(77.dp)
+                .padding(horizontal = 21.dp, vertical = 7.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items.forEach { (target, label, symbol) ->
+                val active = currentPage == target
+                Column(
+                    modifier = Modifier.weight(1f)
+                        .clip(RoundedCornerShape(13.dp))
+                        .clickable { onNavigate(target) }
+                        .padding(vertical = 3.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.size(width = 44.dp, height = 32.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (active) PaleBlue else Color.Transparent),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(symbol, fontSize = 19.sp,
+                            color = if (active) Navy else Subtle)
+                    }
                     Text(
-                        symbol,
-                        fontSize = 20.sp,
-                        color = if (selected) Navy else Subtle
+                        label, fontSize = 10.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                        color = if (active) Navy else Subtle
                     )
-                },
-                label = {
-                    Text(
-                        label,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selected) Navy else Subtle
-                    )
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = PaleBlue
-                )
-            )
+                }
+            }
         }
     }
 }
@@ -133,11 +144,18 @@ internal fun VokasiButton(
             onClick = onClick,
             enabled = enabled,
             interactionSource = interactionSource,
-            modifier = modifier.height(52.dp).scale(scale),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Navy, contentColor = Color.White)
+            modifier = modifier.height(52.dp).scale(scale)
+                .clip(RoundedCornerShape(15.dp))
+                .background(Brush.linearGradient(listOf(Navy, Color(0xFF345F93)))),
+            shape = RoundedCornerShape(15.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Transparent,
+                contentColor = Color.White,
+                disabledContainerColor = Color.White.copy(alpha = 0.18f),
+                disabledContentColor = Color.White.copy(alpha = 0.5f)
+            )
         ) {
-            Text(text, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(text, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
         }
     }
 }
@@ -202,8 +220,8 @@ internal fun Pill(text: String, color: Color = PaleBlue, textColor: Color = Navy
 @Composable
 internal fun WhiteCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Card(
-        modifier = modifier.shadow(8.dp, RoundedCornerShape(20.dp), ambientColor = Color.Black.copy(alpha = 0.05f), spotColor = Color.Black.copy(alpha = 0.1f)),
-        shape = RoundedCornerShape(20.dp),
+        modifier = modifier.shadow(8.dp, RoundedCornerShape(22.dp), ambientColor = Color.Black.copy(alpha = 0.05f), spotColor = Color.Black.copy(alpha = 0.1f)),
+        shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
