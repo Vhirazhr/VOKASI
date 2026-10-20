@@ -13,25 +13,54 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.logic.*
 import com.example.vokasilearning.ui.*
+import java.util.Calendar
 import java.util.Locale
 
-/** Compact controls hosted inside Profile, not a separate history page. */
+/** One compact filter on Profile: optional type plus a calendar date range. */
 @Composable
 internal fun StudentHistoryFilterControls(
     applied: HistorySelection,
-    availableYears: List<Int>,
     onApply: (HistorySelection) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     var draft by remember(applied) { mutableStateOf(applied) }
-    var periodsOpen by remember { mutableStateOf(false) }
-    var monthsOpen by remember { mutableStateOf(false) }
-    var yearsOpen by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val months = listOf(
-        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-    )
+
+    fun chooseDate(start: Boolean) {
+        val existing = if (start) draft.fromDate else draft.toDate
+        val bits = existing.split("-").mapNotNull { it.toIntOrNull() }
+        val calendar = wibCalendar()
+        val year = bits.getOrNull(0) ?: calendar.get(Calendar.YEAR)
+        val month = (bits.getOrNull(1) ?: calendar.get(Calendar.MONTH) + 1) - 1
+        val day = bits.getOrNull(2) ?: calendar.get(Calendar.DAY_OF_MONTH)
+        DatePickerDialog(
+            context,
+            { _, y, m, d ->
+                val selected = String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d)
+                draft = if (start) {
+                    draft.copy(
+                        fromDate = selected,
+                        toDate = draft.toDate.takeIf { it >= selected }.orEmpty()
+                    )
+                } else {
+                    draft.copy(
+                        toDate = selected,
+                        fromDate = draft.fromDate.takeIf { it <= selected }.orEmpty()
+                    )
+                }
+            }, year, month, day
+        ).apply {
+            datePicker.maxDate = System.currentTimeMillis()
+            val lower = if (start) "" else draft.fromDate
+            if (lower.isNotBlank()) {
+                val range = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+                    timeZone = java.util.TimeZone.getTimeZone("Asia/Jakarta")
+                    isLenient = false
+                }.parse(lower)?.time
+                if (range != null) datePicker.minDate = range
+            }
+        }.show()
+    }
 
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 18.dp),
@@ -46,7 +75,7 @@ internal fun StudentHistoryFilterControls(
                 },
                 shape = RoundedCornerShape(12.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-            ) { Text("☷  Filter", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+            ) { Text("Filter", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
         }
 
         if (expanded) {
@@ -62,111 +91,55 @@ internal fun StudentHistoryFilterControls(
                         )
                     }
                 }
-                Text("Periode", color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Box(Modifier.fillMaxWidth()) {
+                Text("Rentang tanggal", color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     OutlinedButton(
-                        onClick = { periodsOpen = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        onClick = { chooseDate(true) },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
-                        Text(draft.period.label, modifier = Modifier.weight(1f), color = Ink)
-                        Text("⌄", color = Navy)
+                        Text(
+                            draft.fromDate.ifBlank { "Dari tanggal" },
+                            fontSize = 11.sp, color = Ink,
+                            maxLines = 1
+                        )
                     }
-                    DropdownMenu(expanded = periodsOpen, onDismissRequest = { periodsOpen = false }) {
-                        HistoryPeriod.entries.forEach { period ->
-                            DropdownMenuItem(
-                                text = { Text(period.label) },
-                                onClick = {
-                                    draft = draft.copy(period = period)
-                                    periodsOpen = false
-                                }
-                            )
-                        }
-                    }
-                }
-                if (draft.period == HistoryPeriod.EXACT_DATE) {
                     OutlinedButton(
-                        onClick = {
-                            val parts = draft.date.split("-").mapNotNull { it.toIntOrNull() }
-                            val calendar = wibCalendar()
-                            val yy = parts.getOrNull(0) ?: calendar.get(java.util.Calendar.YEAR)
-                            val mm = parts.getOrNull(1)?.minus(1) ?: calendar.get(java.util.Calendar.MONTH)
-                            val dd = parts.getOrNull(2) ?: calendar.get(java.util.Calendar.DAY_OF_MONTH)
-                            DatePickerDialog(
-                                context,
-                                { _, year, month, day ->
-                                    draft = draft.copy(
-                                        date = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, day)
-                                    )
-                                },
-                                yy, mm, dd
-                            ).apply {
-                                datePicker.maxDate = System.currentTimeMillis()
-                            }.show()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        onClick = { chooseDate(false) },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
-                        Text(draft.date, modifier = Modifier.weight(1f), color = Ink)
-                        Text("Pilih tanggal", color = Navy, fontSize = 12.sp)
-                    }
-                }
-                if (draft.period == HistoryPeriod.MONTH_YEAR || draft.period == HistoryPeriod.YEAR) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (draft.period == HistoryPeriod.MONTH_YEAR) {
-                            Box(Modifier.weight(1f)) {
-                                OutlinedButton(
-                                    onClick = { monthsOpen = true },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) { Text(months[draft.month.coerceIn(1, 12) - 1], fontSize = 12.sp) }
-                                DropdownMenu(
-                                    expanded = monthsOpen,
-                                    onDismissRequest = { monthsOpen = false }
-                                ) {
-                                    months.forEachIndexed { index, month ->
-                                        DropdownMenuItem(
-                                            text = { Text(month) },
-                                            onClick = { draft = draft.copy(month = index + 1); monthsOpen = false }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        Box(Modifier.weight(1f)) {
-                            OutlinedButton(
-                                onClick = { yearsOpen = true },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp)
-                            ) { Text(draft.year.toString(), fontSize = 12.sp) }
-                            DropdownMenu(
-                                expanded = yearsOpen,
-                                onDismissRequest = { yearsOpen = false }
-                            ) {
-                                availableYears.forEach { year ->
-                                    DropdownMenuItem(
-                                        text = { Text(year.toString()) },
-                                        onClick = { draft = draft.copy(year = year); yearsOpen = false }
-                                    )
-                                }
-                            }
-                        }
+                        Text(
+                            draft.toDate.ifBlank { "Sampai tanggal" },
+                            fontSize = 11.sp, color = Ink,
+                            maxLines = 1
+                        )
                     }
                 }
                 Row(
                     Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = {
-                        val reset = applied.copy(type = HistoryType.ALL, period = HistoryPeriod.ALL)
+                        val reset = draft.copy(
+                            type = HistoryType.ALL, period = HistoryPeriod.ALL,
+                            fromDate = "", toDate = ""
+                        )
                         draft = reset
                         onApply(reset)
                         expanded = false
                     }) { Text("Reset", color = Subtle) }
                     Spacer(Modifier.width(8.dp))
                     Button(
-                        onClick = { onApply(draft); expanded = false },
+                        onClick = {
+                            onApply(draft.copy(period = HistoryPeriod.ALL))
+                            expanded = false
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = Navy),
                         shape = RoundedCornerShape(12.dp)
                     ) { Text("Terapkan") }
