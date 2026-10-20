@@ -65,10 +65,14 @@ import com.example.vokasilearning.ui.*
 @Composable
 internal fun StudentHome(
     me: Student, students: List<Student>, attempts: List<Attempt>, countQuestions: Int,
-    onStart: () -> Unit, onRanking: () -> Unit
+    onStart: () -> Unit, onRanking: () -> Unit,
+    onPractice: (String) -> Unit
 ) {
     val today = dayKey(System.currentTimeMillis())
-    val todayCount = attempts.count { it.studentId == me.username && dayKey(it.timeMillis) == today }
+    val todayCount = attempts.count {
+        it.studentId == me.username && it.practiceCategory == null && dayKey(it.timeMillis) == today
+    }
+    val practiceInsights = PracticeInsights.forStudent(me.username, attempts)
     val seasonXp = studentSeasonXp(me, attempts)
     val streak = calculateStreak(me, attempts)
     val numberOfQuestions = if (countQuestions >= 500) QUESTIONS_PER_SESSION else 0
@@ -182,6 +186,100 @@ internal fun StudentHome(
             }
         }
         item {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StudentSectionHeading("BELAJAR LEBIH TERARAH", "Latihan per materi")
+                Text(
+                    "Pilih materi yang ingin kamu kuasai. Sistem menandai materi yang sering salah berdasarkan hasil latihanmu.",
+                    color = Subtle, fontSize = 12.sp, lineHeight = 18.sp
+                )
+                practiceInsights.chunked(2).forEach { pair ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        pair.forEach { insight ->
+                            val alreadyRewarded = attempts.any {
+                                it.studentId == me.username && it.practiceCategory == insight.category &&
+                                    dayKey(it.timeMillis) == today && it.earnedXp > 0
+                            }
+                            val icon = when (insight.category) {
+                                "Perkalian" -> "×"
+                                "Pembagian" -> "÷"
+                                "Penjumlahan" -> "+"
+                                else -> "⇄"
+                            }
+                            Card(
+                                modifier = Modifier.weight(1f)
+                                    .clickable { onPractice(insight.category) },
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                shape = RoundedCornerShape(20.dp),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (insight.needsPractice) Color(0xFFF3CBA0) else Border
+                                )
+                            ) {
+                                Column(
+                                    Modifier.fillMaxWidth().padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(
+                                        Modifier.size(36.dp).clip(RoundedCornerShape(10.dp))
+                                            .background(if (insight.needsPractice) PaleGold else PaleBlue),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(icon, fontSize = 21.sp, color = Navy, fontWeight = FontWeight.Bold)
+                                    }
+                                    Text(
+                                        insight.category,
+                                        color = Ink, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp,
+                                        maxLines = 2, lineHeight = 17.sp
+                                    )
+                                    Text(
+                                        insight.status,
+                                        color = if (insight.needsPractice) Warning else Subtle,
+                                        fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+                                        minLines = 2
+                                    )
+                                    if (insight.attempted > 0) {
+                                        Text(
+                                            "Benar ${insight.correct}/${insight.attempted}",
+                                            color = NavyLight, fontSize = 11.sp
+                                        )
+                                    }
+                                    Text(
+                                        if (alreadyRewarded) "Bonus hari ini sudah diambil"
+                                        else "+5 XP latihan pertama hari ini",
+                                        color = if (alreadyRewarded) Subtle else Good,
+                                        fontSize = 10.sp, lineHeight = 14.sp
+                                    )
+                                    Text("Latih 10 soal  →", color = Navy, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+                val priority = practiceInsights.filter { it.needsPractice }
+                    .sortedBy { it.accuracy }.firstOrNull()
+                if (priority != null) {
+                    WhiteCard(Modifier.fillMaxWidth()) {
+                        Text("SARAN LATIHAN UNTUKMU", color = NavyLight, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(
+                            "Yuk ulangi ${priority.focus ?: priority.category.lowercase()}. " +
+                                "Di 5 sesi terakhir, jawaban benar kamu ${priority.correct} dari ${priority.attempted} soal materi ini.",
+                            color = Ink, fontSize = 12.sp, lineHeight = 18.sp
+                        )
+                        TextButton(onClick = { onPractice(priority.category) }) {
+                            Text("Mulai pengulangan ${priority.category} →", color = Navy, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
             StaggeredSlideIn(0) {
                 Column(
                     Modifier.fillMaxWidth().padding(horizontal = 18.dp),
@@ -218,7 +316,7 @@ internal fun StudentHome(
                                     if (todayCount > 0) "Latihan harian tercatat!" else "Yuk, mulai latihan pertamamu!",
                                     color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold
                                 )
-                                Text("$todayCount sesi hari ini • $streak hari streak",
+                                Text("$todayCount sesi wajib hari ini • $streak hari streak",
                                     color = Subtle, fontSize = 11.sp)
                                 LinearProgressIndicator(
                                     progress = { if (todayCount > 0) 1f else 0f },
