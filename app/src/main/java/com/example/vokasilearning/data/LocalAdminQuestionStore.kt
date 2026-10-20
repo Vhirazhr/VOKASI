@@ -15,8 +15,7 @@ internal object LocalAdminQuestionStore {
 
     fun load(context: Context): List<Question> = try {
         val file = context.getFileStreamPath(FILE)
-        if (!file.exists()) return emptyList()
-        val arr = JSONArray(file.readText(Charsets.UTF_8))
+        val arr = if (file.exists()) JSONArray(file.readText(Charsets.UTF_8)) else JSONArray()
         (0 until arr.length()).map { i ->
             val value = arr.getJSONObject(i)
             val options = value.getJSONArray("options")
