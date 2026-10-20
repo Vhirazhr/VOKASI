@@ -56,4 +56,28 @@ class BankPolicyTest {
         }
         assertTrue(threw)
     }
+    @Test
+    fun eachSubjectPracticeHasTenUniqueQuestionsAndMatchingKey() {
+        val bank = syntheticBank()
+        // Test the actual API against the four official subject names.
+        val practices = bank.map { q ->
+            val subject = when (q.difficultyCode.first()) {
+                'K' -> "Perkalian"
+                'P' -> "Pembagian"
+                'J' -> "Penjumlahan"
+                else -> "Konversi Satuan"
+            }
+            q.copy(category = subject)
+        }
+        listOf("Perkalian", "Pembagian", "Penjumlahan", "Konversi Satuan").forEach { category ->
+            repeat(50) { seed ->
+                val session = BankPolicy.generatePractice(practices, category, Random(seed))
+                assertEquals(10, session.size)
+                assertEquals(10, session.map { it.id }.toSet().size)
+                assertTrue(session.all { it.category == category })
+                session.forEach { q -> assertEquals(q.correctAnswer, q.options[q.answerIndex]) }
+            }
+        }
+    }
+
 }
