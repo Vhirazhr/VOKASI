@@ -40,13 +40,32 @@ internal fun AdminAddQuestionScreen(
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
-        contentPadding = PaddingValues(18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(13.dp)
     ) {
-        item { TextButton(onClick = onBack) { Text("‹ Kembali", color = Navy) } }
-        item { VokasiTitle("Tambah Soal", "Form terstruktur sesuai aturan kuis.") }
         item {
-            WhiteCard(Modifier.fillMaxWidth()) {
+            Box(Modifier.fillMaxWidth()) {
+                AdminHero("Tambah Soal", "Buat soal dengan kunci dan pembahasan", compact = true)
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
+                        .padding(top = 167.dp),
+                    shape = RoundedCornerShape(25.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(5.dp)
+                ) {
+                    Column(Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
+                        TextButton(onClick = onBack) {
+                            Text("‹ Kembali ke Bank Soal", color = Navy,
+                                fontWeight = FontWeight.Bold)
+                        }
+                        Text("Isi semua bagian sebelum menyimpan.",
+                            color = Subtle, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        item {
+            WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                 Text("MATERI & TINGKAT", color = NavyLight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Box(Modifier.fillMaxWidth()) {
                     OutlinedButton(onClick = { categoryMenu = true },
@@ -77,17 +96,21 @@ internal fun AdminAddQuestionScreen(
                             }
                         }
                     }
-                    Box(Modifier.weight(1f)) {
-                        OutlinedButton(onClick = {}, enabled = false,
-                            modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                            Text("${BankPolicy.secondsByCode.getValue(difficulty)} detik", fontSize = 12.sp, color = Navy)
-                        }
+                    Box(
+                        Modifier.weight(1f).height(48.dp)
+                            .background(PaleBlue, RoundedCornerShape(12.dp)),
+                        contentAlignment = androidx.compose.ui.Alignment.Center
+                    ) {
+                        Text(
+                            "${BankPolicy.secondsByCode.getValue(difficulty)} detik / soal",
+                            fontSize = 12.sp, color = Navy, fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
         }
         item {
-            WhiteCard(Modifier.fillMaxWidth()) {
+            WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                 Text("PERTANYAAN", color = NavyLight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 OutlinedTextField(
                     value = prompt,
@@ -100,7 +123,7 @@ internal fun AdminAddQuestionScreen(
             }
         }
         item {
-            WhiteCard(Modifier.fillMaxWidth()) {
+            WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                 Text("PILIHAN & KUNCI", color = NavyLight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 choices.forEachIndexed { i, choice ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -121,7 +144,7 @@ internal fun AdminAddQuestionScreen(
             }
         }
         item {
-            WhiteCard(Modifier.fillMaxWidth()) {
+            WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                 Text("PEMBAHASAN", color = NavyLight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 OutlinedTextField(
                     value = explanation,
@@ -134,7 +157,8 @@ internal fun AdminAddQuestionScreen(
             }
         }
         if (error) {
-            item { Text("Soal tidak tersimpan. Periksa kesamaan pertanyaan atau pilihan.",
+            item { Text("Soal belum tersimpan. Cek duplikasi dan isian.",
+                modifier = Modifier.padding(horizontal = 18.dp),
                 color = Bad, fontSize = 12.sp) }
         }
         item {
@@ -147,7 +171,7 @@ internal fun AdminAddQuestionScreen(
                         correct, difficulty, explanation.trim()
                     )
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
             )
         }
     }
