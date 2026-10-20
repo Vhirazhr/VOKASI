@@ -59,7 +59,7 @@ internal fun AdminHome(
                 Card(
                     modifier = Modifier.fillMaxWidth()
                         .padding(horizontal = 18.dp)
-                        .padding(top = 198.dp)
+                        .padding(top = 245.dp)
                         .shadow(14.dp, RoundedCornerShape(28.dp)),
                     shape = RoundedCornerShape(28.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White)
