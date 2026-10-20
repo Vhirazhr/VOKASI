@@ -114,7 +114,7 @@ internal fun AdminSelect(
                 contentPadding = PaddingValues(horizontal = 10.dp),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text(value.ifBlank { "Pilih" }, modifier = Modifier.weight(1f),
+                Text(value.ifBlank { "Semua" }, modifier = Modifier.weight(1f),
                     fontSize = 12.sp, color = Ink, maxLines = 1,
                     overflow = TextOverflow.Ellipsis)
                 Text("⌄", color = Navy)
