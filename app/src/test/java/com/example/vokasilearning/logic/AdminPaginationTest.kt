@@ -23,7 +23,7 @@ class AdminPaginationTest {
     @Test fun emptyRecordsNeverShowInvalidPage() {
         assertEquals(1, AdminPagination.count(0, 15))
         assertEquals(0, AdminPagination.active(3, 0, 15))
-        assertEquals(emptyList<Int>(), AdminPagination.slice(emptyList(), 3, 15))
+        assertEquals(emptyList<Int>(), AdminPagination.slice(emptyList<Int>(), 3, 15))
     }
 
     @Test fun hundredAnswerReviewsAreTenAtATime() {
