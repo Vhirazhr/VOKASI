@@ -65,6 +65,7 @@ import com.example.vokasilearning.ui.*
 @Composable
 internal fun QuizScreen(
     questions: List<Question>, index: Int, selectedIndex: Int?, seconds: Int, totalSeconds: Int,
+    feedback: AnswerFeedback?,
     onPick: (Int) -> Unit, onSubmit: () -> Unit, onQuit: () -> Unit
 ) {
     if (questions.isEmpty() || index !in questions.indices) return
@@ -128,20 +129,32 @@ internal fun QuizScreen(
                 Text("Pilih satu jawaban:", color = Subtle, fontSize = 13.sp, fontWeight = FontWeight.Medium)
 
                 q.options.forEachIndexed { optionIndex, text ->
-                    val selected = selectedIndex == optionIndex
-                    val bgColor by animateColorAsState(if (selected) PaleBlue else Color.White, label = "OptBg")
-                    val borderColor by animateColorAsState(if (selected) Navy else Border, label = "OptBorder")
+                    val selected = (feedback?.selectedIndex ?: selectedIndex) == optionIndex
+                    val bgTarget = when {
+                        selected && feedback?.correct == true -> PaleGreen
+                        selected && feedback?.correct == false -> Color(0xFFFFE8EB)
+                        selected -> PaleBlue
+                        else -> Color.White
+                    }
+                    val borderTarget = when {
+                        selected && feedback?.correct == true -> Good
+                        selected && feedback?.correct == false -> Bad
+                        selected -> Navy
+                        else -> Border
+                    }
+                    val bgColor by animateColorAsState(bgTarget, label = "OptBg")
+                    val borderColor by animateColorAsState(borderTarget, label = "OptBorder")
 
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
                             .background(bgColor)
                             .border(if (selected) 2.dp else 1.dp, borderColor, RoundedCornerShape(16.dp))
-                            .clickable { onPick(optionIndex) }.padding(16.dp),
+                            .clickable(enabled = feedback == null) { onPick(optionIndex) }.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Box(
                             Modifier.size(32.dp).clip(CircleShape)
-                                .background(if (selected) Navy else Canvas),
+                                .background(if (selected && feedback?.correct == true) Good else if (selected && feedback?.correct == false) Bad else if (selected) Navy else Canvas),
                             contentAlignment = Alignment.Center
                         ) {
                             Text("${'A' + optionIndex}", color = if (selected) Color.White else Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -157,10 +170,28 @@ internal fun QuizScreen(
             Modifier.fillMaxWidth().background(Color.White).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            if (feedback != null) {
+                Row(
+                    Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(if (feedback.correct) PaleGreen else Color(0xFFFFE8EB))
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (feedback.correct) "✓ Jawaban kamu BENAR!" else "✕ Jawaban kamu SALAH.",
+                        color = if (feedback.correct) Good else Bad,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text("Lanjut otomatis…", color = Subtle, fontSize = 10.sp)
+                }
+            }
             VokasiButton(
-                text = if (index == questions.lastIndex) "Kirim Jawaban & Selesai" else "Kirim Jawaban →",
+                text = if (feedback != null) "Memproses jawaban…" else if (index == questions.lastIndex) "Kirim Jawaban & Selesai" else "Kirim Jawaban →",
                 onClick = onSubmit,
-                enabled = selectedIndex != null && seconds > 0,
+                enabled = selectedIndex != null && seconds > 0 && feedback == null,
                 modifier = Modifier.fillMaxWidth()
             )
             Text(
