@@ -37,6 +37,7 @@ internal fun AdminStudentsScreen(
     var major by remember(initialMajor) { mutableStateOf(initialMajor.takeIf { requested ->
         students.any { it.classroom.major == requested }
     }) }
+    var grade by remember(initialMajor) { mutableStateOf<String?>(null) }
     var classroom by remember(initialMajor) { mutableStateOf<String?>(null) }
     var selectedStudent by remember(initialMajor) { mutableStateOf<Student?>(null) }
     var query by remember { mutableStateOf("") }
@@ -50,7 +51,7 @@ internal fun AdminStudentsScreen(
             .mapValues { (_, list) -> list.maxByOrNull { it.timeMillis }!! }
     }
     val majors = students.groupBy { it.classroom.major }.toSortedMap()
-    val classes = students.filter { it.classroom.major == major }
+    val classes = students.filter { it.classroom.major == major && (grade == null || schoolGrade(it.classroom.label) == grade) }
         .groupBy { it.classroom.label }.toSortedMap()
     val matches = if (query.isBlank()) emptyList() else students.filter {
         it.name.contains(query.trim(), ignoreCase = true) ||
@@ -65,7 +66,8 @@ internal fun AdminStudentsScreen(
         query.isNotBlank() -> "Pencarian"
         selectedStudent != null -> "Detail Siswa"
         classroom != null -> "Pilih Siswa"
-        major != null -> "Pilih Kelas"
+        grade != null -> "Pilih Kelas"
+        major != null -> "Pilih Tingkat"
         else -> "Pilih Jurusan"
     }
     fun back() {
@@ -73,20 +75,22 @@ internal fun AdminStudentsScreen(
             selectedStudent != null -> { selectedStudent = null }
             query.isNotBlank() -> query = ""
             classroom != null -> classroom = null
+            grade != null -> grade = null
             major != null -> major = null
         }
         page = 0
     }
     fun selectStudent(student: Student) {
         major = student.classroom.major
+        grade = schoolGrade(student.classroom.label)
         classroom = student.classroom.label
         selectedStudent = student
         query = ""
         page = 0
     }
-    BackHandler(enabled = selectedStudent != null || classroom != null ||
+    BackHandler(enabled = selectedStudent != null || classroom != null || grade != null ||
         major != null || query.isNotBlank()) { back() }
-    val scopeResetKey = listOf(major.orEmpty(), classroom.orEmpty(), selectedStudent?.username.orEmpty(), query)
+    val scopeResetKey = listOf(major.orEmpty(), grade.orEmpty(), classroom.orEmpty(), selectedStudent?.username.orEmpty(), query)
     LaunchedEffect(scopeResetKey) { pagingActivated = false; lazyState.scrollToItem(0) }
     LaunchedEffect(page, pagingActivated) {
         if (pagingActivated) lazyState.scrollToItem(2)
@@ -100,7 +104,8 @@ internal fun AdminStudentsScreen(
         selectedStudent != null && query.isBlank() -> history.size
         query.isNotBlank() -> matches.size
         classroom != null -> classmates.size
-        major != null -> classes.size
+        grade != null -> classes.size
+        major != null -> listOf("X", "XI", "XII").count { level -> students.any { it.classroom.major == major && schoolGrade(it.classroom.label) == level } }
         else -> majors.size
     }
     val pageSize = 10
@@ -120,7 +125,7 @@ internal fun AdminStudentsScreen(
     ) {
         item {
             Box(Modifier.fillMaxWidth()) {
-                AdminHero("Data Siswa", "Jurusan • Kelas • Siswa", compact = true)
+                AdminHero("Data Siswa", "Jurusan • Tingkat • Kelas • Siswa", compact = true)
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
                         .padding(top = 198.dp),
@@ -159,14 +164,15 @@ internal fun AdminStudentsScreen(
                         when {
                             query.isNotBlank() -> "${matches.size} siswa ditemukan"
                             selectedStudent != null -> "${selectedStudent!!.classroom.major} / ${selectedStudent!!.classroom.label}"
-                            classroom != null -> "${major.orEmpty()} / ${classroom.orEmpty()}"
+                            classroom != null -> "${major.orEmpty()} / ${grade.orEmpty()} / ${classroom.orEmpty()}"
+                            grade != null -> "${major.orEmpty()} / ${grade.orEmpty()}"
                             major != null -> major.orEmpty()
                             else -> "Pilih jurusan untuk melanjutkan"
                         },
                         color = Subtle, fontSize = 11.sp, maxLines = 2
                     )
                 }
-                if (major != null || classroom != null || selectedStudent != null || query.isNotBlank()) {
+                if (major != null || grade != null || classroom != null || selectedStudent != null || query.isNotBlank()) {
                     TextButton(onClick = { back() }) {
                         Text("‹ Kembali", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
@@ -254,7 +260,7 @@ internal fun AdminStudentsScreen(
                     )
                 }
             }
-        } else if (major != null) {
+        } else if (grade != null) {
             val visibleClasses = classes.entries.drop(activePage * pageSize).take(pageSize)
             items(visibleClasses, key = { it.key }) { entry ->
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
@@ -273,6 +279,30 @@ internal fun AdminStudentsScreen(
                     }
                 }
             }
+        } else if (major != null) {
+            val grades = listOf("X", "XI", "XII").filter { level ->
+                students.any { it.classroom.major == major && schoolGrade(it.classroom.label) == level }
+            }
+            items(grades, key = { it }) { level ->
+                val matching = students.filter {
+                    it.classroom.major == major && schoolGrade(it.classroom.label) == level
+                }
+                WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Tingkat $level", color = Ink, fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold)
+                            Text("${matching.map { it.classroom.label }.distinct().size} kelas • ${matching.size} siswa",
+                                color = Subtle, fontSize = 11.sp)
+                        }
+                        Button(
+                            onClick = { grade = level; classroom = null; page = 0 },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Navy)
+                        ) { Text("Lihat Kelas", fontSize = 12.sp) }
+                    }
+                }
+            }
         } else {
             val visibleMajors = majors.entries.drop(activePage * pageSize).take(pageSize)
             items(visibleMajors, key = { it.key }) { entry ->
@@ -286,10 +316,10 @@ internal fun AdminStudentsScreen(
                                 color = Subtle, fontSize = 11.sp)
                         }
                         Button(
-                            onClick = { major = entry.key; page = 0 },
+                            onClick = { major = entry.key; grade = null; page = 0 },
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Navy)
-                        ) { Text("Lihat Kelas", fontSize = 12.sp) }
+                        ) { Text("Pilih Tingkat", fontSize = 12.sp) }
                     }
                 }
             }
