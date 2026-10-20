@@ -208,13 +208,12 @@ internal fun StudentHome(
                                 else -> "⇄"
                             }
                             Card(
-                                modifier = Modifier.weight(1f)
-                                    .clickable { onPractice(insight.category) },
+                                modifier = Modifier.weight(1f),
                                 colors = CardDefaults.cardColors(containerColor = Color.White),
                                 shape = RoundedCornerShape(20.dp),
                                 border = BorderStroke(
                                     1.dp,
-                                    if (insight.needsPractice) Color(0xFFF3CBA0) else Border
+                                    if (insight.needsPractice) Bad.copy(alpha = 0.6f) else Border
                                 )
                             ) {
                                 Column(
@@ -223,7 +222,7 @@ internal fun StudentHome(
                                 ) {
                                     Box(
                                         Modifier.size(36.dp).clip(RoundedCornerShape(10.dp))
-                                            .background(if (insight.needsPractice) PaleGold else PaleBlue),
+                                            .background(if (insight.needsPractice) Color(0xFFFFE7EA) else PaleBlue),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(icon, fontSize = 21.sp, color = Navy, fontWeight = FontWeight.Bold)
@@ -235,7 +234,7 @@ internal fun StudentHome(
                                     )
                                     Text(
                                         insight.status,
-                                        color = if (insight.needsPractice) Warning else Subtle,
+                                        color = if (insight.needsPractice) Bad else Subtle,
                                         fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
                                         minLines = 2
                                     )
@@ -251,24 +250,13 @@ internal fun StudentHome(
                                         color = if (alreadyRewarded) Subtle else Good,
                                         fontSize = 10.sp, lineHeight = 14.sp
                                     )
-                                    Text("Latihan →", color = Navy, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    VokasiButton(
+                                    text = "Mulai Latihan",
+                                    onClick = { onPractice(insight.category) },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                                 }
                             }
-                        }
-                    }
-                }
-                val priority = practiceInsights.filter { it.needsPractice }
-                    .sortedBy { it.accuracy }.firstOrNull()
-                if (priority != null) {
-                    WhiteCard(Modifier.fillMaxWidth()) {
-                        Text("SARAN LATIHAN UNTUKMU", color = NavyLight, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-                        Text(
-                            "Yuk ulangi ${priority.focus ?: priority.category.lowercase()}. " +
-                                "Di 5 sesi terakhir, jawaban benar kamu ${priority.correct} dari ${priority.attempted} soal materi ini.",
-                            color = Ink, fontSize = 12.sp, lineHeight = 18.sp
-                        )
-                        TextButton(onClick = { onPractice(priority.category) }) {
-                            Text("Mulai pengulangan ${priority.category} →", color = Navy, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
