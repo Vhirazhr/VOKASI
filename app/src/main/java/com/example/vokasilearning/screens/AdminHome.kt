@@ -24,6 +24,7 @@ internal fun AdminHome(
     students: List<Student>, questions: List<Question>, attempts: List<Attempt>,
     onStudents: (String) -> Unit,
     onMonitoring: (String, String, String) -> Unit,
+    onExcelExport: (String, String, String) -> Unit,
     onLog: () -> Unit,
     onProfile: () -> Unit,
     adminName: String,
@@ -98,7 +99,8 @@ internal fun AdminHome(
                         AdminExcelAction(
                             students, attempts, major, classroom, date,
                             modifier = Modifier.fillMaxWidth(),
-                            text = "Unduh Excel Kelas"
+                            text = "Unduh Excel Kelas",
+                            onExport = onExcelExport
                         )
                     }
                 }
