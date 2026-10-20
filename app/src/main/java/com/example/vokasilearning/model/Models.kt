@@ -24,13 +24,27 @@ internal data class Student(
 
 internal data class Question(
     val id: Int, val category: String, val question: String,
-    val options: List<String>, val answerIndex: Int
+    val options: List<String>, val answerIndex: Int,
+    val difficultyCode: String = "",
+    val timeLimitSeconds: Int = 0,
+    val explanation: String = "",
+    val correctAnswer: String = ""
 )
 
 internal data class Attempt(
     val studentId: String, val timeMillis: Long, val signature: String,
     val correct: Int, val answered: Int, val questionCount: Int,
-    val score: Int, val earnedXp: Int, val secondsSpent: Int
+    val score: Int, val earnedXp: Int, val secondsSpent: Int,
+    val review: List<AnswerReview> = emptyList(),
+    val sessionKey: String = ""
+)
+
+internal enum class AnswerStatus { BENAR, SALAH, TIMEOUT, TIDAK_DIJAWAB }
+internal data class AnswerReview(
+    val question: Question,
+    val selectedIndex: Int?,
+    val status: AnswerStatus,
+    val responseSeconds: Int = 0
 )
 
 internal data class LevelData(val level: Int, val startXp: Int, val nextXp: Int)
