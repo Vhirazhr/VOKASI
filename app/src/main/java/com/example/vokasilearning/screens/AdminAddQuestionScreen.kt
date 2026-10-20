@@ -1,5 +1,6 @@
 package com.example.vokasilearning.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,7 +18,7 @@ import com.example.vokasilearning.ui.*
 @Composable
 internal fun AdminAddQuestionScreen(
     onBack: () -> Unit,
-    onSave: (String, String, List<String>, Int, String, String) -> Boolean
+    onSave: (String, String, List<String>, Int, String, String) -> String?
 ) {
     val codes = linkedMapOf(
         "Perkalian" to listOf("K1", "K2", "K3", "K4", "K5"),
@@ -29,14 +30,23 @@ internal fun AdminAddQuestionScreen(
     var difficulty by remember { mutableStateOf("K1") }
     var prompt by remember { mutableStateOf("") }
     val choices = remember { mutableStateListOf("", "", "", "") }
-    var correct by remember { mutableIntStateOf(0) }
+    var correct by remember { mutableStateOf<Int?>(null) }
     var explanation by remember { mutableStateOf("") }
     var categoryMenu by remember { mutableStateOf(false) }
     var codeMenu by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var confirmLeave by remember { mutableStateOf(false) }
+    val dirty = prompt.isNotBlank() || choices.any { it.isNotBlank() } ||
+        explanation.isNotBlank() || correct != null ||
+        category != "Perkalian" || difficulty != "K1"
     val valid = prompt.isNotBlank() && explanation.isNotBlank() &&
-        choices.all { it.isNotBlank() } &&
-        choices.map { it.trim() }.distinct().size == 4
+        correct != null && choices.all { it.isNotBlank() } &&
+        choices.map { it.trim().lowercase() }.distinct().size == 4
+
+    fun requestBack() {
+        if (dirty) confirmLeave = true else onBack()
+    }
+    BackHandler { requestBack() }
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
@@ -54,7 +64,7 @@ internal fun AdminAddQuestionScreen(
                     elevation = CardDefaults.cardElevation(5.dp)
                 ) {
                     Column(Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
-                        TextButton(onClick = onBack) {
+                        TextButton(onClick = { requestBack() }) {
                             Text("‹ Kembali ke Bank Soal", color = Navy,
                                 fontWeight = FontWeight.Bold)
                         }
@@ -114,7 +124,7 @@ internal fun AdminAddQuestionScreen(
                 Text("PERTANYAAN", color = NavyLight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 OutlinedTextField(
                     value = prompt,
-                    onValueChange = { prompt = it; error = false },
+                    onValueChange = { prompt = it; errorMessage = null },
                     placeholder = { Text("Tulis pertanyaan yang jelas") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2, maxLines = 4,
@@ -128,11 +138,11 @@ internal fun AdminAddQuestionScreen(
                 choices.forEachIndexed { i, choice ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         RadioButton(
-                            selected = correct == i, onClick = { correct = i },
+                            selected = correct == i, onClick = { correct = i; errorMessage = null },
                             colors = RadioButtonDefaults.colors(selectedColor = Navy)
                         )
                         OutlinedTextField(
-                            value = choice, onValueChange = { choices[i] = it; error = false },
+                            value = choice, onValueChange = { choices[i] = it; errorMessage = null },
                             label = { Text("Jawaban ${'A' + i}") },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
@@ -140,7 +150,8 @@ internal fun AdminAddQuestionScreen(
                         )
                     }
                 }
-                Text("Pilih lingkaran pada jawaban benar.", fontSize = 11.sp, color = Subtle)
+                Text(if (correct == null) "Pilih satu kunci jawaban." else "Kunci: jawaban ${'A' + correct!!}",
+                    fontSize = 11.sp, color = if (correct == null) Warning else Good)
             }
         }
         item {
@@ -148,7 +159,7 @@ internal fun AdminAddQuestionScreen(
                 Text("PEMBAHASAN", color = NavyLight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 OutlinedTextField(
                     value = explanation,
-                    onValueChange = { explanation = it; error = false },
+                    onValueChange = { explanation = it; errorMessage = null },
                     placeholder = { Text("Cara memperoleh jawaban benar") },
                     minLines = 2, maxLines = 5,
                     modifier = Modifier.fillMaxWidth(),
@@ -156,23 +167,46 @@ internal fun AdminAddQuestionScreen(
                 )
             }
         }
-        if (error) {
-            item { Text("Soal belum tersimpan. Cek duplikasi dan isian.",
-                modifier = Modifier.padding(horizontal = 18.dp),
-                color = Bad, fontSize = 12.sp) }
+        if (errorMessage != null) {
+            item {
+                Text(
+                    errorMessage.orEmpty(),
+                    modifier = Modifier.padding(horizontal = 18.dp),
+                    color = Bad, fontSize = 12.sp
+                )
+            }
         }
         item {
             VokasiButton(
                 text = "Simpan Soal",
                 enabled = valid,
                 onClick = {
-                    error = !onSave(
-                        category, prompt.trim(), choices.map { it.trim() },
-                        correct, difficulty, explanation.trim()
-                    )
+                    correct?.let { selectedKey ->
+                        errorMessage = onSave(
+                            category, prompt.trim(), choices.map { it.trim() },
+                            selectedKey, difficulty, explanation.trim()
+                        )
+                    }
                 },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
             )
         }
+    }
+    if (confirmLeave) {
+        AlertDialog(
+            onDismissRequest = { confirmLeave = false },
+            title = { Text("Batalkan soal?", fontWeight = FontWeight.ExtraBold) },
+            text = { Text("Isian yang belum disimpan akan hilang.") },
+            confirmButton = {
+                TextButton(onClick = { confirmLeave = false; onBack() }) {
+                    Text("Keluar", color = Bad)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmLeave = false }) {
+                    Text("Lanjut Edit", color = Navy)
+                }
+            }
+        )
     }
 }
