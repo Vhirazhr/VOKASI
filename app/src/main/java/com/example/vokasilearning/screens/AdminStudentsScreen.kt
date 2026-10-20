@@ -320,7 +320,13 @@ internal fun AdminStudentsScreen(
     }
 
     reviewing?.let { attempt ->
-        AdminAnswerReviewDialog(attempt = attempt, onClose = { reviewing = null })
+        val owner = students.firstOrNull { it.username == attempt.studentId }
+        AdminAnswerReviewDialog(
+            attempt = attempt,
+            studentName = owner?.name ?: attempt.studentNameSnapshot,
+            classroom = owner?.classroom?.label ?: attempt.classSnapshot,
+            onClose = { reviewing = null }
+        )
     }
 }
 
