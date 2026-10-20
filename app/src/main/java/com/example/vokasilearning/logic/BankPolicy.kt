@@ -53,4 +53,20 @@ internal object BankPolicy {
         require(result.groupingBy { it.difficultyCode }.eachCount() == quotas)
         return result
     }
+    /** Optional remedial drill: ten questions from one subject, not the compulsory exam. */
+    fun generatePractice(bank: List<Question>, category: String, random: Random = Random.Default): List<Question> {
+        require(category in setOf("Perkalian", "Pembagian", "Penjumlahan", "Konversi Satuan")) {
+            "Materi latihan tidak dikenal: $category"
+        }
+        val pool = bank.filter { it.category == category }
+        require(pool.size >= 10) { "Minimal 10 soal untuk latihan $category" }
+        return pool.shuffled(random).take(10).map { question ->
+            val answer = question.options.getOrNull(question.answerIndex)
+                ?: error("Opsi soal ${question.id} tidak valid")
+            require(question.timeLimitSeconds > 0 && question.options.size == 4)
+            val newOptions = question.options.shuffled(random)
+            question.copy(options = newOptions, answerIndex = newOptions.indexOf(answer))
+        }
+    }
+
 }
