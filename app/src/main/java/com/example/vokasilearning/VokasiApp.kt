@@ -133,6 +133,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
         val attempt = quizSession.finish(student, attempts.toList())
         attempts.add(attempt)
         LocalAttemptStore.save(activity, attempts.toList())
+        recordAdmin(
+            "Nilai",
+            "${student.username} • ${attempt.practiceCategory?.let { "Latihan $it" } ?: "Wajib"} • Nilai ${attempt.score}/100"
+        )
         QuizProgressStore.clear(activity, student.username)
         currentAttempt = attempt
         reviewingHistory = false
