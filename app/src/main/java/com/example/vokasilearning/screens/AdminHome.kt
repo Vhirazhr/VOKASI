@@ -14,6 +14,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Calendar
+import java.util.Locale
 import com.example.vokasilearning.logic.*
 import com.example.vokasilearning.model.*
 import com.example.vokasilearning.ui.*
@@ -41,14 +43,25 @@ internal fun AdminHome(
     var statsMajor by remember { mutableStateOf("") }
     var statsGrade by remember { mutableStateOf("") }
     var statsClass by remember { mutableStateOf("") }
-    var statsDate by remember { mutableStateOf(dayKey(System.currentTimeMillis())) }
+    val currentYear = wibCalendar().get(Calendar.YEAR)
+    val currentMonth = wibCalendar().get(Calendar.MONTH) + 1
+    var statsMonth by remember { mutableIntStateOf(currentMonth) }
+    var statsYear by remember { mutableIntStateOf(currentYear) }
+    var showScopeFilters by remember { mutableStateOf(false) }
+    val monthNames = listOf(
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    )
+    val years = (attempts.mapNotNull { dayKey(it.timeMillis).take(4).toIntOrNull() } +
+        (currentYear - 4..currentYear).toList()).distinct()
+        .filter { it in 2000..currentYear }.sortedDescending().map { it.toString() }
     val scopedClasses = students.filter { statsMajor.isNotBlank() &&
         it.classroom.major == statsMajor &&
         (statsGrade.isBlank() || schoolGrade(it.classroom.label) == statsGrade) }
         .map { it.classroom.label }.distinct().sorted()
-    val stats = remember(students, attempts, statsMajor, statsGrade, statsClass, statsDate) {
-        SchoolAnalytics.calculate(students, attempts,
-            SchoolScope(statsMajor, statsGrade, statsClass), statsDate)
+    val stats = remember(students, attempts, statsMajor, statsGrade, statsClass, statsMonth, statsYear) {
+        SchoolAnalytics.calculateMonthly(students, attempts,
+            SchoolScope(statsMajor, statsGrade, statsClass), statsYear, statsMonth)
     }
 
     LazyColumn(
@@ -109,89 +122,118 @@ internal fun AdminHome(
         }
 
         item {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 AdminSectionTitle("Data sekolah", "Statistik & perkembangan")
-                Text("Keseluruhan sekolah ditampilkan secara otomatis. Filter hanya jika diperlukan.",
-                    color = Subtle, fontSize = 12.sp)
                 WhiteCard(Modifier.fillMaxWidth()) {
-                    AdminSelect("Jurusan", statsMajor,
-                        listOf("") + majors,
-                        { statsMajor = it; statsClass = "" }, Modifier.fillMaxWidth())
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AdminSelect("Tingkat", statsGrade, listOf("", "X", "XI", "XII"),
-                            { statsGrade = it; statsClass = "" }, Modifier.weight(1f))
-                        AdminSelect("Kelas", statsClass, listOf("") + scopedClasses,
-                            { statsClass = it }, Modifier.weight(1f))
+                        AdminSelect(
+                            "Bulan", monthNames[statsMonth - 1], monthNames,
+                            { statsMonth = monthNames.indexOf(it) + 1 },
+                            Modifier.weight(1f)
+                        )
+                        AdminSelect("Tahun", statsYear.toString(), years,
+                            { statsYear = it.toInt() }, Modifier.weight(1f))
                     }
-                    if (statsMajor.isBlank()) {
-                        Text("Pilih jurusan jika ingin memfilter sampai kelas tertentu.",
-                            color = Subtle, fontSize = 11.sp)
-                    }
-                    AdminDateSelect(statsDate, { statsDate = it }, Modifier.fillMaxWidth())
-                    Text(
-                        if (statsMajor.isBlank() && statsGrade.isBlank() && statsClass.isBlank())
-                            "Seluruh sekolah" else
-                            listOf(statsMajor, statsGrade, statsClass).filter { it.isNotBlank() }.joinToString(" • "),
-                        color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AdminStatChip("Siswa", "${stats.students}", Navy, Modifier.weight(1f))
-                        AdminStatChip("Selesai", "${stats.completed}", Good, Modifier.weight(1f))
-                        AdminStatChip("Belum", "${stats.missing}", Warning, Modifier.weight(1f))
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AdminStatChip("Jurusan", "${stats.majors}", Navy, Modifier.weight(1f))
-                        AdminStatChip("Kelas", "${stats.classes}", Navy, Modifier.weight(1f))
-                        AdminStatChip("Rata-rata", stats.average?.toString() ?: "—", Navy, Modifier.weight(1f))
-                    }
-                    Text("Partisipasi latihan wajib: ${stats.participationPercent}%",
-                        color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    LinearProgressIndicator(
-                        progress = { stats.participationPercent / 100f },
-                        modifier = Modifier.fillMaxWidth().height(7.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                        color = Good, trackColor = PaleGreen
-                    )
-                    HorizontalDivider(color = Border)
-                    Text("Distribusi nilai siswa yang selesai", color = Ink,
-                        fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AdminStatChip("75–100", "${stats.high}", Good, Modifier.weight(1f))
-                        AdminStatChip("60–74", "${stats.middle}", Warning, Modifier.weight(1f))
-                        AdminStatChip("0–59", "${stats.low}", Bad, Modifier.weight(1f))
-                    }
-                    HorizontalDivider(color = Border)
-                    Text("Perkembangan siswa", color = Ink, fontSize = 15.sp,
-                        fontWeight = FontWeight.ExtraBold)
-                    Text("Bandingkan nilai wajib terbaru dengan pengerjaan sebelumnya.",
-                        color = Subtle, fontSize = 11.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AdminStatChip("Naik", "${stats.improved}", Good, Modifier.weight(1f))
-                        AdminStatChip("Tetap", "${stats.stable}", Navy, Modifier.weight(1f))
-                        AdminStatChip("Turun", "${stats.declined}", Bad, Modifier.weight(1f))
-                    }
-                    Text("Tren rata-rata per hari (maksimal 7 hari dengan data)",
-                        color = Subtle, fontSize = 11.sp)
-                    if (stats.trend.isEmpty()) {
-                        Text("Belum ada riwayat untuk ditampilkan.", color = Subtle, fontSize = 12.sp)
-                    } else {
-                        stats.trend.forEach { (day, average) ->
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Text(day, color = Subtle, fontSize = 11.sp,
-                                    modifier = Modifier.width(100.dp))
-                                LinearProgressIndicator(
-                                    progress = { (average ?: 0) / 100f },
-                                    modifier = Modifier.weight(1f).height(7.dp),
-                                    color = Navy, trackColor = PaleBlue
-                                )
-                                Text(average?.toString() ?: "—", color = Ink, fontSize = 12.sp,
-                                    modifier = Modifier.width(36.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End)
-                            }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (statsMajor.isBlank() && statsGrade.isBlank() && statsClass.isBlank())
+                                    "Seluruh sekolah"
+                                else listOf(statsMajor, statsGrade, statsClass)
+                                    .filter { it.isNotBlank() }.joinToString(" • "),
+                                color = Navy, fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp, maxLines = 2
+                            )
+                            Text("Rekap latihan wajib per bulan",
+                                color = Subtle, fontSize = 11.sp)
+                        }
+                        TextButton(onClick = { showScopeFilters = !showScopeFilters }) {
+                            Text(if (showScopeFilters) "Tutup filter" else "Filter jurusan",
+                                color = Navy, fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold)
                         }
                     }
-                    Text("Persentase dan rata-rata hanya berdasarkan nilai wajib di tanggal terpilih.",
+                    if (showScopeFilters) {
+                        AdminSelect("Jurusan", statsMajor, listOf("") + majors,
+                            { statsMajor = it; statsClass = "" }, Modifier.fillMaxWidth())
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AdminSelect("Tingkat", statsGrade, listOf("", "X", "XI", "XII"),
+                                { statsGrade = it; statsClass = "" }, Modifier.weight(1f))
+                            AdminSelect("Kelas", statsClass, listOf("") + scopedClasses,
+                                { statsClass = it }, Modifier.weight(1f))
+                        }
+                        if (statsMajor.isBlank()) {
+                            Text("Pilih jurusan sebelum memfilter kelas.",
+                                color = Subtle, fontSize = 11.sp)
+                        }
+                        TextButton(onClick = {
+                            statsMajor = ""; statsGrade = ""; statsClass = ""
+                            showScopeFilters = false
+                        }) {
+                            Text("Tampilkan semua", color = Navy, fontSize = 12.sp)
+                        }
+                    }
+                    HorizontalDivider(color = Border)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("Siswa", color = Subtle, fontSize = 11.sp)
+                            Text("${stats.students}", color = Ink, fontSize = 24.sp,
+                                fontWeight = FontWeight.ExtraBold)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Sudah latihan", color = Subtle, fontSize = 11.sp)
+                            Text("${stats.completed}", color = Good, fontSize = 24.sp,
+                                fontWeight = FontWeight.ExtraBold)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Rata-rata", color = Subtle, fontSize = 11.sp)
+                            Text(stats.average?.toString() ?: "—",
+                                color = Navy, fontSize = 24.sp,
+                                fontWeight = FontWeight.ExtraBold)
+                        }
+                    }
+                    Text("${stats.majors} jurusan • ${stats.classes} kelas • ${stats.missing} belum mengerjakan",
                         color = Subtle, fontSize = 11.sp)
+                }
+
+                SchoolScoreDonut(stats)
+                SchoolMonthlyTrend(stats)
+
+                WhiteCard(Modifier.fillMaxWidth()) {
+                    Text("Perubahan nilai siswa", color = Ink, fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold)
+                    Text("Dibandingkan dengan bulan sebelumnya, untuk siswa yang mengikuti kedua periode.",
+                        color = Subtle, fontSize = 11.sp)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("${stats.improved}", color = Good,
+                                fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("Naik", color = Subtle, fontSize = 12.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("${stats.stable}", color = Navy,
+                                fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("Tetap", color = Subtle, fontSize = 12.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("${stats.declined}", color = Bad,
+                                fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("Turun", color = Subtle, fontSize = 12.sp)
+                        }
+                    }
+                    Text(
+                        "Rata-rata bulan sebelumnya: ${stats.previousAverage?.toString() ?: "Belum ada data"}",
+                        color = Subtle, fontSize = 11.sp
+                    )
                 }
             }
         }
