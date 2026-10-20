@@ -27,6 +27,14 @@ internal fun scoreGrade(score: Int): String = when {
     else -> "Perlu Latihan"
 }
 
+/** Brief, achievement-sensitive headline for the full-screen completion dialog. */
+internal fun completionHeadline(score: Int): String = when {
+    score >= 90 -> "Luar biasa!"
+    score >= 75 -> "Kerja bagus!"
+    score >= 60 -> "Terus berkembang!"
+    else -> "Ayo berlatih lagi!"
+}
+
 /** Short completion feedback for both compulsory and optional practice. */
 internal fun completionNotice(
     score: Int,
