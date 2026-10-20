@@ -184,22 +184,15 @@ internal fun QuizScreen(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.ExtraBold
                     )
-                    Spacer(Modifier.weight(1f))
-                    Text("Lanjut otomatis…", color = Subtle, fontSize = 10.sp)
                 }
             }
             VokasiButton(
-                text = if (feedback != null) "Memproses jawaban…" else if (index == questions.lastIndex) "Kirim Jawaban & Selesai" else "Kirim Jawaban →",
+                text = "Kirim Jawaban",
                 onClick = onSubmit,
                 enabled = selectedIndex != null && seconds > 0 && feedback == null,
                 modifier = Modifier.fillMaxWidth()
             )
-            Text(
-                "Waktu yang tersisa pada soal ini tidak dipindahkan ke soal berikutnya.",
-                color = Subtle, fontSize = 10.sp,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
+
         }
     }
 }
