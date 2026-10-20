@@ -82,6 +82,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
     var adminStudentMajor by remember { mutableStateOf("") }
     var adminClassFilter by remember { mutableStateOf("") }
     var adminDateFilter by remember { mutableStateOf("") }
+    var adminQuestionNotice by remember { mutableStateOf<String?>(null) }
 
     val quizSession = rememberQuizSession()
 
@@ -303,28 +304,40 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         questions = questions.toList(), bundledIds = bundledIds,
                         onAdd = { page = Page.ADMIN_ADD },
                         onDelete = { id ->
-                            if (id !in bundledIds) {
+                            if (id in bundledIds) {
+                                false
+                            } else {
                                 val removed = questions.firstOrNull { it.id == id }
-                                if (removed != null) {
-                                    questions.remove(removed)
+                                if (removed == null) {
+                                    false
+                                } else {
                                     try {
+                                        // Persist first. The UI list is updated only after a successful write.
                                         LocalAdminQuestionStore.save(
-                                            activity, questions.filter { it.id !in bundledIds }
+                                            activity, questions.filter { it.id !in bundledIds && it.id != id }
                                         )
+                                        questions.remove(removed)
+                                        true
                                     } catch (_: Exception) {
-                                        questions.add(removed)
+                                        false
                                     }
                                 }
                             }
-                        }
+                        },
+                        notice = adminQuestionNotice,
+                        onDismissNotice = { adminQuestionNotice = null }
                     )
                     Page.ADMIN_ADD -> AdminAddQuestionScreen(
                         onBack = { page = Page.ADMIN_QUESTIONS },
                         onSave = { category, prompt, options, correct, difficulty, explanation ->
-                            val seconds = BankPolicy.secondsByCode[difficulty]
-                            if (seconds == null || correct !in options.indices) {
-                                false
+                            val reason = AdminQuestionRules.error(
+                                questions.toList(), category, prompt, options, correct,
+                                difficulty, explanation
+                            )
+                            if (reason != null) {
+                                reason
                             } else {
+                                val seconds = BankPolicy.secondsByCode.getValue(difficulty)
                                 val id = (questions.maxOfOrNull { it.id } ?: 0) + 1
                                 val newQuestion = Question(
                                     id = id, category = category, question = prompt,
@@ -333,15 +346,21 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                     explanation = explanation, correctAnswer = options[correct]
                                 )
                                 try {
-                                    BankPolicy.validateBank(questions.toList() + newQuestion,
-                                        requireExactly500 = false)
-                                    LocalAdminQuestionStore.save(activity,
-                                        questions.filter { it.id !in bundledIds } + newQuestion)
+                                    BankPolicy.validateBank(
+                                        questions.toList() + newQuestion, requireExactly500 = false
+                                    )
+                                    // Keep the database and list in sync if saving fails.
+                                    LocalAdminQuestionStore.save(
+                                        activity, questions.filter { it.id !in bundledIds } + newQuestion
+                                    )
                                     questions.add(newQuestion)
+                                    adminQuestionNotice = "Soal #$id berhasil disimpan di perangkat."
                                     page = Page.ADMIN_QUESTIONS
-                                    true
+                                    null
+                                } catch (_: IllegalArgumentException) {
+                                    "Soal tidak sesuai aturan bank. Periksa kode dan kunci."
                                 } catch (_: Exception) {
-                                    false
+                                    "Gagal menyimpan di perangkat. Coba lagi."
                                 }
                             }
                         }
