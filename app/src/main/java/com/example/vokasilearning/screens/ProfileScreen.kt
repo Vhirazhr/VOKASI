@@ -1,5 +1,13 @@
 package com.example.vokasilearning.screens
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import com.example.vokasilearning.data.StudentResultPdf
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -32,6 +40,7 @@ internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () ->
     val wibToday = wibCalendar()
     val initialHistorySelection = remember(me.username) {
         HistorySelection(
+            type = HistoryType.REQUIRED,
             date = dayKey(System.currentTimeMillis()),
             month = wibToday.get(Calendar.MONTH) + 1,
             year = wibToday.get(Calendar.YEAR)
@@ -45,6 +54,39 @@ internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () ->
         java.text.SimpleDateFormat("dd MMM yyyy • HH:mm", java.util.Locale("id", "ID")).apply {
             timeZone = java.util.TimeZone.getTimeZone("Asia/Jakarta")
         }
+    }
+    val context = LocalContext.current
+    var exportingAttempt by remember { mutableStateOf<Attempt?>(null) }
+    val pdfDate = remember {
+        java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("Asia/Jakarta")
+        }
+    }
+    val pdfLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        val attempt = exportingAttempt
+        exportingAttempt = null
+        if (uri != null && attempt != null) {
+            try {
+                val stream = context.contentResolver.openOutputStream(uri)
+                    ?: error("Tidak dapat membuat berkas")
+                stream.use { StudentResultPdf.write(it, me, attempt) }
+                Toast.makeText(context, "Laporan PDF tersimpan", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Gagal menyimpan PDF: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    fun downloadReport(attempt: Attempt) {
+        if (attempt.studentId != me.username || attempt.review.isEmpty()) return
+        val name = attempt.studentNameSnapshot.ifBlank { me.name }
+            .replace(Regex("[^A-Za-z0-9_-]"), "_").take(32)
+        val kind = if (attempt.practiceCategory == null) "Wajib"
+            else attempt.practiceCategory.replace(Regex("[^A-Za-z0-9_-]"), "_")
+        val date = pdfDate.format(Date(attempt.timeMillis))
+        exportingAttempt = attempt
+        pdfLauncher.launch("VOKASI_${name}_${kind}_${date}.pdf")
     }
     val totalXp = lifetimeXp(me, attempts)
     val seasonXp = studentSeasonXp(me, attempts)
@@ -264,8 +306,26 @@ internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () ->
                             }
                         )
                     }
-                    TextButton(onClick = { onReview(attempt) }) {
-                        Text("Lihat Hasil →", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = { downloadReport(attempt) },
+                            enabled = attempt.review.isNotEmpty(),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Text("Unduh PDF", color = Navy, fontSize = 12.sp, maxLines = 1)
+                        }
+                        TextButton(
+                            onClick = { onReview(attempt) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Lihat Hasil", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                        }
                     }
                 }
             }
