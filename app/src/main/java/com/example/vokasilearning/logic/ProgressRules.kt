@@ -27,6 +27,25 @@ internal fun scoreGrade(score: Int): String = when {
     else -> "Perlu Latihan"
 }
 
+/** Short completion feedback for both compulsory and optional practice. */
+internal fun completionNotice(
+    score: Int,
+    correct: Int,
+    questionCount: Int,
+    earnedXp: Int,
+    streak: Int
+): String {
+    val praise = when {
+        score >= 90 -> "Luar biasa!"
+        score >= 75 -> "Kerja bagus!"
+        score >= 60 -> "Terus berkembang!"
+        else -> "Latihan selesai, ayo coba lagi!"
+    }
+    val xp = if (earnedXp > 0) "+$earnedXp XP" else "Belum ada XP tambahan"
+    val streakText = if (streak > 0) "Streak $streak hari" else "Mulai streak pertamamu"
+    return "$praise $correct/$questionCount benar • $xp • $streakText"
+}
+
 internal fun wibCalendar() = Calendar.getInstance(TimeZone.getTimeZone("Asia/Jakarta"))
 internal fun dayKey(millis: Long): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
     timeZone = TimeZone.getTimeZone("Asia/Jakarta")
