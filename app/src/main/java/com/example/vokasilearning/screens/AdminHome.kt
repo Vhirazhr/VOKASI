@@ -24,6 +24,10 @@ internal fun AdminHome(
     students: List<Student>, questions: List<Question>, attempts: List<Attempt>,
     onStudents: (String) -> Unit,
     onMonitoring: (String, String, String) -> Unit,
+    onLog: () -> Unit,
+    onProfile: () -> Unit,
+    adminName: String,
+    schoolName: String,
     onLogout: () -> Unit
 ) {
     val majors = students.map { it.classroom.major }.distinct().sorted()
@@ -53,8 +57,8 @@ internal fun AdminHome(
         item {
             Box(Modifier.fillMaxWidth()) {
                 AdminHero(
-                    title = "Halo, Admin!",
-                    subtitle = "Pantau hasil latihan siswa • SMKN 1 Singosari"
+                    title = "Halo, ${adminName.take(20)}!",
+                    subtitle = "Pantau hasil latihan siswa • $schoolName"
                 )
                 Card(
                     modifier = Modifier.fillMaxWidth()
@@ -181,6 +185,21 @@ internal fun AdminHome(
                     }
                     Text("Persentase dan rata-rata hanya berdasarkan nilai wajib di tanggal terpilih.",
                         color = Subtle, fontSize = 11.sp)
+                }
+            }
+        }
+        item {
+            WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                AdminSectionTitle("Administrasi", "Pengaturan Panel")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = onLog, modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) { Text("Log Aktivitas", fontSize = 12.sp, color = Navy) }
+                    OutlinedButton(
+                        onClick = onProfile, modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) { Text("Profil Admin", fontSize = 12.sp, color = Navy) }
                 }
             }
         }
