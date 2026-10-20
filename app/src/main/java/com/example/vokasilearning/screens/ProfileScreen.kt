@@ -26,7 +26,7 @@ import java.util.Calendar
 import kotlin.math.max
 
 @Composable
-internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () -> Unit, onReview: (Attempt) -> Unit) {
+internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () -> Unit, onReview: (Attempt) -> Unit, onAllHistory: () -> Unit) {
     val mine = attempts.filter { it.studentId == me.username }.sortedByDescending { it.timeMillis }
     val totalXp = lifetimeXp(me, attempts)
     val seasonXp = studentSeasonXp(me, attempts)
@@ -203,7 +203,7 @@ internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () ->
                 }
             }
         } else {
-            items(mine, key = { it.signature + "_" + it.timeMillis }) { attempt ->
+            items(mine.take(5), key = { it.signature + "_" + it.timeMillis }) { attempt ->
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
@@ -219,6 +219,21 @@ internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () ->
                         Text("Lihat jawaban dan pembahasan →", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
+            }
+        }
+        if (mine.size > 5) {
+            item {
+                TextButton(
+                    onClick = onAllHistory,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
+                ) { Text("Lihat semua ${mine.size} riwayat →", color = Navy, fontWeight = FontWeight.Bold) }
+            }
+        } else if (mine.isNotEmpty()) {
+            item {
+                TextButton(
+                    onClick = onAllHistory,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
+                ) { Text("Filter riwayat →", color = Navy, fontWeight = FontWeight.Bold) }
             }
         }
         item {
