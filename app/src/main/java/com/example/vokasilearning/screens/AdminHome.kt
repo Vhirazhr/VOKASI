@@ -83,7 +83,7 @@ internal fun AdminHome(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 WhiteCard(Modifier.weight(1f)) {
-                    Text("Siswa demo", color = Subtle, fontSize = 12.sp)
+                    Text("Siswa terdaftar (lokal)", color = Subtle, fontSize = 12.sp)
                     AnimatedCounter(target = students.size, textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold))
                 }
                 WhiteCard(Modifier.weight(1f)) {
@@ -105,7 +105,7 @@ internal fun AdminHome(
         item {
             WhiteCard(Modifier.fillMaxWidth()) {
                 Text("Monitoring", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Ink)
-                Text("Lihat siswa, kelas, XP, dan hasil latihan yang tercatat secara lokal.", color = Subtle, fontSize = 13.sp)
+                Text("Lihat rekap nilai siswa per kelas serta histori sesi yang tersimpan di perangkat admin.", color = Subtle, fontSize = 13.sp)
                 Spacer(Modifier.height(4.dp))
                 VokasiButton(text = "Lihat Monitoring →", onClick = onMonitoring, isSecondary = true, modifier = Modifier.fillMaxWidth())
             }
@@ -115,8 +115,8 @@ internal fun AdminHome(
             WhiteCard(Modifier.fillMaxWidth()) {
                 Text("Aturan otomatis sistem", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Ink)
                 Spacer(Modifier.height(4.dp))
-                Text("• 10 soal acak per sesi", color = Subtle, fontSize = 13.sp)
-                Text("• 60 detik per soal", color = Subtle, fontSize = 13.sp)
+                Text("• 100 soal acak berstrata per sesi", color = Subtle, fontSize = 13.sp)
+                Text("• Maksimum 30 menit per sesi (timer setiap soal berbeda)", color = Subtle, fontSize = 13.sp)
                 Text("• +20 XP per sesi, max 10.000/hari", color = Subtle, fontSize = 13.sp)
                 Text("• Season berlangsung 3 bulan", color = Subtle, fontSize = 13.sp)
             }
