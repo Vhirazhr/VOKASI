@@ -79,6 +79,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
     var currentId by remember { mutableStateOf<String?>(null) }
     var isAdmin by remember { mutableStateOf(false) }
     var adminMajorFilter by remember { mutableStateOf("") }
+    var adminStudentMajor by remember { mutableStateOf("") }
     var adminClassFilter by remember { mutableStateOf("") }
     var adminDateFilter by remember { mutableStateOf("") }
 
@@ -200,7 +201,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             Triple(Page.ADMIN_QUESTIONS, "Soal", "▤")
                         ),
                         currentPage = page,
-                        onNavigate = { page = it }
+                        onNavigate = {
+                            if (it == Page.ADMIN_STUDENTS) adminStudentMajor = ""
+                            page = it
+                        }
                     )
                 }
             }
@@ -279,7 +283,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     )
                     Page.ADMIN_HOME -> AdminHome(
                         students.toList(), questions.toList(), attempts.toList(),
-                        onStudents = { page = Page.ADMIN_STUDENTS },
+                        onStudents = { chosenMajor ->
+                            adminStudentMajor = chosenMajor
+                            page = Page.ADMIN_STUDENTS
+                        },
                         onMonitoring = { major, classroom, date ->
                             adminMajorFilter = major
                             adminClassFilter = classroom
@@ -289,7 +296,8 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         onLogout = { logout() }
                     )
                     Page.ADMIN_STUDENTS -> AdminStudentsScreen(
-                        students = students.toList(), attempts = attempts.toList()
+                        students = students.toList(), attempts = attempts.toList(),
+                        initialMajor = adminStudentMajor
                     )
                     Page.ADMIN_QUESTIONS -> AdminQuestionsScreen(
                         questions = questions.toList(), bundledIds = bundledIds,
