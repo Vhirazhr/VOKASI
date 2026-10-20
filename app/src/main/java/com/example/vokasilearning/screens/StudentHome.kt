@@ -157,7 +157,7 @@ internal fun StudentHome(
                             fontSize = 23.sp, fontWeight = FontWeight.ExtraBold,
                             lineHeight = 29.sp)
                         Text(
-                            "100 soal perkalian, pembagian, penjumlahan, dan konversi satuan diacak sesuai tingkat kesulitan.",
+                            "4 materi • 100 soal acak",
                             color = Subtle, fontSize = 12.sp, lineHeight = 18.sp
                         )
                         HorizontalDivider(color = Border)
@@ -173,14 +173,10 @@ internal fun StudentHome(
                                 PaleGold, Warning, Modifier.weight(1f))
                         }
                         VokasiButton(
-                            text = "Mulai Mengerjakan  →", onClick = onStart,
+                            text = "Mulai Latihan", onClick = onStart,
                             enabled = countQuestions >= 500,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Text("♢  Sistem menentukan soal dan batas waktu secara otomatis",
-                            color = Subtle, fontSize = 10.sp,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center)
                     }
                 }
             }
@@ -192,7 +188,7 @@ internal fun StudentHome(
             ) {
                 StudentSectionHeading("BELAJAR LEBIH TERARAH", "Latihan per materi")
                 Text(
-                    "Pilih materi yang ingin kamu kuasai. Sistem menandai materi yang sering salah berdasarkan hasil latihanmu.",
+                    "Ulangi materi yang perlu ditingkatkan.",
                     color = Subtle, fontSize = 12.sp, lineHeight = 18.sp
                 )
                 practiceInsights.chunked(2).forEach { pair ->
@@ -250,12 +246,12 @@ internal fun StudentHome(
                                         )
                                     }
                                     Text(
-                                        if (alreadyRewarded) "Bonus hari ini sudah diambil"
-                                        else "+5 XP latihan pertama hari ini",
+                                        if (alreadyRewarded) "Bonus selesai"
+                                        else "Bonus +5 XP",
                                         color = if (alreadyRewarded) Subtle else Good,
                                         fontSize = 10.sp, lineHeight = 14.sp
                                     )
-                                    Text("Latih 10 soal  →", color = Navy, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("Latihan →", color = Navy, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
