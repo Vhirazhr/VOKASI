@@ -326,58 +326,146 @@ internal fun ResultPage(
 }
 
 @Composable
-internal fun ResultPopup(
-    me: Student, users: List<Student>, attempts: List<Attempt>, attempt: Attempt,
-    onClose: () -> Unit, onAllRanking: () -> Unit
+internal fun CompletionDialog(
+    attempt: Attempt,
+    streak: Int,
+    onViewResults: () -> Unit
 ) {
-    val scores = users.filter { it.classroom.label == me.classroom.label }.map { user ->
-        val last = attempts.lastOrNull { it.studentId == user.username }
-        user to (last?.score ?: user.seedScore)
-    }.sortedByDescending { it.second }
+    val gradeColor = when {
+        attempt.score >= 90 -> Good
+        attempt.score >= 75 -> Navy
+        attempt.score >= 60 -> Color(0xFFA06C13)
+        else -> Bad
+    }
+    val gradeBackground = when {
+        attempt.score >= 90 -> PaleGreen
+        attempt.score >= 75 -> PaleBlue
+        attempt.score >= 60 -> PaleGold
+        else -> Color(0xFFFFE7EA)
+    }
+    val wrong = (attempt.questionCount - attempt.correct).coerceAtLeast(0)
 
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(
+        onDismissRequest = onViewResults,
+        properties = DialogProperties(dismissOnClickOutside = false)
+    ) {
         Card(
-            Modifier.fillMaxWidth(0.92f).heightIn(max = 700.dp).shadow(24.dp, RoundedCornerShape(28.dp)),
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+            modifier = Modifier.fillMaxWidth().heightIn(max = 620.dp),
+            shape = RoundedCornerShape(26.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
         ) {
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🎉 Latihan Selesai!", color = Ink, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Nilai dihitung otomatis", color = Subtle, fontSize = 13.sp)
-                }
-
-                // Animated Stats Row
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ResultNumber(label = "Nilai", amount = attempt.score, suffix = "%", modifier = Modifier.weight(1f))
-                    ResultNumber(label = "XP", amount = attempt.earnedXp, prefix = "+", modifier = Modifier.weight(1f), color = Good)
-                    ResultNumber(label = "Streak", amount = calculateStreak(me, attempts), prefix = "🔥 ", modifier = Modifier.weight(1f), color = Warning)
-                }
-
-                Text("Peringkat Kelas • ${me.classroom.label}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink)
-
-                LazyColumn(
-                    Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 240.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(13.dp)
+            ) {
+                Box(
+                    Modifier.size(52.dp).clip(CircleShape).background(PaleBlue),
+                    contentAlignment = Alignment.Center
                 ) {
-                    itemsIndexed(scores) { index, pair ->
-                        Row(
-                            Modifier.fillMaxWidth().background(if (pair.first.username == me.username) PaleBlue else Canvas, RoundedCornerShape(12.dp)).padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text("${index + 1}.", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Subtle, modifier = Modifier.width(24.dp))
-                            Avatar(pair.first, 32.dp)
-                            Text(pair.first.name, Modifier.weight(1f), fontSize = 13.sp, fontWeight = if (pair.first.username == me.username) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("${pair.second}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Navy)
-                        }
+                    Text("✓", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold, color = Navy)
+                }
+                Text(
+                    if (attempt.practiceCategory == null) "LATIHAN WAJIB SELESAI"
+                    else "LATIHAN MATERI SELESAI",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = NavyLight,
+                    letterSpacing = 0.8.sp
+                )
+                Text(
+                    completionHeadline(attempt.score),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Ink,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 29.sp
+                )
+                Column(
+                    Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(gradeBackground)
+                        .padding(horizontal = 14.dp, vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Text("NILAI KAMU", color = gradeColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "${attempt.score}",
+                        color = gradeColor,
+                        fontSize = 53.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        lineHeight = 57.sp
+                    )
+                    Text(
+                        scoreGrade(attempt.score),
+                        color = gradeColor,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Column(
+                        Modifier.weight(1f).clip(RoundedCornerShape(13.dp))
+                            .background(PaleGreen).padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("Benar", color = Good, fontSize = 11.sp)
+                        Text("${attempt.correct}/${attempt.questionCount}",
+                            color = Good, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                    Column(
+                        Modifier.weight(1f).clip(RoundedCornerShape(13.dp))
+                            .background(Color(0xFFFFE7EA)).padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("Salah", color = Bad, fontSize = 11.sp)
+                        Text("$wrong", color = Bad, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
                     }
                 }
-
-                Spacer(Modifier.height(8.dp))
-                VokasiButton(text = "Tutup / Beranda", onClick = onClose, modifier = Modifier.fillMaxWidth())
-                TextButton(onClick = onAllRanking, modifier = Modifier.fillMaxWidth()) {
-                    Text("Buka papan peringkat lengkap", color = Navy, fontWeight = FontWeight.SemiBold)
+                HorizontalDivider(color = Border)
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Column(
+                        Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text("XP Diperoleh", fontSize = 11.sp, color = Subtle)
+                        Text(
+                            "+${attempt.earnedXp} XP",
+                            fontSize = 18.sp,
+                            color = if (attempt.earnedXp > 0) Good else Subtle,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                    Column(
+                        Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text("Streak", fontSize = 11.sp, color = Subtle)
+                        Text(
+                            if (streak > 0) "$streak hari" else "Belum mulai",
+                            fontSize = if (streak > 0) 18.sp else 15.sp,
+                            color = Navy,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
                 }
+                VokasiButton(
+                    text = "Lihat Hasil",
+                    onClick = onViewResults,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
