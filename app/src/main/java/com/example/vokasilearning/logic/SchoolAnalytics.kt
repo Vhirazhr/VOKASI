@@ -2,6 +2,9 @@ package com.example.vokasilearning.logic
 
 import com.example.vokasilearning.model.Attempt
 import com.example.vokasilearning.model.Student
+import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 
 /** X, XI and XII are distinct years; sections within each year remain distinct. */
 internal fun schoolGrade(classLabel: String): String =
@@ -82,4 +85,68 @@ internal object SchoolAnalytics {
             trend = trend
         )
     }
+    /**
+     * Monthly compulsory overview. Each pupil is counted only once, using their
+     * last compulsory result within the selected WIB calendar month.
+     * Growth compares pupils who have a result in BOTH this and previous month.
+     */
+    fun calculateMonthly(
+        students: List<Student>,
+        attempts: List<Attempt>,
+        scope: SchoolScope,
+        year: Int,
+        month: Int
+    ): SchoolStatistics {
+        require(month in 1..12)
+        val chosenMonth = String.format(Locale.US, "%04d-%02d", year, month)
+        val members = members(students, scope)
+        val ids = members.mapTo(HashSet()) { it.username }
+        val compulsory = attempts.filter { it.practiceCategory == null && it.studentId in ids }
+        val monthly = compulsory.groupBy { dayKey(it.timeMillis).take(7) }
+
+        fun latestPerStudent(key: String): Map<String, Attempt> =
+            monthly[key].orEmpty().groupBy { it.studentId }.mapValues { (_, runs) ->
+                runs.maxWithOrNull(compareBy<Attempt> { it.timeMillis }.thenBy { it.sessionKey })!!
+            }
+
+        val current = latestPerStudent(chosenMonth)
+        val cursor = Calendar.getInstance(TimeZone.getTimeZone("Asia/Jakarta"), Locale.US).apply {
+            clear()
+            set(year, month - 1, 1)
+        }
+        cursor.add(Calendar.MONTH, -1)
+        val previousKey = String.format(Locale.US, "%04d-%02d",
+            cursor.get(Calendar.YEAR), cursor.get(Calendar.MONTH) + 1)
+        val previous = latestPerStudent(previousKey)
+        val overlapping = current.keys.intersect(previous.keys)
+        val scored = current.values.map { it.score }
+        val history = (5 downTo 0).map { offset ->
+            val calendar = Calendar.getInstance(TimeZone.getTimeZone("Asia/Jakarta"), Locale.US).apply {
+                clear()
+                set(year, month - 1, 1)
+                add(Calendar.MONTH, -offset)
+            }
+            val key = String.format(Locale.US, "%04d-%02d",
+                calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1)
+            val monthScores = latestPerStudent(key).values.map { it.score }
+            key to monthScores.takeIf { it.isNotEmpty() }?.average()?.toInt()
+        }
+        return SchoolStatistics(
+            students = members.size,
+            classes = members.map { it.classroom.major to it.classroom.label }.distinct().size,
+            majors = members.map { it.classroom.major }.distinct().size,
+            completed = current.size,
+            average = scored.takeIf { it.isNotEmpty() }?.average()?.toInt(),
+            high = scored.count { it >= 75 },
+            middle = scored.count { it in 60..74 },
+            low = scored.count { it < 60 },
+            previousAverage = previous.values.map { it.score }.takeIf { it.isNotEmpty() }
+                ?.average()?.toInt(),
+            improved = overlapping.count { current.getValue(it).score > previous.getValue(it).score },
+            declined = overlapping.count { current.getValue(it).score < previous.getValue(it).score },
+            stable = overlapping.count { current.getValue(it).score == previous.getValue(it).score },
+            trend = history
+        )
+    }
+
 }
