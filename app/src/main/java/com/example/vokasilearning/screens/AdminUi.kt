@@ -174,7 +174,8 @@ internal fun AdminExcelAction(
     classroom: String,
     date: String,
     modifier: Modifier = Modifier,
-    text: String = "Unduh Excel"
+    text: String = "Unduh Excel",
+    onExport: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
     var target by remember { mutableStateOf<Triple<String, String, String>?>(null) }
@@ -195,6 +196,7 @@ internal fun AdminExcelAction(
                     )
                 }
                 Toast.makeText(context, "Excel tersimpan", Toast.LENGTH_SHORT).show()
+                onExport(selection.first, selection.second, selection.third)
             } catch (ex: Exception) {
                 Toast.makeText(context, "Ekspor gagal: ${ex.message}", Toast.LENGTH_LONG).show()
             }
