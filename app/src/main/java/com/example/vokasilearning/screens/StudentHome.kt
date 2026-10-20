@@ -297,11 +297,21 @@ internal fun StudentHome(
                                 verticalArrangement = Arrangement.spacedBy(7.dp)
                             ) {
                                 Text(
-                                    if (todayCount > 0) "Latihan harian tercatat!" else "Yuk, mulai latihan pertamamu!",
+                                    when {
+                                        todayCount > 0 -> "Latihan wajib selesai!"
+                                        streak == 0 -> "Mulai streak pertamamu!"
+                                        else -> "Jaga streak ${streak} harimu!"
+                                    },
                                     color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold
                                 )
-                                Text("$todayCount sesi wajib hari ini • $streak hari streak",
-                                    color = Subtle, fontSize = 11.sp)
+                                Text(
+                                    when {
+                                        todayCount > 0 -> "$todayCount sesi wajib • Streak $streak hari"
+                                        streak == 0 -> "Selesaikan latihan untuk memulai streak"
+                                        else -> "Belum latihan hari ini • Streak $streak hari"
+                                    },
+                                    color = Subtle, fontSize = 11.sp
+                                )
                                 LinearProgressIndicator(
                                     progress = { if (todayCount > 0) 1f else 0f },
                                     modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
@@ -331,8 +341,11 @@ internal fun StudentHome(
                     }
                     WhiteCard(Modifier.weight(1f)) {
                         Text("Streak Harian", color = Subtle, fontSize = 11.sp)
-                        Text("🔥 $streak hari", color = Ink, fontWeight = FontWeight.ExtraBold,
-                            fontSize = 19.sp)
+                        Text(
+                            if (streak == 0) "Belum mulai" else "$streak hari",
+                            color = if (streak == 0) Subtle else Ink,
+                            fontWeight = FontWeight.ExtraBold, fontSize = if (streak == 0) 15.sp else 19.sp
+                        )
                     }
                 }
             }
