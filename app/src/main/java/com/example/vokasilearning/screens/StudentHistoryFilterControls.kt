@@ -16,7 +16,10 @@ import com.example.vokasilearning.ui.*
 import java.util.Calendar
 import java.util.Locale
 
-/** One compact filter on Profile: optional type plus a calendar date range. */
+/**
+ * Visible category tabs, like the ranking screen; date filter is secondary.
+ * Default tab is compulsory training, and switching it applies immediately.
+ */
 @Composable
 internal fun StudentHistoryFilterControls(
     applied: HistorySelection,
@@ -51,13 +54,12 @@ internal fun StudentHistoryFilterControls(
             }, year, month, day
         ).apply {
             datePicker.maxDate = System.currentTimeMillis()
-            val lower = if (start) "" else draft.fromDate
-            if (lower.isNotBlank()) {
-                val range = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+            if (!start && draft.fromDate.isNotBlank()) {
+                val earliest = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
                     timeZone = java.util.TimeZone.getTimeZone("Asia/Jakarta")
                     isLenient = false
-                }.parse(lower)?.time
-                if (range != null) datePicker.minDate = range
+                }.parse(draft.fromDate)?.time
+                if (earliest != null) datePicker.minDate = earliest
             }
         }.show()
     }
@@ -75,22 +77,35 @@ internal fun StudentHistoryFilterControls(
                 },
                 shape = RoundedCornerShape(12.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-            ) { Text("Filter", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+            ) { Text("Tanggal", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+        }
+
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(
+                HistoryType.REQUIRED to "Wajib",
+                HistoryType.PRACTICE to "Latihan Materi"
+            ).forEach { (type, label) ->
+                val selected = applied.type == type
+                Button(
+                    onClick = {
+                        onApply(applied.copy(type = type))
+                        if (expanded) draft = draft.copy(type = type)
+                    },
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selected) Navy else androidx.compose.ui.graphics.Color.White,
+                        contentColor = if (selected) androidx.compose.ui.graphics.Color.White else Subtle
+                    )
+                ) { Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+            }
         }
 
         if (expanded) {
             WhiteCard(Modifier.fillMaxWidth()) {
-                Text("Jenis latihan", color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    HistoryType.entries.forEach { type ->
-                        FilterChip(
-                            selected = draft.type == type,
-                            onClick = { draft = draft.copy(type = type) },
-                            label = { Text(type.label, fontSize = 11.sp) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
                 Text("Rentang tanggal", color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Row(
                     Modifier.fillMaxWidth(),
@@ -103,9 +118,8 @@ internal fun StudentHistoryFilterControls(
                         contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
                         Text(
-                            draft.fromDate.ifBlank { "Dari tanggal" },
-                            fontSize = 11.sp, color = Ink,
-                            maxLines = 1
+                            draft.fromDate.ifBlank { "Dari" },
+                            fontSize = 11.sp, color = Ink, maxLines = 1
                         )
                     }
                     OutlinedButton(
@@ -115,21 +129,14 @@ internal fun StudentHistoryFilterControls(
                         contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
                         Text(
-                            draft.toDate.ifBlank { "Sampai tanggal" },
-                            fontSize = 11.sp, color = Ink,
-                            maxLines = 1
+                            draft.toDate.ifBlank { "Sampai" },
+                            fontSize = 11.sp, color = Ink, maxLines = 1
                         )
                     }
                 }
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = {
-                        val reset = draft.copy(
-                            type = HistoryType.ALL, period = HistoryPeriod.ALL,
-                            fromDate = "", toDate = ""
-                        )
+                        val reset = applied.copy(fromDate = "", toDate = "", period = HistoryPeriod.ALL)
                         draft = reset
                         onApply(reset)
                         expanded = false
@@ -137,7 +144,7 @@ internal fun StudentHistoryFilterControls(
                     Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = {
-                            onApply(draft.copy(period = HistoryPeriod.ALL))
+                            onApply(draft.copy(type = applied.type, period = HistoryPeriod.ALL))
                             expanded = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Navy),
@@ -145,6 +152,11 @@ internal fun StudentHistoryFilterControls(
                     ) { Text("Terapkan") }
                 }
             }
+        } else if (applied.fromDate.isNotBlank() || applied.toDate.isNotBlank()) {
+            Text(
+                "${applied.fromDate.ifBlank { "Awal" }} – ${applied.toDate.ifBlank { "Hari ini" }}",
+                color = Subtle, fontSize = 11.sp
+            )
         }
     }
 }
