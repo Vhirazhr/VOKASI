@@ -26,7 +26,7 @@ import java.util.Calendar
 import kotlin.math.max
 
 @Composable
-internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () -> Unit) {
+internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () -> Unit, onReview: (Attempt) -> Unit) {
     val mine = attempts.filter { it.studentId == me.username }.sortedByDescending { it.timeMillis }
     val totalXp = lifetimeXp(me, attempts)
     val seasonXp = studentSeasonXp(me, attempts)
@@ -207,13 +207,16 @@ internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () ->
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("Latihan Aritmetika", color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(attempt.practiceCategory?.let { "Latihan $it" } ?: "Latihan Wajib", color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             Text(
                                 "${dayKey(attempt.timeMillis)} • ${attempt.correct}/${attempt.questionCount} benar",
                                 color = Subtle, fontSize = 11.sp
                             )
                         }
                         Pill("${attempt.score}%  •  +${attempt.earnedXp} XP", PaleGreen, Good)
+                    }
+                    TextButton(onClick = { onReview(attempt) }) {
+                        Text("Lihat jawaban dan pembahasan →", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
             }
