@@ -92,20 +92,6 @@ internal fun AdminHome(
                                 Modifier.weight(1f))
                             AdminDateSelect(date, { date = it }, Modifier.weight(1f))
                         }
-                        HorizontalDivider(color = Border)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AdminStatChip("Sudah", "${summary.completedCount}", Good,
-                                Modifier.weight(1f))
-                            AdminStatChip("Belum", "${summary.missingCount}", Warning,
-                                Modifier.weight(1f))
-                            AdminStatChip("Rata-rata",
-                                summary.averageScore?.toString() ?: "—", Navy,
-                                Modifier.weight(1f))
-                        }
-                        Text(
-                            "${summary.studentCount} siswa di $classroom • Nilai wajib terbaru per siswa",
-                            fontSize = 11.sp, color = Subtle
-                        )
                         VokasiButton(
                             text = "Lihat Hasil Siswa",
                             onClick = { onMonitoring(major, classroom, date) },
