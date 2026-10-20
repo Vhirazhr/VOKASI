@@ -65,7 +65,7 @@ import com.example.vokasilearning.ui.*
 @Composable
 internal fun VokasiApp(activity: ComponentActivity) {
     val students = remember { mutableStateListOf<Student>().apply { addAll(initialStudents()) } }
-    val questions = remember { mutableStateListOf<Question>().apply { addAll(initialQuestions()) } }
+    val questions = remember { mutableStateListOf<Question>().apply { addAll(QuestionBankLoader.load(activity)) } }
     val attempts = remember { mutableStateListOf<Attempt>() }
 
     var page by remember { mutableStateOf(Page.LOGIN) }
@@ -85,7 +85,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
     }
     fun finishQuiz() {
         val student = students.firstOrNull { it.username == currentId } ?: return
-        if (page != Page.QUIZ) return
+        if (page != Page.QUIZ || !quizSession.isComplete) return
         val attempt = quizSession.finish(student, attempts.toList())
         attempts.add(attempt)
         currentAttempt = attempt
@@ -97,11 +97,11 @@ internal fun VokasiApp(activity: ComponentActivity) {
 
     LaunchedEffect(page, quizSession.sessionId) {
         if (page == Page.QUIZ) {
-            while (page == Page.QUIZ && quizSession.remainingSeconds > 0) {
-                delay(1000L)
-                if (page == Page.QUIZ) quizSession.remainingSeconds--
+            while (page == Page.QUIZ && !quizSession.isComplete) {
+                if (quizSession.tick()) break
+                delay(250L)
             }
-            if (page == Page.QUIZ && quizSession.remainingSeconds <= 0) finishQuiz()
+            if (page == Page.QUIZ && quizSession.isComplete) finishQuiz()
         }
     }
 
@@ -119,7 +119,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
             onDismissRequest = { quitDialog = false },
             title = { Text("Keluar dari latihan?", fontWeight = FontWeight.Bold) },
             text = { Text("Jawaban sesi ini tidak dinilai dan XP tidak akan diberikan.") },
-            confirmButton = { TextButton(onClick = { quitDialog = false; page = Page.HOME }) { Text("Keluar", color = Bad) } },
+            confirmButton = { TextButton(onClick = { quitDialog = false; quizSession.abandon(); page = Page.HOME }) { Text("Keluar", color = Bad) } },
             dismissButton = { TextButton(onClick = { quitDialog = false }) { Text("Lanjut") } }
         )
     }
@@ -189,11 +189,13 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         onStart = { startQuiz() }, onRanking = { page = Page.LEADERBOARD }
                     )
                     Page.QUIZ -> QuizScreen(
-                        questions = quizSession.questions, index = quizSession.index, answers = quizSession.answers,
-                        seconds = quizSession.remainingSeconds, onPick = { id, selection -> quizSession.answers[id] = selection },
-                        onNext = { if (quizSession.index < quizSession.questions.lastIndex) quizSession.index++ },
-                        onPrevious = { if (quizSession.index > 0) quizSession.index-- },
-                        onFinish = { finishQuiz() }, onQuit = { quitDialog = true }
+                        questions = quizSession.questions, index = quizSession.index,
+                        selectedIndex = quizSession.selectedIndex,
+                        seconds = quizSession.remainingSeconds,
+                        totalSeconds = quizSession.totalRemainingSeconds,
+                        onPick = { selection -> quizSession.choose(selection) },
+                        onSubmit = { if (quizSession.submit()) finishQuiz() },
+                        onQuit = { quitDialog = true }
                     )
                     Page.RESULT -> if (me != null && currentAttempt != null) ResultPage(
                         currentAttempt!!, onHome = { showResultPopup = false; page = Page.HOME },
