@@ -194,7 +194,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         onStart = { startQuiz() }, onRanking = { page = Page.LEADERBOARD }
                     )
                     Page.QUIZ -> QuizScreen(
-                        questions = quizSession.questions, index = quizSession.index, quizSession.answers = quizSession.answers,
+                        questions = quizSession.questions, index = quizSession.index, answers = quizSession.answers,
                         seconds = quizSession.remainingSeconds, onPick = { id, selection -> quizSession.answers[id] = selection },
                         onNext = { if (quizSession.index < quizSession.questions.lastIndex) quizSession.index++ },
                         onPrevious = { if (quizSession.index > 0) quizSession.index-- },
