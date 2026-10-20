@@ -64,9 +64,8 @@ import com.example.vokasilearning.ui.*
 
 @Composable
 internal fun QuizScreen(
-    questions: List<Question>, index: Int, answers: Map<Int, Int>, seconds: Int,
-    onPick: (Int, Int) -> Unit, onNext: () -> Unit, onPrevious: () -> Unit,
-    onFinish: () -> Unit, onQuit: () -> Unit
+    questions: List<Question>, index: Int, selectedIndex: Int?, seconds: Int, totalSeconds: Int,
+    onPick: (Int) -> Unit, onSubmit: () -> Unit, onQuit: () -> Unit
 ) {
     if (questions.isEmpty()) return
     val current = questions[index]
@@ -79,7 +78,7 @@ internal fun QuizScreen(
                 Spacer(Modifier.weight(1f))
                 // Animated timer color
                 val timerColor by animateColorAsState(
-                    targetValue = if (seconds < 60) Bad else Color.White,
+                    targetValue = if (seconds <= 5) Bad else Color.White,
                     label = "TimerColor"
                 )
                 Pill("⏱ ${clockText(seconds)}", Color.White.copy(alpha = 0.15f), timerColor)
@@ -87,7 +86,7 @@ internal fun QuizScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Soal ${index + 1} dari ${questions.size}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Spacer(Modifier.weight(1f))
-                Text("${answers.size} dijawab", color = Color(0xFFB0C4DE), fontSize = 12.sp)
+                Text("Total sisa ${clockText(totalSeconds)}", color = Color(0xFFB0C4DE), fontSize = 12.sp)
             }
             // Smooth Progress Bar
             val progress by animateFloatAsState(
@@ -129,7 +128,7 @@ internal fun QuizScreen(
                 Text("Pilih satu jawaban:", color = Subtle, fontSize = 13.sp, fontWeight = FontWeight.Medium)
 
                 q.options.forEachIndexed { optionIndex, text ->
-                    val selected = answers[q.id] == optionIndex
+                    val selected = selectedIndex == optionIndex
                     val bgColor by animateColorAsState(if (selected) PaleBlue else Color.White, label = "OptBg")
                     val borderColor by animateColorAsState(if (selected) Navy else Border, label = "OptBorder")
 
@@ -137,7 +136,7 @@ internal fun QuizScreen(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
                             .background(bgColor)
                             .border(if (selected) 2.dp else 1.dp, borderColor, RoundedCornerShape(16.dp))
-                            .clickable { onPick(q.id, optionIndex) }.padding(16.dp),
+                            .clickable { onPick(optionIndex) }.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Box(
@@ -153,22 +152,22 @@ internal fun QuizScreen(
             }
         }
 
-        // Bottom Navigation (Prev/Next)
-        Row(
+        // Once submitted, a question cannot be revisited.
+        Column(
             Modifier.fillMaxWidth().background(Color.White).padding(20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             VokasiButton(
-                text = "Sebelumnya",
-                onClick = onPrevious,
-                enabled = index > 0,
-                isSecondary = true,
-                modifier = Modifier.weight(1f)
+                text = if (index == questions.lastIndex) "Kirim Jawaban & Selesai" else "Kirim Jawaban →",
+                onClick = onSubmit,
+                enabled = selectedIndex != null && seconds > 0,
+                modifier = Modifier.fillMaxWidth()
             )
-            VokasiButton(
-                text = if (index == questions.lastIndex) "Selesai" else "Berikutnya →",
-                onClick = if (index == questions.lastIndex) onFinish else onNext,
-                modifier = Modifier.weight(1f)
+            Text(
+                "Waktu yang tersisa pada soal ini tidak dipindahkan ke soal berikutnya.",
+                color = Subtle, fontSize = 10.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
             )
         }
     }
