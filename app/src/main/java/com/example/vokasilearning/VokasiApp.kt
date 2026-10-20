@@ -75,6 +75,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
     val quizSession = rememberQuizSession()
 
     var currentAttempt by remember { mutableStateOf<Attempt?>(null) }
+    var reviewingHistory by remember { mutableStateOf(false) }
     var showResultPopup by remember { mutableStateOf(false) }
     var quitDialog by remember { mutableStateOf(false) }
     val me = students.firstOrNull { it.username == currentId }
@@ -90,6 +91,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
         attempts.add(attempt)
         LocalAttemptStore.save(activity, attempts.toList())
         currentAttempt = attempt
+        reviewingHistory = false
         showResultPopup = false
         page = Page.RESULT
     }
@@ -201,12 +203,14 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         onQuit = { quitDialog = true }
                     )
                     Page.RESULT -> if (me != null && currentAttempt != null) ResultPage(
-                        currentAttempt!!, onHome = { showResultPopup = false; page = Page.HOME },
-                        onRanking = { showResultPopup = false; page = Page.LEADERBOARD }
+                        currentAttempt!!, onHome = { reviewingHistory = false; page = Page.HOME },
+                        onRanking = { reviewingHistory = false; page = Page.LEADERBOARD },
+                        onPractice = { category -> reviewingHistory = false; startQuiz(category) },
+                        openReviewOnEntry = reviewingHistory
                     )
                     Page.LEADERBOARD -> if (me != null) LeaderboardScreen(me, students.toList(), attempts.toList())
                     Page.PROFILE -> if (me != null) ProfileScreen(me, attempts.toList(), onLogout = { logout() },
-                        onReview = { attempt -> currentAttempt = attempt; page = Page.RESULT })
+                        onReview = { attempt -> currentAttempt = attempt; reviewingHistory = true; page = Page.RESULT })
                     Page.ADMIN_HOME -> AdminHome(
                         students.toList(), questions.toList(), attempts.toList(),
                         onQuestions = { page = Page.ADMIN_QUESTIONS }, onMonitoring = { page = Page.ADMIN_MONITOR },
