@@ -28,7 +28,7 @@ internal object DailyExcelReport {
         val members = students.filter { it.classroom.label == classroom }.sortedBy { it.name }
         val rows = members.mapIndexed { i, student ->
             val latest = attempts.asSequence()
-                .filter { it.studentId == student.username && dayKey(it.timeMillis) == date }
+                .filter { it.studentId == student.username && it.practiceCategory == null && dayKey(it.timeMillis) == date }
                 .maxWithOrNull(compareBy<Attempt> { it.timeMillis }.thenBy { it.sessionKey })
             listOf(
                 (i + 1).toString(),
