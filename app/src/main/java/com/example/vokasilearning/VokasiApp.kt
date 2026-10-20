@@ -78,6 +78,9 @@ internal fun VokasiApp(activity: ComponentActivity) {
     var page by remember { mutableStateOf(Page.LOGIN) }
     var currentId by remember { mutableStateOf<String?>(null) }
     var isAdmin by remember { mutableStateOf(false) }
+    var adminMajorFilter by remember { mutableStateOf("") }
+    var adminClassFilter by remember { mutableStateOf("") }
+    var adminDateFilter by remember { mutableStateOf("") }
 
     val quizSession = rememberQuizSession()
 
@@ -277,8 +280,12 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     Page.ADMIN_HOME -> AdminHome(
                         students.toList(), questions.toList(), attempts.toList(),
                         onStudents = { page = Page.ADMIN_STUDENTS },
-                        onQuestions = { page = Page.ADMIN_QUESTIONS },
-                        onMonitoring = { page = Page.ADMIN_MONITOR },
+                        onMonitoring = { major, classroom, date ->
+                            adminMajorFilter = major
+                            adminClassFilter = classroom
+                            adminDateFilter = date
+                            page = Page.ADMIN_MONITOR
+                        },
                         onLogout = { logout() }
                     )
                     Page.ADMIN_STUDENTS -> AdminStudentsScreen(
@@ -331,7 +338,12 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             }
                         }
                     )
-                    Page.ADMIN_MONITOR -> AdminMonitorScreen(students.toList(), attempts.toList())
+                    Page.ADMIN_MONITOR -> AdminMonitorScreen(
+                        students.toList(), attempts.toList(),
+                        initialMajor = adminMajorFilter,
+                        initialClass = adminClassFilter,
+                        initialDate = adminDateFilter
+                    )
                 }
             }
         }
