@@ -130,7 +130,11 @@ internal fun ResultPage(
     fun exportPdf() {
         val id = (attempt.studentNameSnapshot.ifBlank { student.name })
             .replace(Regex("[^A-Za-z0-9_-]"), "_").take(36)
-        val filename = "VOKASI_Hasil_${id}_${dayKey(attempt.timeMillis)}.pdf"
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("Asia/Jakarta")
+        }.format(Date(attempt.timeMillis))
+        val category = attempt.practiceCategory?.replace(Regex("[^A-Za-z0-9_-]"), "_") ?: "Wajib"
+        val filename = "VOKASI_${id}_${category}_${timestamp}.pdf"
         exportLauncher.launch(filename)
     }
 
