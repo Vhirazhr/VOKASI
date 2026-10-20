@@ -1,4 +1,4 @@
-package com.example.vokasilearning.features.student
+package com.example.vokasilearning.screens
 
 import android.graphics.BitmapFactory
 import android.os.Bundle
@@ -55,17 +55,12 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import kotlin.math.max
-import com.example.vokasilearning.app.*
-import com.example.vokasilearning.navigation.*
-import com.example.vokasilearning.domain.*
+import com.example.vokasilearning.*
 import com.example.vokasilearning.data.*
-import com.example.vokasilearning.features.auth.*
-import com.example.vokasilearning.features.student.*
-import com.example.vokasilearning.features.admin.*
-import com.example.vokasilearning.ui.components.*
-import com.example.vokasilearning.ui.theme.*
-import com.example.vokasilearning.ui.adaptive.*
-import com.example.vokasilearning.ui.security.*
+import com.example.vokasilearning.logic.*
+import com.example.vokasilearning.model.*
+import com.example.vokasilearning.screens.*
+import com.example.vokasilearning.ui.*
 
 @Composable
 internal fun StudentHome(

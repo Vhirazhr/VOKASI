@@ -1,9 +1,15 @@
-package com.example.vokasilearning.ui.theme
+package com.example.vokasilearning.ui
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import com.example.vokasilearning.*
+import com.example.vokasilearning.data.*
+import com.example.vokasilearning.logic.*
+import com.example.vokasilearning.model.*
+import com.example.vokasilearning.screens.*
+import com.example.vokasilearning.ui.*
 
 // --- DESIGN TOKENS ---
 internal val Navy = Color(0xFF233F68)

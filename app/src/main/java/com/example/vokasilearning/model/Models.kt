@@ -1,6 +1,12 @@
-package com.example.vokasilearning.domain
+package com.example.vokasilearning.model
 
 import androidx.compose.ui.graphics.ImageBitmap
+import com.example.vokasilearning.*
+import com.example.vokasilearning.data.*
+import com.example.vokasilearning.logic.*
+import com.example.vokasilearning.model.*
+import com.example.vokasilearning.screens.*
+import com.example.vokasilearning.ui.*
 
 internal data class Classroom(val label: String, val major: String)
 

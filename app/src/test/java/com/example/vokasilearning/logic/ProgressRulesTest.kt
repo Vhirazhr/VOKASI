@@ -1,4 +1,4 @@
-package com.example.vokasilearning.domain
+package com.example.vokasilearning.logic
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

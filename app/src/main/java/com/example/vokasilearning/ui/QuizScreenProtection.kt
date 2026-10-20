@@ -1,10 +1,15 @@
-package com.example.vokasilearning.ui.security
+package com.example.vokasilearning.ui
 
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import com.example.vokasilearning.domain.DEMO_RECORDING
+import com.example.vokasilearning.*
+import com.example.vokasilearning.data.*
+import com.example.vokasilearning.logic.*
+import com.example.vokasilearning.model.*
+import com.example.vokasilearning.screens.*
+import com.example.vokasilearning.ui.*
 
 /** Debug: izin rekaman khusus demo. Release: perlindungan FLAG_SECURE tetap aktif saat kuis. */
 @Composable

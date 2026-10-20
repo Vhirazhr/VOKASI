@@ -1,32 +1,65 @@
-# VOKASI Learning — struktur aplikasi Android
+# VOKASI LEARNING — Petunjuk struktur kode
 
-Refaktor dari MainActivity.kt monolitik menjadi paket berdasarkan fungsi tanpa perubahan Gradle, SDK atau framework (tetap Kotlin + Jetpack Compose).
+Aku sederhanakan semua file Kotlin yang sering kamu edit. Setelah package utama, setiap folder hanya **satu tingkat**. Tidak perlu buka `features/student/...` atau `ui/components/...` lagi.
 
-| Folder | Peran |
-|---|---|
-| MainActivity.kt | Android entry point saja |
-| app/VokasiApp.kt | Aplikasi utama dan perpindahan halaman |
-| navigation/Page.kt | Definisi halaman |
-| domain/Models.kt | Student, Question, Attempt |
-| domain/QuizSession.kt | State sesi, acak soal, timer, penghitungan nilai dan XP |
-| domain/ProgressRules.kt | Level, season, streak, WIB, ranking |
-| data/DemoData.kt | Akun dan bank soal demo |
-| features/auth/ | Login & pendaftaran |
-| features/student/ | Beranda, kuis, hasil, profil, ranking |
-| features/admin/ | Admin dan monitoring |
-| ui/components/ | Komponen UI bersama |
-| ui/adaptive/ | Layar HP, landscape dan tablet |
-| ui/security/ | FLAG_SECURE kuis, pengecualian khusus rekaman debug |
-| ui/theme/VokasiPalette.kt | Tema warna VOKASI |
+```text
+app/src/main/java/com/example/vokasilearning/
+├── MainActivity.kt       ← pembuka Android, tidak untuk fitur
+├── VokasiApp.kt          ← root + perpindahan halaman
+├── Page.kt               ← daftar halaman
+├── screens/              ← SEMUA halaman (siswa + admin)
+│   ├── LoginScreen.kt
+│   ├── RegisterScreen.kt
+│   ├── StudentHome.kt
+│   ├── QuizScreen.kt
+│   ├── ResultsScreens.kt
+│   ├── LeaderboardScreen.kt
+│   ├── ProfileScreen.kt
+│   ├── AdminHome.kt
+│   ├── AdminQuestionsScreen.kt
+│   ├── AdminAddQuestionScreen.kt
+│   └── AdminMonitorScreen.kt
+├── logic/                ← aturan sistem
+│   ├── QuizSession.kt
+│   ├── ProgressRules.kt
+│   └── AppConfig.kt
+├── model/
+│   └── Models.kt         ← bentuk data
+├── data/
+│   └── DemoData.kt       ← contoh siswa dan soal matematika
+└── ui/                   ← komponen & tampilan bersama
+    ├── VokasiTheme.kt
+    ├── VokasiComponents.kt
+    ├── AdaptiveAppFrame.kt
+    └── QuizScreenProtection.kt
+```
 
-Kompatibilitas saat ini Android 7.0 ke atas (minSdk 24). iPhone/iPad tidak otomatis bisa menjalankan APK; perlu port iOS tersendiri.
+## Edit di mana?
+
+- Beranda siswa: **screens/StudentHome.kt**
+- Tampilan soal: **screens/QuizScreen.kt**
+- Popup hasil, nilai: **screens/ResultsScreens.kt**
+- Login dan pendaftaran: **screens/LoginScreen.kt**, **screens/RegisterScreen.kt**
+- XP, streak, level, season: **logic/ProgressRules.kt**
+- Timer, soal acak, skor dan XP sesi: **logic/QuizSession.kt**
+- Soal demo: **data/DemoData.kt**
+- Warna, tema: **ui/VokasiTheme.kt**
+- Tombol, kartu, avatar: **ui/VokasiComponents.kt**
+- Android entry point: **MainActivity.kt** (cukup memanggil VokasiApp)
+
+Tekan **Shift dua kali** di Android Studio, ketik nama file, lalu Enter.
+
+## Yang tidak diubah
+
+- Kotlin + Jetpack Compose, konfigurasi Gradle/SDK tetap.
+- `minSdk=24`: target Android 7.0+.
+- Hanya satu sekolah, dua role, dashboard fokus latihan acak.
+- XP 20 per sesi valid, batas 10.000 XP per siswa per hari, season tiga bulan.
+- `FLAG_SECURE` tetap untuk build rilis; build debug boleh direkam khusus demo.
+- Desain visual mengacu Figma; sistem aplikasi tetap mengikuti kesepakatan.
 
 ## Verifikasi sebelum merge
 
-- Build > Make Project pada Android Studio; kode belum dikompilasi langsung di mesin Android.
-- Login dummy siswa dan admin, latihan wajib, timer, popup hasil, XP, leaderboard.
-- Lihat rendering di HP kecil dan tablet; ukuran font besar dan rotasi landscape.
-- Coba screen record pada debug dan pastikan soal tetap terlindungi pada build release.
-- Materi dummy terbatas pada penjumlahan, pengurangan, perkalian dan sedikit pembagian.
+Build dan tes login, kuis, timeout, hasil, admin, peringkat di Android Studio. Uji HP kecil dan tablet. **Belum teruji build APK langsung** di sini.
 
-Ini masih prototipe: belum ada backend, sinkronisasi, validasi identitas sekolah yang aman, atau penyimpanan akun sungguhan.
+iPhone/iPad butuh target iOS terpisah; kode APK Android tidak langsung berjalan di iOS.

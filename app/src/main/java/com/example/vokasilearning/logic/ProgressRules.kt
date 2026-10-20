@@ -1,4 +1,4 @@
-package com.example.vokasilearning.domain
+package com.example.vokasilearning.logic
 
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -6,6 +6,12 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import kotlin.math.max
+import com.example.vokasilearning.*
+import com.example.vokasilearning.data.*
+import com.example.vokasilearning.logic.*
+import com.example.vokasilearning.model.*
+import com.example.vokasilearning.screens.*
+import com.example.vokasilearning.ui.*
 
 internal fun clockText(totalSeconds: Int): String {
     val safeSeconds = totalSeconds.coerceAtLeast(0)
