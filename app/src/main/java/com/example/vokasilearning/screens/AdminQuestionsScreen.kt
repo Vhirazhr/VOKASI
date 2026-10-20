@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +29,8 @@ internal fun AdminQuestionsScreen(
     var category by remember { mutableStateOf("Semua") }
     var search by remember { mutableStateOf("") }
     var page by remember { mutableIntStateOf(0) }
+    var pagingActivated by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
     var deleteId by remember { mutableStateOf<Int?>(null) }
     var expandedId by remember { mutableStateOf<Int?>(null) }
     val categories = listOf("Semua", "Perkalian", "Pembagian", "Penjumlahan", "Konversi Satuan")
@@ -41,9 +44,13 @@ internal fun AdminQuestionsScreen(
     val pageCount = maxOf(1, (found.size + pageSize - 1) / pageSize)
     val activePage = page.coerceIn(0, pageCount - 1)
     val visibleQuestions = found.drop(activePage * pageSize).take(pageSize)
+    LaunchedEffect(activePage, pagingActivated) {
+        if (pagingActivated) listState.scrollToItem(2)
+    }
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
+        state = listState,
         contentPadding = PaddingValues(bottom = 26.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -71,7 +78,7 @@ internal fun AdminQuestionsScreen(
                         VokasiButton("Tambah Soal", onClick = onAdd, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(
                             value = search,
-                            onValueChange = { search = it; page = 0; expandedId = null },
+                            onValueChange = { search = it; page = 0; pagingActivated = false; expandedId = null },
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text("Cari soal, ID, atau kode") },
                             singleLine = true, shape = RoundedCornerShape(13.dp)
@@ -93,7 +100,7 @@ internal fun AdminQuestionsScreen(
                     categories.forEach { value ->
                         FilterChip(
                             selected = value == category,
-                            onClick = { category = value; page = 0; expandedId = null },
+                            onClick = { category = value; page = 0; pagingActivated = false; expandedId = null },
                             label = { Text(value, fontSize = 12.sp) }
                         )
                     }
@@ -170,14 +177,14 @@ internal fun AdminQuestionsScreen(
                         verticalAlignment = Alignment.CenterVertically) {
                         OutlinedButton(
                             enabled = activePage > 0,
-                            onClick = { page = activePage - 1; expandedId = null },
+                            onClick = { page = activePage - 1; pagingActivated = true; expandedId = null },
                             shape = RoundedCornerShape(12.dp)
                         ) { Text("Sebelumnya", fontSize = 12.sp) }
                         Text("${activePage + 1}/$pageCount",
                             color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         OutlinedButton(
                             enabled = activePage < pageCount - 1,
-                            onClick = { page = activePage + 1; expandedId = null },
+                            onClick = { page = activePage + 1; pagingActivated = true; expandedId = null },
                             shape = RoundedCornerShape(12.dp)
                         ) { Text("Berikutnya", fontSize = 12.sp) }
                     }
