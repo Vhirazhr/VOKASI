@@ -311,6 +311,9 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             adminDateFilter = date
                             page = Page.ADMIN_MONITOR
                         },
+                        onExcelExport = { major, classroom, date ->
+                            recordAdmin("Laporan", "Ekspor Excel: $major • $classroom • $date")
+                        },
                         onLog = { page = Page.ADMIN_LOG },
                         onProfile = { page = Page.ADMIN_PROFILE },
                         adminName = adminPrefs.displayName,
@@ -411,7 +414,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         students.toList(), attempts.toList(),
                         initialMajor = adminMajorFilter,
                         initialClass = adminClassFilter,
-                        initialDate = adminDateFilter
+                        initialDate = adminDateFilter,
+                        onExcelExport = { major, classroom, date ->
+                            recordAdmin("Laporan", "Ekspor Excel: $major • $classroom • $date")
+                        }
                     )
                 }
             }
