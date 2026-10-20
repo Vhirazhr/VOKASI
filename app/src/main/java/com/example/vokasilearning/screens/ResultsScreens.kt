@@ -61,72 +61,154 @@ import com.example.vokasilearning.logic.*
 import com.example.vokasilearning.model.*
 import com.example.vokasilearning.screens.*
 import com.example.vokasilearning.ui.*
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+
 
 @Composable
-internal fun ResultPage(attempt: Attempt, onHome: () -> Unit, onRanking: () -> Unit) {
+internal fun ResultPage(
+    attempt: Attempt,
+    onHome: () -> Unit,
+    onRanking: () -> Unit,
+    onPractice: (String) -> Unit,
+    openReviewOnEntry: Boolean = false
+) {
     val timedOut = attempt.review.count { it.status == AnswerStatus.TIMEOUT }
     val incorrect = attempt.review.count { it.status == AnswerStatus.SALAH }
     val missing = attempt.review.count { it.status == AnswerStatus.TIDAK_DIJAWAB }
-    var showDetails by remember { mutableStateOf(false) }
+    val totalWrong = attempt.questionCount - attempt.correct
+    var showDetails by remember(attempt.sessionKey) { mutableStateOf(openReviewOnEntry) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val insights = PracticeInsights.forStudent(attempt.studentId, listOf(attempt))
+        .filter { it.needsPractice }.sortedBy { it.accuracy }
+    LaunchedEffect(showDetails, attempt.sessionKey) {
+        if (showDetails) listState.animateScrollToItem(4)
+    }
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
+        state = listState,
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item { VokasiTitle("Hasil Latihan", "100 soal • Skor dihitung otomatis setelah sesi selesai") }
+        item {
+            StudentSectionHeading(
+                "SESI SELESAI",
+                if (attempt.practiceCategory == null) "Hasil Latihan Wajib" else "Latihan ${attempt.practiceCategory}"
+            )
+        }
         item {
             WhiteCard(Modifier.fillMaxWidth()) {
                 Column(
                     Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    Text("Nilai kamu", color = Subtle, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     AnimatedCounter(
                         target = attempt.score,
                         suffix = "%",
                         textStyle = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.ExtraBold),
                         color = Navy
                     )
-                    Text("${attempt.correct} benar dari ${attempt.questionCount} soal", color = Subtle, fontSize = 14.sp)
+                    Text(
+                        "Kamu menjawab benar ${attempt.correct} dari ${attempt.questionCount} soal.",
+                        color = Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        ResultNumber(
+                            label = "Benar", amount = attempt.correct,
+                            modifier = Modifier.weight(1f), color = Good
+                        )
+                        ResultNumber(
+                            label = "Salah", amount = totalWrong,
+                            modifier = Modifier.weight(1f), color = Bad
+                        )
+                    }
+                    Text(
+                        "Rincian: $incorrect jawaban salah • $timedOut timeout • $missing tidak dijawab",
+                        color = Subtle, fontSize = 11.sp, textAlign = TextAlign.Center
+                    )
                     Pill("Grade: ${scoreGrade(attempt.score)}", PaleGreen, Good)
                     Text(
-                        "Benar ${attempt.correct} • Salah $incorrect • Timeout $timedOut • Kosong $missing",
-                        color = Ink, fontSize = 12.sp
+                        "Durasi ${clockText(attempt.secondsSpent)} • +${attempt.earnedXp} XP",
+                        color = Subtle, fontSize = 12.sp
                     )
-                    Text("Durasi: ${clockText(attempt.secondsSpent)} • XP +${attempt.earnedXp}", color = Subtle, fontSize = 12.sp)
-                    Text("Laporan saat ini tersimpan pada perangkat, belum tersinkron ke server sekolah.", color = Subtle, fontSize = 11.sp)
                 }
             }
         }
         item {
-            VokasiButton(
-                text = if (showDetails) "Tutup Pembahasan" else "Lihat Pembahasan 100 Soal",
-                onClick = { showDetails = !showDetails },
-                modifier = Modifier.fillMaxWidth(),
-                isSecondary = true
-            )
+            WhiteCard(Modifier.fillMaxWidth()) {
+                Text("LANGKAH SELANJUTNYA", fontSize = 10.sp, color = NavyLight, fontWeight = FontWeight.ExtraBold)
+                VokasiButton(
+                    text = "Lihat Jawabanku & Kunci Jawaban →",
+                    onClick = {
+                        showDetails = true
+                        scope.launch { listState.animateScrollToItem(4) }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                VokasiButton(
+                    text = "Lihat Papan Peringkat 🏆",
+                    onClick = onRanking,
+                    isSecondary = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+        item {
+            if (insights.isNotEmpty()) {
+                val item = insights.first()
+                WhiteCard(Modifier.fillMaxWidth()) {
+                    Text("SARAN BELAJAR", color = NavyLight, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(
+                        "Coba latihan ${item.focus ?: item.category.lowercase()} lagi. Kamu benar ${item.correct}/${item.attempted} di materi ini.",
+                        color = Ink, fontSize = 12.sp
+                    )
+                    TextButton(onClick = { onPractice(item.category) }) {
+                        Text("Latih 10 soal ${item.category} →", color = Navy, fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else {
+                Text(
+                    "Kunci dan pembahasan dapat dilihat setelah sesi selesai. Data nilai saat ini tersimpan lokal.",
+                    color = Subtle, fontSize = 11.sp
+                )
+            }
         }
         if (showDetails) {
+            item { StudentSectionHeading("ULASAN JAWABAN", "${attempt.review.size} soal beserta pembahasan") }
             itemsIndexed(attempt.review) { i, item ->
                 WhiteCard(Modifier.fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Soal ${i + 1} • ${item.question.category} (${item.question.difficultyCode})",
+                        Text(
+                            "Soal ${i + 1} • ${item.question.category} (${item.question.difficultyCode})",
                             color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp,
-                            modifier = Modifier.weight(1f))
+                            modifier = Modifier.weight(1f)
+                        )
                         Pill(
                             item.status.name.replace('_',' '),
-                            if (item.status == AnswerStatus.BENAR) PaleGreen else PaleGold,
-                            if (item.status == AnswerStatus.BENAR) Good else Warning
+                            if (item.status == AnswerStatus.BENAR) PaleGreen else Color(0xFFFFE8EB),
+                            if (item.status == AnswerStatus.BENAR) Good else Bad
                         )
                     }
-                    Text(item.question.question, color = Ink, fontSize = 13.sp)
+                    Text(item.question.question, color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     Text(
                         "Jawabanmu: ${item.selectedIndex?.let { item.question.options[it] } ?: "Tidak dijawab / timeout"}",
-                        color = Subtle, fontSize = 12.sp
+                        color = if (item.status == AnswerStatus.BENAR) Good else Bad,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
-                    Text("Jawaban benar: ${item.question.options[item.question.answerIndex]}",
-                        color = Good, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Kunci: ${item.question.options[item.question.answerIndex]}",
+                        color = Good, fontSize = 12.sp, fontWeight = FontWeight.Bold
+                    )
                     if (item.question.explanation.isNotBlank()) {
                         Text("Pembahasan: ${item.question.explanation}", color = Subtle, fontSize = 12.sp)
                     }
@@ -135,10 +217,12 @@ internal fun ResultPage(attempt: Attempt, onHome: () -> Unit, onRanking: () -> U
             }
         }
         item {
-            VokasiButton(text = "Kembali ke Beranda", onClick = onHome, modifier = Modifier.fillMaxWidth())
-        }
-        item {
-            VokasiButton(text = "Lihat Papan Peringkat", onClick = onRanking, isSecondary = true, modifier = Modifier.fillMaxWidth())
+            VokasiButton(
+                text = "Kembali ke Beranda",
+                onClick = onHome,
+                modifier = Modifier.fillMaxWidth(),
+                isSecondary = true
+            )
         }
     }
 }
