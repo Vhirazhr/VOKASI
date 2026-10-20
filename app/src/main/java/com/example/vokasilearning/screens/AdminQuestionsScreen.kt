@@ -27,7 +27,7 @@ internal fun AdminQuestionsScreen(
 ) {
     var category by remember { mutableStateOf("Semua") }
     var search by remember { mutableStateOf("") }
-    var visibleCount by remember { mutableIntStateOf(15) }
+    var page by remember { mutableIntStateOf(0) }
     var deleteId by remember { mutableStateOf<Int?>(null) }
     var expandedId by remember { mutableStateOf<Int?>(null) }
     val categories = listOf("Semua", "Perkalian", "Pembagian", "Penjumlahan", "Konversi Satuan")
@@ -37,6 +37,10 @@ internal fun AdminQuestionsScreen(
                 q.difficultyCode.contains(search.trim(), true) ||
                 q.id.toString() == search.trim())
     }.sortedBy { it.id }
+    val pageSize = 15
+    val pageCount = maxOf(1, (found.size + pageSize - 1) / pageSize)
+    val activePage = page.coerceIn(0, pageCount - 1)
+    val visibleQuestions = found.drop(activePage * pageSize).take(pageSize)
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
@@ -67,7 +71,7 @@ internal fun AdminQuestionsScreen(
                         VokasiButton("Tambah Soal", onClick = onAdd, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(
                             value = search,
-                            onValueChange = { search = it; visibleCount = 15 },
+                            onValueChange = { search = it; page = 0; expandedId = null },
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text("Cari soal, ID, atau kode") },
                             singleLine = true, shape = RoundedCornerShape(13.dp)
@@ -89,12 +93,12 @@ internal fun AdminQuestionsScreen(
                     categories.forEach { value ->
                         FilterChip(
                             selected = value == category,
-                            onClick = { category = value; visibleCount = 15 },
+                            onClick = { category = value; page = 0; expandedId = null },
                             label = { Text(value, fontSize = 12.sp) }
                         )
                     }
                 }
-                Text("${found.size} soal ditemukan • Soal bawaan tidak dapat dihapus",
+                Text("${found.size} soal ditemukan • Maksimal 15 per halaman",
                     color = Subtle, fontSize = 11.sp)
             }
         }
@@ -105,7 +109,7 @@ internal fun AdminQuestionsScreen(
                 }
             }
         } else {
-            items(found.take(visibleCount), key = { it.id }) { q ->
+            items(visibleQuestions, key = { it.id }) { q ->
                 val extra = q.id !in bundledIds
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -154,11 +158,28 @@ internal fun AdminQuestionsScreen(
                     }
                 }
             }
-            if (found.size > visibleCount) {
-                item {
-                    TextButton(onClick = { visibleCount += 15 },
-                        modifier = Modifier.fillMaxWidth()) {
-                        Text("Muat 15 lagi", color = Navy, fontWeight = FontWeight.Bold)
+            item {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        "Soal ${activePage * pageSize + 1}–${activePage * pageSize + visibleQuestions.size} dari ${found.size}",
+                        color = Subtle, fontSize = 11.sp
+                    )
+                    Row(Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(
+                            enabled = activePage > 0,
+                            onClick = { page = activePage - 1; expandedId = null },
+                            shape = RoundedCornerShape(12.dp)
+                        ) { Text("Sebelumnya", fontSize = 12.sp) }
+                        Text("${activePage + 1}/$pageCount",
+                            color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        OutlinedButton(
+                            enabled = activePage < pageCount - 1,
+                            onClick = { page = activePage + 1; expandedId = null },
+                            shape = RoundedCornerShape(12.dp)
+                        ) { Text("Berikutnya", fontSize = 12.sp) }
                     }
                 }
             }
