@@ -82,4 +82,32 @@ class AdminAnalyticsTest {
         ).averageScore)
     }
 
+    @Test fun handlesHundredsOfStudentsWithIdenticalClassLabelsAcrossMajors() {
+        val many = (1..10).flatMap { major ->
+            (1..6).flatMap { room ->
+                (1..10).map { pupil ->
+                    val id = "u_${major}_${room}_${pupil}"
+                    Student(id, "demo", "Siswa $id",
+                        Classroom("X $room", "Jurusan $major"))
+                }
+            }
+        }
+        val timestamp = date("2026-10-21 09:00")
+        val sessions = many.filter { it.username.substringAfterLast('_').toInt() % 2 == 0 }
+            .map { student ->
+                Attempt(student.username, timestamp, student.username,
+                    80, 100, 100, 80, 20, 900)
+            }
+        val summaries = AdminAnalytics.allClasses(many, sessions, "2026-10-21")
+        assertEquals(600, many.size)
+        assertEquals(60, summaries.size)
+        assertEquals(600, summaries.sumOf { it.studentCount })
+        assertEquals(300, summaries.sumOf { it.completedCount })
+        assertEquals(300, summaries.sumOf { it.missingCount })
+        assertEquals(300, summaries.sumOf { it.sessions })
+        assertEquals(true, summaries.all {
+            it.studentCount == 10 && it.completedCount == 5 && it.averageScore == 80
+        })
+    }
+
 }
