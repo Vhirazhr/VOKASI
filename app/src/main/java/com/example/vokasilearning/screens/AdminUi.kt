@@ -122,7 +122,7 @@ internal fun AdminSelect(
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 options.forEach { option ->
                     DropdownMenuItem(
-                        text = { Text(option, fontSize = 13.sp) },
+                        text = { Text(option.ifBlank { "Semua" }, fontSize = 13.sp) },
                         onClick = { onChange(option); open = false }
                     )
                 }
