@@ -65,8 +65,8 @@ internal fun LeaderboardScreen(me: Student, users: List<Student>, attempts: List
                     horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     listOf(
-                        RankingMetric.XP to "✦  XP Season",
-                        RankingMetric.STREAK to "🔥  Daily Streak"
+                        RankingMetric.XP to "XP Season",
+                        RankingMetric.STREAK to "Daily Streak"
                     ).forEach { (option, label) ->
                         val active = metric == option
                         Box(
@@ -159,7 +159,7 @@ internal fun LeaderboardScreen(me: Student, users: List<Student>, attempts: List
                         }
                         Pill(
                             if (metric == RankingMetric.XP) "${studentSeasonXp(me, attempts)} XP"
-                            else "🔥 ${calculateStreak(me, attempts)} hari",
+                            else "${calculateStreak(me, attempts)} hari",
                             PaleBlue, Navy
                         )
                     }
@@ -247,7 +247,7 @@ internal fun LeaderboardScreen(me: Student, users: List<Student>, attempts: List
                             }
                             Text(
                                 if (metric == RankingMetric.XP) "${studentSeasonXp(student, attempts)} XP"
-                                else "🔥 ${calculateStreak(student, attempts)}",
+                                else "${calculateStreak(student, attempts)}",
                                 color = Navy,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.ExtraBold,
@@ -283,7 +283,7 @@ internal fun PodiumItem(
     val label = if (metric == RankingMetric.XP) {
         "${studentSeasonXp(student, attempts)} XP"
     } else {
-        "🔥 ${calculateStreak(student, attempts)}"
+        "${calculateStreak(student, attempts)}"
     }
     Column(
         modifier.fillMaxWidth()
@@ -294,7 +294,7 @@ internal fun PodiumItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
-        Text(if (rank == 1) "👑" else "★", color = Warning, fontSize = if (rank == 1) 19.sp else 14.sp)
+        Text("★", color = NavyLight, fontSize = 17.sp)
         Avatar(student, if (rank == 1) 52.dp else 43.dp)
         Text(
             student.name.substringBefore(' '),
