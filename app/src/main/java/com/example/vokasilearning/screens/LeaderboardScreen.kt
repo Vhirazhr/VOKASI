@@ -181,7 +181,7 @@ internal fun LeaderboardScreen(me: Student, users: List<Student>, attempts: List
                         ) {
                             PodiumItem(ordered[1], 2, metric, attempts, Modifier.weight(1f).height(163.dp))
                             PodiumItem(ordered[0], 1, metric, attempts, Modifier.weight(1f).height(194.dp))
-                            PodiumItem(ordered[2], 3, metric, attempts, Modifier.weight(1f).height(150.dp))
+                            PodiumItem(ordered[2], 3, metric, attempts, Modifier.weight(1f).height(163.dp))
                         }
                     } else {
                         Row(
@@ -192,7 +192,7 @@ internal fun LeaderboardScreen(me: Student, users: List<Student>, attempts: List
                             ordered.forEachIndexed { i, student ->
                                 PodiumItem(
                                     student, i + 1, metric, attempts,
-                                    Modifier.weight(1f).height(if (i == 0) 190.dp else 160.dp)
+                                    Modifier.weight(1f).height(if (i == 0) 190.dp else 163.dp)
                                 )
                             }
                         }
