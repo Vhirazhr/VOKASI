@@ -25,7 +25,8 @@ internal fun AdminMonitorScreen(
     attempts: List<Attempt>,
     initialMajor: String = "",
     initialClass: String = "",
-    initialDate: String = ""
+    initialDate: String = "",
+    onExcelExport: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     val majors = students.map { it.classroom.major }.distinct().sorted()
     var major by remember(initialMajor) {
@@ -108,7 +109,8 @@ internal fun AdminMonitorScreen(
                         }
                         AdminExcelAction(
                             students, attempts, major, classroom, date,
-                            modifier = Modifier.fillMaxWidth(), text = "Unduh Excel Kelas"
+                            modifier = Modifier.fillMaxWidth(), text = "Unduh Excel Kelas",
+                            onExport = onExcelExport
                         )
                         Text("Nilai wajib terakhir pada tanggal terpilih • ${summary.studentCount} siswa",
                             color = Subtle, fontSize = 11.sp)
