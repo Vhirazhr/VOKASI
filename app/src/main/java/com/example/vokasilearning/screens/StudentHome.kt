@@ -71,7 +71,7 @@ internal fun StudentHome(
     val todayCount = attempts.count { it.studentId == me.username && dayKey(it.timeMillis) == today }
     val seasonXp = studentSeasonXp(me, attempts)
     val streak = calculateStreak(me, attempts)
-    val numberOfQuestions = minOf(QUESTIONS_PER_SESSION, countQuestions)
+    val numberOfQuestions = if (countQuestions >= 500) QUESTIONS_PER_SESSION else 0
     val topStudents = rankList(students, attempts, me, RankingScope.SCHOOL, RankingMetric.XP).take(3)
 
     LazyColumn(
@@ -153,7 +153,7 @@ internal fun StudentHome(
                             fontSize = 23.sp, fontWeight = FontWeight.ExtraBold,
                             lineHeight = 29.sp)
                         Text(
-                            "Soal penjumlahan, pengurangan, perkalian, dan pembagian dipilih otomatis oleh sistem.",
+                            "100 soal perkalian, pembagian, penjumlahan, dan konversi satuan diacak sesuai tingkat kesulitan.",
                             color = Subtle, fontSize = 12.sp, lineHeight = 18.sp
                         )
                         HorizontalDivider(color = Border)
@@ -163,14 +163,14 @@ internal fun StudentHome(
                         ) {
                             HomeQuickStat("✦", "$numberOfQuestions", "soal acak",
                                 PaleBlue, NavyLight, Modifier.weight(1f))
-                            HomeQuickStat("◷", "${numberOfQuestions * SECONDS_PER_QUESTION / 60} mnt",
+                            HomeQuickStat("◷", "${SESSION_TOTAL_SECONDS / 60} mnt",
                                 "waktu sesi", PaleGreen, Good, Modifier.weight(1f))
                             HomeQuickStat("★", "+$SESSION_XP XP", "sesi valid",
                                 PaleGold, Warning, Modifier.weight(1f))
                         }
                         VokasiButton(
                             text = "Mulai Mengerjakan  →", onClick = onStart,
-                            enabled = countQuestions > 0,
+                            enabled = countQuestions >= 500,
                             modifier = Modifier.fillMaxWidth()
                         )
                         Text("♢  Sistem menentukan soal dan batas waktu secara otomatis",
