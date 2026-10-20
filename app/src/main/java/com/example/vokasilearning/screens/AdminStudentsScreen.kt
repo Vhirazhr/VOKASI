@@ -51,7 +51,7 @@ internal fun AdminStudentsScreen(students: List<Student>, attempts: List<Attempt
                 AdminHero("Data Siswa", "Direktori berdasarkan jurusan dan kelas", compact = true)
                 Card(
                     modifier = Modifier.fillMaxWidth()
-                        .padding(horizontal = 18.dp).padding(top = 167.dp),
+                        .padding(horizontal = 18.dp).padding(top = 198.dp),
                     shape = RoundedCornerShape(25.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(5.dp)
