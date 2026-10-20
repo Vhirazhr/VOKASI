@@ -81,8 +81,23 @@ internal fun VokasiApp(activity: ComponentActivity) {
     val me = students.firstOrNull { it.username == currentId }
 
     fun logout() { currentId = null; isAdmin = false; page = Page.LOGIN }
+    fun saveQuizCheckpoint() {
+        val owner = currentId ?: return
+        if (quizSession.questions.isNotEmpty()) {
+            QuizProgressStore.save(activity, owner, quizSession.snapshot(owner))
+        }
+    }
     fun startQuiz(category: String? = null) {
-        if (quizSession.start(questions.toList(), category)) page = Page.QUIZ
+        if (quizSession.start(questions.toList(), category)) {
+            saveQuizCheckpoint()
+            page = Page.QUIZ
+        }
+    }
+    fun restoreQuiz(owner: String): Boolean {
+        val stored = QuizProgressStore.load(activity, owner) ?: return false
+        val restored = quizSession.restore(stored)
+        if (!restored) QuizProgressStore.clear(activity, owner)
+        return restored
     }
     fun finishQuiz() {
         val student = students.firstOrNull { it.username == currentId } ?: return
@@ -90,6 +105,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
         val attempt = quizSession.finish(student, attempts.toList())
         attempts.add(attempt)
         LocalAttemptStore.save(activity, attempts.toList())
+        QuizProgressStore.clear(activity, student.username)
         currentAttempt = attempt
         reviewingHistory = false
         showResultPopup = false
@@ -100,12 +116,27 @@ internal fun VokasiApp(activity: ComponentActivity) {
 
     LaunchedEffect(page, quizSession.sessionId) {
         if (page == Page.QUIZ) {
+            var savedIndex = quizSession.index
             while (page == Page.QUIZ && !quizSession.isComplete) {
-                if (quizSession.tick()) break
+                if (quizSession.tick()) { saveQuizCheckpoint(); break }
+                if (quizSession.index != savedIndex) {
+                    saveQuizCheckpoint()
+                    savedIndex = quizSession.index
+                }
                 delay(250L)
             }
             if (page == Page.QUIZ && quizSession.isComplete) finishQuiz()
         }
+    }
+
+    DisposableEffect(activity, page, currentId) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && page == Page.QUIZ) {
+                saveQuizCheckpoint()
+            }
+        }
+        activity.lifecycle.addObserver(observer)
+        onDispose { activity.lifecycle.removeObserver(observer) }
     }
 
     BackHandler(enabled = page == Page.QUIZ) { quitDialog = true }
@@ -124,7 +155,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
             onDismissRequest = { quitDialog = false },
             title = { Text("Keluar dari latihan?", fontWeight = FontWeight.Bold) },
             text = { Text("Jawaban sesi ini tidak dinilai dan XP tidak akan diberikan.") },
-            confirmButton = { TextButton(onClick = { quitDialog = false; quizSession.abandon(); page = Page.HOME }) { Text("Keluar", color = Bad) } },
+            confirmButton = { TextButton(onClick = {
+                currentId?.let { QuizProgressStore.clear(activity, it) }
+                quitDialog = false; quizSession.abandon(); page = Page.HOME
+            }) { Text("Keluar", color = Bad) } },
             dismissButton = { TextButton(onClick = { quitDialog = false }) { Text("Lanjut") } }
         )
     }
@@ -171,7 +205,12 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     Page.LOGIN -> LoginScreen(
                         onStudentLogin = { u, p ->
                             val found = students.firstOrNull { it.username.equals(u.trim(), true) && it.password == p }
-                            if (found != null) { currentId = found.username; isAdmin = false; page = Page.HOME; true } else false
+                            if (found != null) {
+                                currentId = found.username
+                                isAdmin = false
+                                page = if (restoreQuiz(found.username)) Page.QUIZ else Page.HOME
+                                true
+                            } else false
                         },
                         onAdminLogin = { u, p ->
                             val good = u.trim() == "admin.demo" && p == "admin123"
@@ -200,8 +239,8 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         seconds = quizSession.remainingSeconds,
                         totalSeconds = quizSession.totalRemainingSeconds,
                         feedback = quizSession.feedback,
-                        onPick = { selection -> quizSession.choose(selection) },
-                        onSubmit = { quizSession.submit() },
+                        onPick = { selection -> quizSession.choose(selection); saveQuizCheckpoint() },
+                        onSubmit = { quizSession.submit(); saveQuizCheckpoint() },
                         onQuit = { quitDialog = true }
                     )
                     Page.RESULT -> if (me != null && currentAttempt != null) ResultPage(
