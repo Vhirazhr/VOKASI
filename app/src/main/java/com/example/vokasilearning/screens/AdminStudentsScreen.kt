@@ -41,7 +41,7 @@ internal fun AdminStudentsScreen(
     var selectedStudent by remember(initialMajor) { mutableStateOf<Student?>(null) }
     var query by remember { mutableStateOf("") }
     var page by remember { mutableIntStateOf(0) }
-    var historyPage by remember { mutableIntStateOf(0) }
+    var pagingActivated by remember { mutableStateOf(false) }
     var reviewing by remember { mutableStateOf<Attempt?>(null) }
     val lazyState = rememberLazyListState()
     val latestCompulsory = remember(attempts) {
@@ -70,7 +70,7 @@ internal fun AdminStudentsScreen(
     }
     fun back() {
         when {
-            selectedStudent != null -> { selectedStudent = null; historyPage = 0 }
+            selectedStudent != null -> { selectedStudent = null }
             query.isNotBlank() -> query = ""
             classroom != null -> classroom = null
             major != null -> major = null
@@ -83,12 +83,14 @@ internal fun AdminStudentsScreen(
         selectedStudent = student
         query = ""
         page = 0
-        historyPage = 0
     }
     BackHandler(enabled = selectedStudent != null || classroom != null ||
         major != null || query.isNotBlank()) { back() }
     val scopeResetKey = listOf(major.orEmpty(), classroom.orEmpty(), selectedStudent?.username.orEmpty(), query)
-    LaunchedEffect(scopeResetKey) { lazyState.scrollToItem(0) }
+    LaunchedEffect(scopeResetKey) { pagingActivated = false; lazyState.scrollToItem(0) }
+    LaunchedEffect(page, pagingActivated) {
+        if (pagingActivated) lazyState.scrollToItem(2)
+    }
 
     val history = selectedStudent?.let { student ->
         attempts.filter { it.studentId == student.username && it.practiceCategory == null }
@@ -301,14 +303,14 @@ internal fun AdminStudentsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     OutlinedButton(
-                        onClick = { page = (activePage - 1).coerceAtLeast(0) },
+                        onClick = { page = (activePage - 1).coerceAtLeast(0); pagingActivated = true },
                         enabled = activePage > 0,
                         shape = RoundedCornerShape(12.dp)
                     ) { Text("Sebelumnya", fontSize = 12.sp) }
                     Text("${activePage + 1}/$pageCount", fontSize = 12.sp,
                         color = Ink, fontWeight = FontWeight.Bold)
                     OutlinedButton(
-                        onClick = { page = (activePage + 1).coerceAtMost(pageCount - 1) },
+                        onClick = { page = (activePage + 1).coerceAtMost(pageCount - 1); pagingActivated = true },
                         enabled = activePage < pageCount - 1,
                         shape = RoundedCornerShape(12.dp)
                     ) { Text("Berikutnya", fontSize = 12.sp) }
