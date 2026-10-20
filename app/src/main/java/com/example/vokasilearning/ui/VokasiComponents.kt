@@ -12,6 +12,12 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -81,7 +87,7 @@ internal fun VokasiBottomNav(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            items.forEach { (target, label, symbol) ->
+            items.forEach { (target, label, _) ->
                 val active = currentPage == target
                 Column(
                     modifier = Modifier.weight(1f)
@@ -97,8 +103,7 @@ internal fun VokasiBottomNav(
                             .background(if (active) PaleBlue else Color.Transparent),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(symbol, fontSize = 19.sp,
-                            color = if (active) Navy else Subtle)
+                        MonochromeNavIcon(target = target, active = active)
                     }
                     Text(
                         label, fontSize = 10.sp,
@@ -107,6 +112,71 @@ internal fun VokasiBottomNav(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * One coherent outline icon family, including admin tabs. No emoji/color glyphs
+ * that vary by device font or default system palette.
+ */
+@Composable
+private fun MonochromeNavIcon(target: Page, active: Boolean) {
+    val tint = if (active) Navy else Subtle
+    Canvas(Modifier.size(24.dp)) {
+        val scale = size.minDimension / 24f
+        val path = Path()
+        fun move(x: Float, y: Float) { path.moveTo(x * scale, y * scale) }
+        fun line(x: Float, y: Float) { path.lineTo(x * scale, y * scale) }
+
+        when (target) {
+            Page.HOME, Page.ADMIN_HOME -> {
+                move(3f, 11f); line(12f, 4f); line(21f, 11f)
+                move(6f, 10f); line(6f, 20f); line(18f, 20f); line(18f, 10f)
+                move(10f, 20f); line(10f, 14f); line(14f, 14f); line(14f, 20f)
+            }
+            Page.LEADERBOARD -> {
+                move(6f, 4f); line(18f, 4f); line(17f, 11f)
+                line(14f, 14f); line(10f, 14f); line(7f, 11f); line(6f, 4f)
+                move(6f, 6f); line(3f, 6f); line(3f, 9f); line(7f, 12f)
+                move(18f, 6f); line(21f, 6f); line(21f, 9f); line(17f, 12f)
+                move(12f, 14f); line(12f, 19f)
+                move(8f, 20f); line(16f, 20f)
+            }
+            Page.PROFILE, Page.HISTORY -> {
+                move(12f, 3f); line(13f, 3f)
+                move(6f, 21f); line(6f, 18f); line(9f, 15f)
+                line(15f, 15f); line(18f, 18f); line(18f, 21f); line(6f, 21f)
+            }
+            Page.ADMIN_QUESTIONS -> {
+                move(5f, 3f); line(18f, 3f); line(18f, 21f); line(5f, 21f); line(5f, 3f)
+                move(8f, 8f); line(15f, 8f)
+                move(8f, 12f); line(15f, 12f)
+                move(8f, 16f); line(13f, 16f)
+            }
+            Page.ADMIN_MONITOR -> {
+                move(3f, 21f); line(21f, 21f)
+                move(5f, 18f); line(5f, 12f); line(9f, 12f); line(9f, 18f)
+                move(11f, 18f); line(11f, 7f); line(15f, 7f); line(15f, 18f)
+                move(17f, 18f); line(17f, 4f); line(21f, 4f); line(21f, 18f)
+            }
+            else -> { move(4f, 12f); line(20f, 12f) }
+        }
+        drawPath(
+            path = path,
+            color = tint,
+            style = Stroke(
+                width = 2.dp.toPx(),
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+        if (target == Page.PROFILE || target == Page.HISTORY) {
+            drawCircle(
+                color = tint, radius = 4.3f * scale,
+                center = Offset(12f * scale, 8f * scale),
+                style = Stroke(width = 2.dp.toPx())
+            )
         }
     }
 }
