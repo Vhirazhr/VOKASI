@@ -23,9 +23,9 @@ internal val Good = Color(0xFF23A381)
 internal val Bad = Color(0xFFE65C66)
 internal val Warning = Color(0xFFF0AC43)
 
-internal val PaleBlue = Color(0xFFE8F0FA)
-internal val PaleGreen = Color(0xFFE5F4ED)
-internal val PalePurple = Color(0xFFF1EBFB)
+internal val PaleBlue = Color(0xFFEAF2FF)
+internal val PaleGreen = Color(0xFFE5F6F1)
+internal val PalePurple = Color(0xFFF0EDFF)
 internal val PaleGold = Color(0xFFFFF2DB)
 
 
