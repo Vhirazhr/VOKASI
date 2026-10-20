@@ -67,7 +67,7 @@ internal fun QuizScreen(
     questions: List<Question>, index: Int, selectedIndex: Int?, seconds: Int, totalSeconds: Int,
     onPick: (Int) -> Unit, onSubmit: () -> Unit, onQuit: () -> Unit
 ) {
-    if (questions.isEmpty()) return
+    if (questions.isEmpty() || index !in questions.indices) return
     val current = questions[index]
 
     Column(Modifier.fillMaxSize().background(Canvas)) {
