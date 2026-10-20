@@ -20,6 +20,8 @@ import kotlin.math.max
  * This is a local training engine; server-verified official sessions still
  * require an authenticated backend.
  */
+internal data class AnswerFeedback(val questionId: Int, val correct: Boolean, val selectedIndex: Int)
+
 internal class QuizSession {
     var questions by mutableStateOf<List<Question>>(emptyList())
         private set
@@ -42,13 +44,21 @@ internal class QuizSession {
     private var questionDeadlineElapsed by mutableLongStateOf(0L)
     private var sessionDeadlineElapsed by mutableLongStateOf(0L)
     private var token: String = ""
+    var practiceCategory by mutableStateOf<String?>(null)
+        private set
+    var feedback by mutableStateOf<AnswerFeedback?>(null)
+        private set
+    private var feedbackUntilElapsed: Long = 0L
 
     val isComplete: Boolean get() = questions.isNotEmpty() && index >= questions.size
     val activeQuestion: Question? get() = questions.getOrNull(index)
 
-    fun start(bank: List<Question>): Boolean {
-        val generated = BankPolicy.generate(bank)
-        if (generated.size != BankPolicy.QUESTION_COUNT) return false
+    fun start(bank: List<Question>, category: String? = null): Boolean {
+        val generated = if (category == null) BankPolicy.generate(bank)
+            else BankPolicy.generatePractice(bank, category)
+        if (generated.isEmpty()) return false
+        practiceCategory = category
+        feedback = null
         questions = generated
         answers.clear()
         timeouts.clear()
@@ -57,7 +67,7 @@ internal class QuizSession {
         index = 0
         startedAtMillis = System.currentTimeMillis()
         startedAtElapsed = SystemClock.elapsedRealtime()
-        sessionDeadlineElapsed = startedAtElapsed + BankPolicy.TOTAL_SECONDS * 1_000L
+        sessionDeadlineElapsed = startedAtElapsed + questions.sumOf { it.timeLimitSeconds } * 1_000L
         questionStartedElapsed = startedAtElapsed
         questionDeadlineElapsed = startedAtElapsed + questions.first().timeLimitSeconds * 1_000L
         token = UUID.randomUUID().toString()
@@ -68,13 +78,14 @@ internal class QuizSession {
 
     fun choose(choiceIndex: Int) {
         tick()
-        if (!isComplete && choiceIndex in 0..3) selectedIndex = choiceIndex
+        if (!isComplete && feedback == null && choiceIndex in 0..3) selectedIndex = choiceIndex
     }
 
     /** Return true only when all 100 questions have been processed. */
     fun submit(): Boolean {
         tick()
         if (isComplete) return true
+        if (feedback != null) return false
         val chosen = selectedIndex ?: return false
         val current = questions[index]
         if (current.id in answers || current.id in timeouts) return false
@@ -82,9 +93,10 @@ internal class QuizSession {
         secondsById[current.id] = (
             (SystemClock.elapsedRealtime() - questionStartedElapsed) / 1_000L
         ).toInt().coerceIn(0, current.timeLimitSeconds)
-        moveNext(SystemClock.elapsedRealtime(), timedOut = false)
-        tick()
-        return isComplete
+        feedback = AnswerFeedback(current.id, chosen == current.answerIndex, chosen)
+        feedbackUntilElapsed = SystemClock.elapsedRealtime() + 1_000L
+        remainingSeconds = 0
+        return false
     }
 
     /**
@@ -100,9 +112,20 @@ internal class QuizSession {
                 index++
             }
             selectedIndex = null
+            feedback = null
             remainingSeconds = 0
             totalRemainingSeconds = 0
             return true
+        }
+        if (feedback != null) {
+            if (now >= feedbackUntilElapsed) {
+                feedback = null
+                moveNext(now, timedOut = false)
+            } else {
+                remainingSeconds = 0
+                totalRemainingSeconds = ((sessionDeadlineElapsed - now + 999L) / 1_000L).toInt().coerceAtLeast(0)
+                return false
+            }
         }
         while (!isComplete && now >= questionDeadlineElapsed) {
             markTimeout()
@@ -143,6 +166,8 @@ internal class QuizSession {
         timeouts.clear()
         secondsById.clear()
         selectedIndex = null
+        feedback = null
+        practiceCategory = null
         remainingSeconds = 0
         totalRemainingSeconds = 0
         index = 0
@@ -172,7 +197,14 @@ internal class QuizSession {
         val alreadyGranted = previous.any {
             it.studentId == student.username && it.sessionKey == token
         }
-        val xp = if (!alreadyGranted) max(0, minOf(SESSION_XP, DAILY_XP_CAP - earnedToday)) else 0
+        val alreadyPracticedToday = practiceCategory != null && previous.any {
+            it.studentId == student.username && it.practiceCategory == practiceCategory &&
+                dayKey(it.timeMillis) == dayKey(now) && it.earnedXp > 0
+        }
+        val reward = if (practiceCategory == null) SESSION_XP else 5
+        val xp = if (!alreadyGranted && !alreadyPracticedToday && correct > 0) {
+            max(0, minOf(reward, DAILY_XP_CAP - earnedToday))
+        } else 0
         return Attempt(
             studentId = student.username,
             timeMillis = now,
@@ -185,7 +217,8 @@ internal class QuizSession {
             secondsSpent = ((SystemClock.elapsedRealtime() - startedAtElapsed) / 1_000L)
                 .toInt().coerceAtLeast(0),
             review = review,
-            sessionKey = token
+            sessionKey = token,
+            practiceCategory = practiceCategory
         )
     }
 }
