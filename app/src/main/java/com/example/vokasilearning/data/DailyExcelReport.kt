@@ -1,6 +1,6 @@
 package com.example.vokasilearning.data
 
-import com.example.vokasilearning.logic.dayKey
+import com.example.vokasilearning.logic.AdminAnalytics
 import com.example.vokasilearning.model.Attempt
 import com.example.vokasilearning.model.Student
 import java.io.OutputStream
@@ -30,10 +30,9 @@ internal object DailyExcelReport {
             it.classroom.label == classroom &&
                 (major == null || it.classroom.major == major)
         }.sortedBy { it.name }
+        val latestByStudent = AdminAnalytics.latestCompulsoryByStudent(attempts, date)
         val rows = members.mapIndexed { i, student ->
-            val latest = attempts.asSequence()
-                .filter { it.studentId == student.username && it.practiceCategory == null && dayKey(it.timeMillis) == date }
-                .maxWithOrNull(compareBy<Attempt> { it.timeMillis }.thenBy { it.sessionKey })
+            val latest = latestByStudent[student.username]
             listOf(
                 (i + 1).toString(),
                 student.name,
