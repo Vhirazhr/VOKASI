@@ -32,4 +32,15 @@ class ProgressRulesTest {
         assertTrue(good.contains("+5 XP"))
     }
 
+    @Test fun dialogTitlesReflectGradeWithoutExaggeration() {
+        assertEquals("Luar biasa!", completionHeadline(100))
+        assertEquals("Luar biasa!", completionHeadline(90))
+        assertEquals("Kerja bagus!", completionHeadline(89))
+        assertEquals("Kerja bagus!", completionHeadline(75))
+        assertEquals("Terus berkembang!", completionHeadline(74))
+        assertEquals("Terus berkembang!", completionHeadline(60))
+        assertEquals("Ayo berlatih lagi!", completionHeadline(59))
+        assertEquals("Ayo berlatih lagi!", completionHeadline(0))
+    }
+
 }
