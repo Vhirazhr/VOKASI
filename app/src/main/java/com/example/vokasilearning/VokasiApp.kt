@@ -65,7 +65,14 @@ import com.example.vokasilearning.ui.*
 @Composable
 internal fun VokasiApp(activity: ComponentActivity) {
     val students = remember { mutableStateListOf<Student>().apply { addAll(initialStudents()) } }
-    val questions = remember { mutableStateListOf<Question>().apply { addAll(QuestionBankLoader.load(activity)) } }
+    val bundledQuestions = remember { QuestionBankLoader.load(activity) }
+    val bundledIds = remember { bundledQuestions.map { it.id }.toSet() }
+    val questions = remember {
+        mutableStateListOf<Question>().apply {
+            addAll(bundledQuestions)
+            addAll(LocalAdminQuestionStore.load(activity).filter { it.id !in bundledIds })
+        }
+    }
     val attempts = remember { mutableStateListOf<Attempt>().apply { addAll(LocalAttemptStore.load(activity)) } }
 
     var page by remember { mutableStateOf(Page.LOGIN) }
@@ -163,7 +170,8 @@ internal fun VokasiApp(activity: ComponentActivity) {
     }
 
     val studentTabs = page == Page.HOME || page == Page.LEADERBOARD || page == Page.PROFILE || page == Page.RESULT
-    val adminTabs = page == Page.ADMIN_HOME || page == Page.ADMIN_QUESTIONS || page == Page.ADMIN_MONITOR
+    val adminTabs = page == Page.ADMIN_HOME || page == Page.ADMIN_STUDENTS ||
+        page == Page.ADMIN_QUESTIONS || page == Page.ADMIN_MONITOR
 
     AdaptiveAppFrame {
     Scaffold(
@@ -182,7 +190,12 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     )
                 } else if (adminTabs) {
                     VokasiBottomNav(
-                        items = listOf(Triple(Page.ADMIN_HOME, "Ringkasan", "⌂"), Triple(Page.ADMIN_QUESTIONS, "Soal", "▤"), Triple(Page.ADMIN_MONITOR, "Monitoring", "◫")),
+                        items = listOf(
+                            Triple(Page.ADMIN_HOME, "Ringkasan", "⌂"),
+                            Triple(Page.ADMIN_STUDENTS, "Siswa", "◉"),
+                            Triple(Page.ADMIN_MONITOR, "Nilai", "◫"),
+                            Triple(Page.ADMIN_QUESTIONS, "Soal", "▤")
+                        ),
                         currentPage = page,
                         onNavigate = { page = it }
                     )
@@ -263,8 +276,13 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     )
                     Page.ADMIN_HOME -> AdminHome(
                         students.toList(), questions.toList(), attempts.toList(),
-                        onQuestions = { page = Page.ADMIN_QUESTIONS }, onMonitoring = { page = Page.ADMIN_MONITOR },
+                        onStudents = { page = Page.ADMIN_STUDENTS },
+                        onQuestions = { page = Page.ADMIN_QUESTIONS },
+                        onMonitoring = { page = Page.ADMIN_MONITOR },
                         onLogout = { logout() }
+                    )
+                    Page.ADMIN_STUDENTS -> AdminStudentsScreen(
+                        students = students.toList(), attempts = attempts.toList()
                     )
                     Page.ADMIN_QUESTIONS -> AdminQuestionsScreen(
                         questions.toList(), onAdd = { page = Page.ADMIN_ADD },
