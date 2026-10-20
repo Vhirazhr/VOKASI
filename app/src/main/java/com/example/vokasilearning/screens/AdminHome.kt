@@ -42,7 +42,8 @@ internal fun AdminHome(
     var statsGrade by remember { mutableStateOf("") }
     var statsClass by remember { mutableStateOf("") }
     var statsDate by remember { mutableStateOf(dayKey(System.currentTimeMillis())) }
-    val scopedClasses = students.filter { (statsMajor.isBlank() || it.classroom.major == statsMajor) &&
+    val scopedClasses = students.filter { statsMajor.isNotBlank() &&
+        it.classroom.major == statsMajor &&
         (statsGrade.isBlank() || schoolGrade(it.classroom.label) == statsGrade) }
         .map { it.classroom.label }.distinct().sorted()
     val stats = remember(students, attempts, statsMajor, statsGrade, statsClass, statsDate) {
@@ -122,6 +123,10 @@ internal fun AdminHome(
                             { statsGrade = it; statsClass = "" }, Modifier.weight(1f))
                         AdminSelect("Kelas", statsClass, listOf("") + scopedClasses,
                             { statsClass = it }, Modifier.weight(1f))
+                    }
+                    if (statsMajor.isBlank()) {
+                        Text("Pilih jurusan jika ingin memfilter sampai kelas tertentu.",
+                            color = Subtle, fontSize = 11.sp)
                     }
                     AdminDateSelect(statsDate, { statsDate = it }, Modifier.fillMaxWidth())
                     Text(
