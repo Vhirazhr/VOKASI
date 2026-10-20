@@ -21,11 +21,15 @@ internal object DailyExcelReport {
         classroom: String,
         date: String,
         students: List<Student>,
-        attempts: List<Attempt>
+        attempts: List<Attempt>,
+        major: String? = null
     ) {
         require(classroom.isNotBlank())
         require(Regex("\\d{4}-\\d{2}-\\d{2}").matches(date))
-        val members = students.filter { it.classroom.label == classroom }.sortedBy { it.name }
+        val members = students.filter {
+            it.classroom.label == classroom &&
+                (major == null || it.classroom.major == major)
+        }.sortedBy { it.name }
         val rows = members.mapIndexed { i, student ->
             val latest = attempts.asSequence()
                 .filter { it.studentId == student.username && it.practiceCategory == null && dayKey(it.timeMillis) == date }
