@@ -144,8 +144,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
         page = when (page) {
             Page.REGISTER -> Page.LOGIN
             Page.ADMIN_ADD -> Page.ADMIN_QUESTIONS
-            Page.HISTORY -> Page.PROFILE
-            Page.RESULT -> if (reviewingHistory) Page.HISTORY else Page.HOME
+            Page.RESULT -> if (reviewingHistory) Page.PROFILE else Page.HOME
             else -> if (isAdmin) Page.ADMIN_HOME else Page.HOME
         }
     }
@@ -163,7 +162,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
         )
     }
 
-    val studentTabs = page == Page.HOME || page == Page.LEADERBOARD || page == Page.PROFILE || page == Page.RESULT || page == Page.HISTORY
+    val studentTabs = page == Page.HOME || page == Page.LEADERBOARD || page == Page.PROFILE || page == Page.RESULT
     val adminTabs = page == Page.ADMIN_HOME || page == Page.ADMIN_QUESTIONS || page == Page.ADMIN_MONITOR
 
     AdaptiveAppFrame {
@@ -178,7 +177,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                 if (studentTabs) {
                     VokasiBottomNav(
                         items = listOf(Triple(Page.HOME, "Beranda", "⌂"), Triple(Page.LEADERBOARD, "Peringkat", "🏆"), Triple(Page.PROFILE, "Profil", "◉")),
-                        currentPage = when (page) { Page.RESULT -> Page.HOME; Page.HISTORY -> Page.PROFILE; else -> page },
+                        currentPage = when (page) { Page.RESULT -> Page.HOME; else -> page },
                         onNavigate = { page = it }
                     )
                 } else if (adminTabs) {
@@ -245,19 +244,15 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     )
                     Page.RESULT -> if (me != null && currentAttempt != null) ResultPage(
                         student = me, attempt = currentAttempt!!,
-                        onBack = { page = if (reviewingHistory) Page.HISTORY else Page.HOME },
+                        onBack = { page = if (reviewingHistory) Page.PROFILE else Page.HOME },
                         onHome = { reviewingHistory = false; page = Page.HOME },
                         onRanking = { reviewingHistory = false; page = Page.LEADERBOARD },
                         onPractice = { category -> reviewingHistory = false; startQuiz(category) },
                         openReviewOnEntry = reviewingHistory
                     )
                     Page.LEADERBOARD -> if (me != null) LeaderboardScreen(me, students.toList(), attempts.toList())
-                    Page.PROFILE -> if (me != null) ProfileScreen(me, attempts.toList(), onLogout = { logout() },
-                        onReview = { attempt -> currentAttempt = attempt; reviewingHistory = true; page = Page.RESULT },
-                        onAllHistory = { page = Page.HISTORY })
-                    Page.HISTORY -> if (me != null) StudentHistoryScreen(
-                        attempts = attempts.filter { it.studentId == me.username },
-                        onBack = { page = Page.PROFILE },
+                    Page.PROFILE -> if (me != null) ProfileScreen(
+                        me, attempts.toList(), onLogout = { logout() },
                         onReview = { attempt -> currentAttempt = attempt; reviewingHistory = true; page = Page.RESULT }
                     )
                     Page.ADMIN_HOME -> AdminHome(
