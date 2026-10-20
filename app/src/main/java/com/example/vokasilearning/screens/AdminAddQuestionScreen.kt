@@ -8,6 +8,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -87,6 +89,7 @@ internal fun AdminAddQuestionScreen(
                         codes.keys.forEach { name ->
                             DropdownMenuItem(text = { Text(name) }, onClick = {
                                 category = name; difficulty = codes.getValue(name).first()
+                                errorMessage = null
                                 categoryMenu = false
                             })
                         }
@@ -101,7 +104,7 @@ internal fun AdminAddQuestionScreen(
                         DropdownMenu(expanded = codeMenu, onDismissRequest = { codeMenu = false }) {
                             codes.getValue(category).forEach { code ->
                                 DropdownMenuItem(text = { Text(code) }, onClick = {
-                                    difficulty = code; codeMenu = false
+                                    difficulty = code; errorMessage = null; codeMenu = false
                                 })
                             }
                         }
@@ -139,6 +142,9 @@ internal fun AdminAddQuestionScreen(
                     Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         RadioButton(
                             selected = correct == i, onClick = { correct = i; errorMessage = null },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Kunci jawaban ${'A' + i}"
+                            },
                             colors = RadioButtonDefaults.colors(selectedColor = Navy)
                         )
                         OutlinedTextField(
