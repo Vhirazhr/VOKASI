@@ -40,7 +40,7 @@ internal fun AdminHero(
 ) {
     Box(
         Modifier.fillMaxWidth()
-            .height(if (compact) 215.dp else 268.dp)
+            .height(if (compact) 256.dp else 310.dp)
             .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp))
             .background(Brush.linearGradient(listOf(DeepNavy, Color(0xFF294D7A))))
             .padding(22.dp)
@@ -75,7 +75,7 @@ internal fun AdminHero(
         }
         Column(
             Modifier.align(Alignment.BottomStart)
-                .padding(bottom = if (compact) 18.dp else 35.dp),
+                .padding(bottom = if (compact) 80.dp else 84.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(title, color = Color.White, fontSize = if (compact) 24.sp else 28.sp,
