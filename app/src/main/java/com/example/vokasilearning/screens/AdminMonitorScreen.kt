@@ -65,7 +65,7 @@ internal fun AdminMonitorScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth()
                         .padding(horizontal = 18.dp)
-                        .padding(top = 167.dp),
+                        .padding(top = 198.dp),
                     shape = RoundedCornerShape(25.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(5.dp)
