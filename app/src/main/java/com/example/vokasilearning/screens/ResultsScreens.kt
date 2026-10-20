@@ -136,6 +136,9 @@ internal fun ResultPage(
 
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    LaunchedEffect(showReview, attempt.sessionKey) {
+        if (showReview) listState.animateScrollToItem(2)
+    }
     Column(Modifier.fillMaxSize().background(Canvas)) {
         Row(
             Modifier.fillMaxWidth().background(Color.White)
@@ -204,10 +207,7 @@ internal fun ResultPage(
                     Text("LANJUTKAN", color = NavyLight, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
                     VokasiButton(
                         text = "Pembahasan",
-                        onClick = {
-                            showReview = true
-                            scope.launch { listState.animateScrollToItem(2) }
-                        }, modifier = Modifier.fillMaxWidth()
+                        onClick = { showReview = true }, modifier = Modifier.fillMaxWidth()
                     )
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         VokasiButton(
