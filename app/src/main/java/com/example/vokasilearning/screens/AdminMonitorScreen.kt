@@ -1,9 +1,5 @@
 package com.example.vokasilearning.screens
 
-import android.app.DatePickerDialog
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,193 +10,199 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.vokasilearning.data.DailyExcelReport
 import com.example.vokasilearning.logic.*
 import com.example.vokasilearning.model.*
 import com.example.vokasilearning.ui.*
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
-import java.util.TimeZone
 
+/** Class/day compulsory grades; latest compulsory attempt per student. */
 @Composable
-internal fun AdminMonitorScreen(students: List<Student>, attempts: List<Attempt>) {
-    val context = LocalContext.current
-    val classes = students.map { it.classroom.label }.distinct().sorted()
-    var classroom by remember { mutableStateOf(classes.firstOrNull().orEmpty()) }
-    var date by remember { mutableStateOf(dayKey(System.currentTimeMillis())) }
-    var classMenu by remember { mutableStateOf(false) }
-    var visibleCount by remember { mutableIntStateOf(10) }
-    var reviewing by remember { mutableStateOf<Attempt?>(null) }
-    var pendingExport by remember { mutableStateOf<Pair<String, String>?>(null) }
-
-    val selectedMembers = students.filter { it.classroom.label == classroom }
-    val summary = AdminAnalytics.classSummary(classroom, students, attempts, date)
-    val todayResults = AdminAnalytics.latestCompulsoryByStudent(attempts, date)
-    val sorted = selectedMembers.sortedWith(
-        compareBy<Student> { if (todayResults.containsKey(it.username)) 1 else 0 }
-            .thenBy { it.name }
-    )
-    val completed = summary.completedCount
-
-    val exporter = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument(
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-    ) { uri ->
-        val selection = pendingExport
-        pendingExport = null
-        if (uri != null && selection != null) {
-            try {
-                val stream = context.contentResolver.openOutputStream(uri)
-                    ?: error("Tidak dapat membuat berkas Excel")
-                stream.use {
-                    DailyExcelReport.write(it, selection.first, selection.second, students, attempts)
-                }
-                Toast.makeText(context, "Excel berhasil disimpan", Toast.LENGTH_SHORT).show()
-            } catch (error: Exception) {
-                Toast.makeText(context, "Ekspor gagal: ${error.message}", Toast.LENGTH_LONG).show()
-            }
-        }
+internal fun AdminMonitorScreen(
+    students: List<Student>,
+    attempts: List<Attempt>,
+    initialMajor: String = "",
+    initialClass: String = "",
+    initialDate: String = ""
+) {
+    val majors = students.map { it.classroom.major }.distinct().sorted()
+    var major by remember(initialMajor) {
+        mutableStateOf(initialMajor.takeIf { it in majors } ?: majors.firstOrNull().orEmpty())
     }
+    val classes = students.filter { it.classroom.major == major }
+        .map { it.classroom.label }.distinct().sorted()
+    var classroom by remember(initialMajor, initialClass, major) {
+        mutableStateOf(initialClass.takeIf { it in classes } ?: classes.firstOrNull().orEmpty())
+    }
+    var date by remember(initialDate) {
+        mutableStateOf(initialDate.ifBlank { dayKey(System.currentTimeMillis()) })
+    }
+    var search by remember { mutableStateOf("") }
+    var onlyMissing by remember { mutableStateOf(false) }
+    var visibleCount by remember(major, classroom, date) { mutableIntStateOf(15) }
+    var reviewing by remember { mutableStateOf<Attempt?>(null) }
+
+    val summary = AdminAnalytics.classSummary(classroom, students, attempts, date, major)
+    val latest = AdminAnalytics.latestCompulsoryByStudent(attempts, date)
+    val members = students.filter {
+        it.classroom.major == major && it.classroom.label == classroom &&
+            (search.isBlank() || it.name.contains(search.trim(), true) ||
+                it.username.contains(search.trim(), true))
+    }.filter { !onlyMissing || latest[it.username] == null }
+        .sortedWith(
+            compareBy<Student> { if (latest[it.username] == null) 1 else 0 }.thenBy { it.name }
+        )
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
-        contentPadding = PaddingValues(18.dp),
-        verticalArrangement = Arrangement.spacedBy(13.dp)
+        contentPadding = PaddingValues(bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item { VokasiTitle("Nilai Harian", "Rekap latihan wajib • data di perangkat ini") }
         item {
-            WhiteCard(Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Kelas", color = Subtle, fontSize = 11.sp)
-                        Box(Modifier.fillMaxWidth()) {
-                            OutlinedButton(
-                                onClick = { classMenu = true },
-                                modifier = Modifier.fillMaxWidth(),
-                                contentPadding = PaddingValues(horizontal = 10.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) { Text(classroom.ifBlank { "Pilih kelas" }, maxLines = 1,
-                                fontSize = 12.sp, color = Ink) }
-                            DropdownMenu(
-                                expanded = classMenu,
-                                onDismissRequest = { classMenu = false }
-                            ) {
-                                classes.forEach { value ->
-                                    DropdownMenuItem(
-                                        text = { Text(value) },
-                                        onClick = {
-                                            classroom = value; classMenu = false; visibleCount = 10
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Column(Modifier.weight(1f)) {
-                        Text("Tanggal", color = Subtle, fontSize = 11.sp)
-                        OutlinedButton(
-                            onClick = {
-                                val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Jakarta"))
-                                val parts = date.split("-").mapNotNull { it.toIntOrNull() }
-                                DatePickerDialog(
-                                    context,
-                                    { _, year, month, day ->
-                                        date = String.format(Locale.US, "%04d-%02d-%02d",
-                                            year, month + 1, day)
-                                        visibleCount = 10
-                                    },
-                                    parts.getOrNull(0) ?: cal.get(Calendar.YEAR),
-                                    (parts.getOrNull(1) ?: cal.get(Calendar.MONTH) + 1) - 1,
-                                    parts.getOrNull(2) ?: cal.get(Calendar.DAY_OF_MONTH)
-                                ).apply { datePicker.maxDate = System.currentTimeMillis() }.show()
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = 8.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) { Text(date, fontSize = 12.sp, color = Ink, maxLines = 1) }
-                    }
-                }
-                VokasiButton(
-                    text = "Unduh Excel",
-                    enabled = classroom.isNotBlank(),
-                    onClick = {
-                        pendingExport = classroom to date
-                        exporter.launch(
-                            "VOKASI_Nilai_${classroom.replace(' ', '_')}_$date.xlsx"
-                        )
-                    },
+            Box(Modifier.fillMaxWidth()) {
+                AdminHero("Nilai Siswa", "Rekap latihan wajib per kelas dan tanggal", compact = true)
+                Card(
                     modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                WhiteCard(Modifier.weight(1f)) {
-                    Text("Sudah", color = Good, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text("$completed", color = Ink, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
-                }
-                WhiteCard(Modifier.weight(1f)) {
-                    Text("Belum", color = Warning, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text("${summary.missingCount}", color = Ink, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
-                }
-                WhiteCard(Modifier.weight(1f)) {
-                    Text("Rata-rata", color = Navy, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text(summary.averageScore?.toString() ?: "—",
-                        color = Ink, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
-                }
-            }
-        }
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Daftar Siswa", color = Ink, fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
-                Text("${summary.studentCount} siswa", color = Subtle, fontSize = 12.sp)
-            }
-        }
-        if (sorted.isEmpty()) {
-            item { WhiteCard(Modifier.fillMaxWidth()) { Text("Tidak ada siswa untuk kelas ini.", color = Subtle) } }
-        } else {
-            items(sorted.take(visibleCount), key = { it.username }) { student ->
-                val result = todayResults[student.username]
-                WhiteCard(Modifier.fillMaxWidth()) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Avatar(student, 42.dp)
-                        Column(Modifier.weight(1f)) {
-                            Text(student.name, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                                color = Ink, maxLines = 2)
-                            Text(if (result == null) "Belum mengerjakan" else "Latihan wajib selesai",
-                                fontSize = 11.sp, color = if (result == null) Warning else Good)
+                        .padding(horizontal = 18.dp)
+                        .padding(top = 167.dp),
+                    shape = RoundedCornerShape(25.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(5.dp)
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("LAPORAN KELAS", color = NavyLight, fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+                            Pill("Lokal / demo", PaleGold, Warning)
                         }
-                        if (result == null) Pill("Belum", PaleGold, Warning)
-                        else Pill("${result.score}/100", PaleBlue, Navy)
+                        AdminSelect("Jurusan", major, majors, { major = it },
+                            Modifier.fillMaxWidth())
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AdminSelect("Kelas", classroom, classes, { classroom = it },
+                                Modifier.weight(1f))
+                            AdminDateSelect(date, { date = it }, Modifier.weight(1f))
+                        }
+                        HorizontalDivider(color = Border)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AdminSummaryMetric("Selesai", "${summary.completedCount}", Good, Modifier.weight(1f))
+                            AdminSummaryMetric("Belum", "${summary.missingCount}", Warning, Modifier.weight(1f))
+                            AdminSummaryMetric("Rata-rata", summary.averageScore?.toString() ?: "—",
+                                Navy, Modifier.weight(1f))
+                        }
+                        AdminExcelAction(
+                            students, attempts, major, classroom, date,
+                            modifier = Modifier.fillMaxWidth(), text = "Unduh Excel Kelas"
+                        )
+                        Text("Nilai wajib terakhir pada tanggal terpilih • ${summary.studentCount} siswa",
+                            color = Subtle, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+        item {
+            Column(Modifier.padding(horizontal = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                AdminSectionTitle("Hasil terbaru", "Daftar nilai siswa")
+                OutlinedTextField(
+                    value = search, onValueChange = { search = it; visibleCount = 15 },
+                    placeholder = { Text("Cari nama atau username") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(13.dp)
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    FilterChip(
+                        selected = !onlyMissing,
+                        onClick = { onlyMissing = false; visibleCount = 15 },
+                        label = { Text("Semua", fontSize = 12.sp) }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    FilterChip(
+                        selected = onlyMissing,
+                        onClick = { onlyMissing = true; visibleCount = 15 },
+                        label = { Text("Belum mengerjakan", fontSize = 12.sp) }
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text("${members.size} siswa", color = Subtle, fontSize = 11.sp)
+                }
+            }
+        }
+        if (members.isEmpty()) {
+            item {
+                WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                    Text("Tidak ada hasil yang cocok.", color = Subtle, fontSize = 12.sp)
+                }
+            }
+        } else {
+            items(members.take(visibleCount), key = { it.username }) { student ->
+                val result = latest[student.username]
+                WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                        Avatar(student, 44.dp)
+                        Column(Modifier.weight(1f)) {
+                            Text(student.name, color = Ink, fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold, maxLines = 2)
+                            Text(student.classroom.label, color = Subtle, fontSize = 11.sp)
+                        }
+                        Pill(
+                            result?.let { "${it.score}/100" } ?: "Belum",
+                            when {
+                                result == null -> PaleGold
+                                result.score < 60 -> Color(0xFFFFE7EA)
+                                result.score >= 90 -> PaleGreen
+                                else -> PaleBlue
+                            },
+                            when {
+                                result == null -> Warning
+                                result.score < 60 -> Bad
+                                result.score >= 90 -> Good
+                                else -> Navy
+                            }
+                        )
                     }
                     if (result != null) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text("${result.correct}/${result.questionCount} benar",
-                                fontSize = 11.sp, color = Subtle, modifier = Modifier.weight(1f))
+                                color = Subtle, fontSize = 11.sp, modifier = Modifier.weight(1f))
                             TextButton(onClick = { reviewing = result }) {
-                                Text("Pembahasan", fontSize = 12.sp, color = Navy)
+                                Text("Lihat Jawaban", color = Navy, fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp)
                             }
                         }
                     }
                 }
             }
-            if (sorted.size > visibleCount) {
+            if (members.size > visibleCount) {
                 item {
-                    TextButton(onClick = { visibleCount += 10 }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Muat 10 lagi", color = Navy, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { visibleCount += 15 },
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text("Muat 15 lagi", color = Navy, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
     }
-    reviewing?.let { item ->
-        AdminAnswerReviewDialog(attempt = item, onClose = { reviewing = null })
+    reviewing?.let { result ->
+        AdminAnswerReviewDialog(result, onClose = { reviewing = null })
+    }
+}
+
+@Composable
+private fun AdminSummaryMetric(
+    label: String, value: String, accent: Color, modifier: Modifier = Modifier
+) {
+    Column(
+        modifier.background(Canvas, RoundedCornerShape(14.dp))
+            .padding(horizontal = 3.dp, vertical = 11.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(label, fontSize = 11.sp, color = accent, fontWeight = FontWeight.Bold)
+        Text(value, fontSize = 21.sp, color = Ink, fontWeight = FontWeight.ExtraBold)
     }
 }
