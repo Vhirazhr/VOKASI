@@ -79,9 +79,9 @@ class StudentHistoryFilterTest {
             listOf(previousDay, firstIncluded, today),
             selection.copy(period = HistoryPeriod.TODAY), now
         ))
-        assertEquals(listOf(today, firstIncluded), StudentHistoryFilter.filter(
+        assertEquals(listOf(today, firstIncluded, previousDay), StudentHistoryFilter.filter(
             listOf(previousDay, firstIncluded, today),
             selection.copy(period = HistoryPeriod.THIS_MONTH), now
-        ).filter { it.timeMillis != previousDay.timeMillis })
+        ))
     }
 }
