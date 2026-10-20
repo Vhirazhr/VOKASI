@@ -22,7 +22,7 @@ import com.example.vokasilearning.ui.*
 @Composable
 internal fun AdminHome(
     students: List<Student>, questions: List<Question>, attempts: List<Attempt>,
-    onStudents: () -> Unit,
+    onStudents: (String) -> Unit,
     onMonitoring: (String, String, String) -> Unit,
     onLogout: () -> Unit
 ) {
@@ -32,7 +32,6 @@ internal fun AdminHome(
         .map { it.classroom.label }.distinct().sorted()
     var classroom by remember(major) { mutableStateOf(classOptions.firstOrNull().orEmpty()) }
     var date by remember { mutableStateOf(dayKey(System.currentTimeMillis())) }
-    var expandedMajor by remember { mutableStateOf<String?>(null) }
     var confirmLogout by remember { mutableStateOf(false) }
     val summary = AdminAnalytics.classSummary(classroom, students, attempts, date, major)
     val byStudent = AdminAnalytics.latestCompulsoryByStudent(attempts, date)
@@ -44,6 +43,13 @@ internal fun AdminHome(
     )
     val allClasses = AdminAnalytics.allClasses(students, attempts, date)
     val byMajor = allClasses.groupBy { it.major }.toSortedMap()
+    val classGrades = classMembers.mapNotNull { byStudent[it.username]?.score }
+    val classStrong = classGrades.count { it >= 75 }
+    val classPracticeNeeded = classGrades.count { it < 60 }
+    val majorClasses = byMajor[major].orEmpty()
+    val majorStudents = students.filter { it.classroom.major == major }
+    val majorGrades = majorStudents.mapNotNull { byStudent[it.username]?.score }
+    val majorAverage = majorGrades.takeIf { it.isNotEmpty() }?.average()?.toInt()
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
@@ -159,6 +165,42 @@ internal fun AdminHome(
         }
 
         item {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                AdminSectionTitle("Statistik kelas", "Ringkasan $classroom")
+                WhiteCard(Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Partisipasi wajib", color = Ink, fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text(
+                            if (summary.studentCount == 0) "—"
+                            else "${summary.completedCount * 100 / summary.studentCount}%",
+                            color = Navy, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                    LinearProgressIndicator(
+                        progress = {
+                            if (summary.studentCount == 0) 0f
+                            else summary.completedCount.toFloat() / summary.studentCount
+                        },
+                        modifier = Modifier.fillMaxWidth().height(7.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        color = Good, trackColor = PaleGreen
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AdminStatChip("Nilai ≥75", "$classStrong", Good, Modifier.weight(1f))
+                        AdminStatChip("Nilai <60", "$classPracticeNeeded", Bad, Modifier.weight(1f))
+                        AdminStatChip("Belum", "${summary.missingCount}", Warning, Modifier.weight(1f))
+                    }
+                    Text(
+                        "Distribusi memakai nilai wajib terbaru per siswa pada $date.",
+                        fontSize = 11.sp, color = Subtle
+                    )
+                }
+            }
+        }
+
+        item {
             Column(Modifier.padding(horizontal = 18.dp)) {
                 AdminSectionTitle("Struktur sekolah", "Rekap per jurusan")
                 Text("Pilih jurusan untuk melihat kelasnya.",
@@ -170,52 +212,63 @@ internal fun AdminHome(
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                     val done = classes.sumOf { it.completedCount }
                     val total = classes.sumOf { it.studentCount }
+                    val memberIds = students.filter { it.classroom.major == majorName }
+                        .map { it.username }.toSet()
+                    val scores = memberIds.mapNotNull { byStudent[it]?.score }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(majorName, color = Ink, fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp)
-                            Text("${classes.size} kelas • $done/$total siswa sudah latihan",
+                                fontSize = 14.sp, maxLines = 2)
+                            Text("${classes.size} kelas • $done/$total siswa selesai",
                                 color = Subtle, fontSize = 11.sp)
+                            Text("Rata-rata nilai: ${scores.takeIf { it.isNotEmpty() }?.average()?.toInt() ?: "—"}",
+                                color = Navy, fontSize = 11.sp)
                         }
-                        TextButton(
-                            onClick = {
-                                expandedMajor = if (expandedMajor == majorName) null else majorName
-                            }
-                        ) {
-                            Text(if (expandedMajor == majorName) "Tutup" else "Lihat kelas",
-                                color = Navy, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        TextButton(onClick = { onStudents(majorName) }) {
+                            Text("Lihat Kelas", color = Navy, fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold)
                         }
                     }
                     LinearProgressIndicator(
                         progress = { if (total == 0) 0f else done.toFloat() / total },
-                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(6.dp)),
+                        modifier = Modifier.fillMaxWidth().height(6.dp)
+                            .clip(RoundedCornerShape(6.dp)),
                         color = Good, trackColor = PaleGreen
                     )
-                    if (expandedMajor == majorName) {
-                        classes.forEach { cls ->
-                            HorizontalDivider(color = Border)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(cls.classroom, color = Ink, fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold)
-                                    Text("${cls.completedCount}/${cls.studentCount} selesai • Rata-rata ${cls.averageScore?.toString() ?: "—"}",
-                                        color = Subtle, fontSize = 11.sp)
-                                }
-                                TextButton(
-                                    onClick = { onMonitoring(majorName, cls.classroom, date) }
-                                ) { Text("Nilai", color = Navy, fontSize = 12.sp) }
-                            }
-                        }
-                    }
                 }
             }
         }
 
         item {
-            TextButton(
-                onClick = onStudents,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
-            ) { Text("Buka Data Siswa", color = Navy, fontWeight = FontWeight.Bold) }
+            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                AdminSectionTitle("Statistik jurusan", major.ifBlank { "Belum dipilih" })
+                WhiteCard(Modifier.fillMaxWidth()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AdminStatChip("Kelas", "${majorClasses.size}", Navy, Modifier.weight(1f))
+                        AdminStatChip("Siswa", "${majorStudents.size}", Navy, Modifier.weight(1f))
+                        AdminStatChip("Selesai", "${majorGrades.size}", Good, Modifier.weight(1f))
+                    }
+                    HorizontalDivider(color = Border)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Rata-rata nilai wajib", modifier = Modifier.weight(1f),
+                            color = Subtle, fontSize = 12.sp)
+                        Text(majorAverage?.toString() ?: "—",
+                            color = Ink, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                    LinearProgressIndicator(
+                        progress = { if (majorStudents.isEmpty()) 0f
+                            else majorGrades.size.toFloat() / majorStudents.size },
+                        modifier = Modifier.fillMaxWidth().height(7.dp)
+                            .clip(RoundedCornerShape(7.dp)),
+                        color = Good, trackColor = PaleGreen
+                    )
+                    Text(
+                        "Partisipasi ${majorGrades.size}/${majorStudents.size} siswa • $date • Data lokal",
+                        color = Subtle, fontSize = 11.sp
+                    )
+                }
+            }
         }
         item {
             TextButton(onClick = { confirmLogout = true },
