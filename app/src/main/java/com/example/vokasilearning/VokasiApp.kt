@@ -77,8 +77,6 @@ internal fun VokasiApp(activity: ComponentActivity) {
     var currentAttempt by remember { mutableStateOf<Attempt?>(null) }
     var reviewingHistory by remember { mutableStateOf(false) }
     var showResultPopup by remember { mutableStateOf(false) }
-    val noticeHost = remember { SnackbarHostState() }
-    val notifiedSessions = remember { mutableStateMapOf<String, Boolean>() }
     var quitDialog by remember { mutableStateOf(false) }
     val me = students.firstOrNull { it.username == currentId }
 
@@ -110,27 +108,8 @@ internal fun VokasiApp(activity: ComponentActivity) {
         QuizProgressStore.clear(activity, student.username)
         currentAttempt = attempt
         reviewingHistory = false
-        showResultPopup = false
+        showResultPopup = true
         page = Page.RESULT
-    }
-
-    // Quiet, one-time notification after a completed compulsory or material practice session.
-    LaunchedEffect(page, currentAttempt?.sessionKey, reviewingHistory) {
-        val attempt = currentAttempt
-        val student = me
-        if (page == Page.RESULT && !reviewingHistory && attempt != null && student != null) {
-            val key = attempt.sessionKey.ifBlank { "${attempt.studentId}_${attempt.timeMillis}" }
-            if (notifiedSessions[key] != true) {
-                notifiedSessions[key] = true
-                noticeHost.showSnackbar(
-                    message = completionNotice(
-                        attempt.score, attempt.correct, attempt.questionCount,
-                        attempt.earnedXp, calculateStreak(student, attempts.toList())
-                    ),
-                    duration = SnackbarDuration.Short
-                )
-            }
-        }
     }
 
     QuizScreenProtection(activity = activity, enabled = page == Page.QUIZ)
@@ -189,7 +168,6 @@ internal fun VokasiApp(activity: ComponentActivity) {
     AdaptiveAppFrame {
     Scaffold(
         containerColor = Canvas,
-        snackbarHost = { SnackbarHost(noticeHost) },
         bottomBar = {
             AnimatedVisibility(
                 visible = studentTabs || adminTabs,
@@ -308,18 +286,15 @@ internal fun VokasiApp(activity: ComponentActivity) {
 
     }
 
-    // Result Popup Overlay
-    AnimatedVisibility(
-        visible = showResultPopup && me != null && currentAttempt != null,
-        enter = fadeIn() + scaleIn(initialScale = 0.9f),
-        exit = fadeOut() + scaleOut(targetScale = 0.9f)
+    // One completion modal per newly finished session. Revisiting history never opens it.
+    if (page == Page.RESULT && showResultPopup && !reviewingHistory &&
+        currentAttempt != null && me != null
     ) {
-        if (me != null && currentAttempt != null) {
-            ResultPopup(
-                me, students.toList(), attempts.toList(), currentAttempt!!,
-                onClose = { showResultPopup = false; page = Page.HOME },
-                onAllRanking = { showResultPopup = false; page = Page.LEADERBOARD }
-            )
-        }
+        CompletionDialog(
+            attempt = currentAttempt!!,
+            streak = calculateStreak(me, attempts.toList()),
+            onViewResults = { showResultPopup = false }
+        )
     }
+
 }
