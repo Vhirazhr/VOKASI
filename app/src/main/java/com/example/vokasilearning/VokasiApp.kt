@@ -83,6 +83,19 @@ internal fun VokasiApp(activity: ComponentActivity) {
     var adminClassFilter by remember { mutableStateOf("") }
     var adminDateFilter by remember { mutableStateOf("") }
     var adminQuestionNotice by remember { mutableStateOf<String?>(null) }
+    var adminPrefs by remember { mutableStateOf(LocalAdminPreferences.load(activity)) }
+    val adminEvents = remember { mutableStateListOf<AdminLogEvent>().apply {
+        addAll(LocalAdminLog.load(activity))
+    } }
+    fun recordAdmin(type: String, detail: String) {
+        try {
+            LocalAdminLog.append(activity, type, detail)
+            adminEvents.clear()
+            adminEvents.addAll(LocalAdminLog.load(activity))
+        } catch (_: Exception) {
+            // Local log is best-effort, never blocks core school administration.
+        }
+    }
 
     val quizSession = rememberQuizSession()
 
@@ -92,7 +105,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
     var quitDialog by remember { mutableStateOf(false) }
     val me = students.firstOrNull { it.username == currentId }
 
-    fun logout() { currentId = null; isAdmin = false; page = Page.LOGIN }
+    fun logout() {
+        if (isAdmin) recordAdmin("Masuk", "Admin keluar dari aplikasi")
+        currentId = null; isAdmin = false; page = Page.LOGIN
+    }
     fun saveQuizCheckpoint() {
         val owner = currentId ?: return
         if (quizSession.questions.isNotEmpty()) {
@@ -230,6 +246,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                 currentId = null
                                 isAdmin = true
                                 page = Page.ADMIN_HOME
+                                recordAdmin("Masuk", "Admin membuka panel VOKASI")
                                 true
                             } else {
                                 val found = students.firstOrNull {
@@ -294,6 +311,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             adminDateFilter = date
                             page = Page.ADMIN_MONITOR
                         },
+                        onLog = { page = Page.ADMIN_LOG },
+                        onProfile = { page = Page.ADMIN_PROFILE },
+                        adminName = adminPrefs.displayName,
+                        schoolName = adminPrefs.school,
                         onLogout = { logout() }
                     )
                     Page.ADMIN_STUDENTS -> AdminStudentsScreen(
@@ -317,6 +338,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                             activity, questions.filter { it.id !in bundledIds && it.id != id }
                                         )
                                         questions.remove(removed)
+                                        recordAdmin("Soal", "Menghapus soal tambahan #$id")
                                         true
                                     } catch (_: Exception) {
                                         false
@@ -355,6 +377,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                     )
                                     questions.add(newQuestion)
                                     adminQuestionNotice = "Soal #$id berhasil disimpan di perangkat."
+                                    recordAdmin("Soal", "Menambahkan soal #$id ($category, $difficulty)")
                                     page = Page.ADMIN_QUESTIONS
                                     null
                                 } catch (_: IllegalArgumentException) {
@@ -364,6 +387,25 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                 }
                             }
                         }
+                    )
+                    Page.ADMIN_LOG -> AdminLogScreen(
+                        events = adminEvents.toList(),
+                        onBack = { page = Page.ADMIN_HOME }
+                    )
+                    Page.ADMIN_PROFILE -> AdminProfileScreen(
+                        config = adminPrefs,
+                        onSave = { value ->
+                            try {
+                                val success = LocalAdminPreferences.save(activity, value)
+                                if (success) {
+                                    adminPrefs = value
+                                    recordAdmin("Profil", "Memperbarui nama tampilan admin dan sekolah")
+                                }
+                                success
+                            } catch (_: Exception) { false }
+                        },
+                        onBack = { page = Page.ADMIN_HOME },
+                        onLogout = { logout() }
                     )
                     Page.ADMIN_MONITOR -> AdminMonitorScreen(
                         students.toList(), attempts.toList(),
