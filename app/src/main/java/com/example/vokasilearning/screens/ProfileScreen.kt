@@ -41,10 +41,6 @@ internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () ->
     var historyShown by remember(me.username) { mutableIntStateOf(5) }
     val filteredHistory = StudentHistoryFilter.filter(mine, historySelection)
     val shownHistory = filteredHistory.take(historyShown)
-    val historyYears = (
-        mine.map { dayKey(it.timeMillis).take(4).toInt() } +
-            wibToday.get(Calendar.YEAR)
-        ).distinct().sortedDescending()
     val historyDateFormat = remember {
         java.text.SimpleDateFormat("dd MMM yyyy • HH:mm", java.util.Locale("id", "ID")).apply {
             timeZone = java.util.TimeZone.getTimeZone("Asia/Jakarta")
@@ -213,7 +209,6 @@ internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () ->
         item {
             StudentHistoryFilterControls(
                 applied = historySelection,
-                availableYears = historyYears,
                 onApply = { selection ->
                     historySelection = selection
                     historyShown = 5
