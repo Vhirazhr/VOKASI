@@ -23,7 +23,9 @@ internal data class HistorySelection(
     val period: HistoryPeriod = HistoryPeriod.ALL,
     val date: String = "",
     val month: Int = 1,
-    val year: Int = 2026
+    val year: Int = 2026,
+    val fromDate: String = "",
+    val toDate: String = ""
 )
 
 /** All dates use the school's Asia/Jakarta time zone, including day boundaries. */
@@ -61,6 +63,11 @@ internal object StudentHistoryFilter {
                             day.startsWith("%04d-%02d".format(java.util.Locale.US, selection.year, selection.month))
                     HistoryPeriod.YEAR -> day.startsWith("%04d-".format(java.util.Locale.US, selection.year))
                 }
+            }
+            .filter { attempt ->
+                val day = dayKey(attempt.timeMillis)
+                (selection.fromDate.isBlank() || day >= selection.fromDate) &&
+                    (selection.toDate.isBlank() || day <= selection.toDate)
             }
             .sortedWith(compareByDescending<Attempt> { it.timeMillis }.thenByDescending { it.sessionKey })
             .toList()
