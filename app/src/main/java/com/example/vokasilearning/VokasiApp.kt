@@ -66,7 +66,7 @@ import com.example.vokasilearning.ui.*
 internal fun VokasiApp(activity: ComponentActivity) {
     val students = remember { mutableStateListOf<Student>().apply { addAll(initialStudents()) } }
     val questions = remember { mutableStateListOf<Question>().apply { addAll(QuestionBankLoader.load(activity)) } }
-    val attempts = remember { mutableStateListOf<Attempt>() }
+    val attempts = remember { mutableStateListOf<Attempt>().apply { addAll(LocalAttemptStore.load(activity)) } }
 
     var page by remember { mutableStateOf(Page.LOGIN) }
     var currentId by remember { mutableStateOf<String?>(null) }
@@ -88,6 +88,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
         if (page != Page.QUIZ || !quizSession.isComplete) return
         val attempt = quizSession.finish(student, attempts.toList())
         attempts.add(attempt)
+        LocalAttemptStore.save(activity, attempts.toList())
         currentAttempt = attempt
         showResultPopup = true
         page = Page.RESULT
