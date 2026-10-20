@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.logic.dayKey
+import com.example.vokasilearning.logic.scoreGrade
 import com.example.vokasilearning.model.Attempt
 import com.example.vokasilearning.ui.*
 
@@ -94,7 +95,20 @@ internal fun StudentHistoryScreen(
                                     color = Subtle, fontSize = 11.sp
                                 )
                             }
-                            Text("${attempt.score}/100", color = Navy, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    "${attempt.score}/100",
+                                    color = when {
+                                        attempt.score >= 90 -> Good
+                                        attempt.score >= 75 -> NavyLight
+                                        attempt.score >= 60 -> Color(0xFFA06C13)
+                                        else -> Bad
+                                    },
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                                Text(scoreGrade(attempt.score), color = Subtle, fontSize = 10.sp)
+                            }
                         }
                         TextButton(onClick = { onReview(attempt) }) {
                             Text("Lihat hasil & pembahasan →", color = Navy, fontWeight = FontWeight.SemiBold)
