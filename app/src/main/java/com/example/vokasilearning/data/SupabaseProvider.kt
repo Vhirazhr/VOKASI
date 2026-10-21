@@ -24,7 +24,7 @@ object SupabaseProvider {
 
     val client: SupabaseClient by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         check(isConfigured) {
-            "Supabase belum dikonfigurasi. Tambahkan supabase.url dan supabase.publishableKey ke local.properties, lalu Sync Gradle."
+            "Konfigurasi Supabase belum valid. Periksa Project URL dan Publishable Key pada app/build.gradle.kts atau local.properties."
         }
 
         createSupabaseClient(
