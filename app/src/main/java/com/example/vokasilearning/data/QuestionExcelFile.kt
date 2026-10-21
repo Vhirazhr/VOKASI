@@ -33,17 +33,52 @@ internal object QuestionExcelFile {
         val explanation: String
     )
 
-    /** Generates a real Excel workbook with the exact supported column names. */
-    fun writeTemplate(output: OutputStream) {
+    /** Empty, import-ready template with the exact required column names. */
+    fun writeTemplate(output: OutputStream) = writeWorkbook(output, emptyList())
+
+    /**
+     * Exports every supplied question (not just the current ten visible rows).
+     * The same nine columns can be imported again as a VOKASI question sheet.
+     */
+    fun writeExport(output: OutputStream, questions: List<Question>) {
+        require(questions.isNotEmpty()) { "Tidak ada soal yang dapat diekspor." }
+        questions.forEach { question ->
+            require(question.options.size == 4 && question.answerIndex in 0..3) {
+                "Soal #" + question.id + " tidak memiliki empat pilihan dan satu kunci yang valid."
+            }
+        }
+        writeWorkbook(output, questions)
+    }
+
+    private fun writeWorkbook(output: OutputStream, questions: List<Question>) {
         val sheet = buildString {
             append(XML).append("<worksheet xmlns=\"").append(NS)
-            append("\"><sheetData><row r=\"1\">")
-            headers.forEachIndexed { i, value ->
-                append("<c r=\"").append('A' + i)
-                append("1\" t=\"inlineStr\"><is><t>")
-                append(value).append("</t></is></c>")
+            append("\"><sheetData>")
+            fun excelRow(rowNumber: Int, values: List<String>) {
+                append("<row r=\"").append(rowNumber).append("\">")
+                values.forEachIndexed { column, value ->
+                    append("<c r=\"").append('A' + column).append(rowNumber)
+                    append("\" t=\"inlineStr\"><is><t>")
+                    append(escapeXml(value))
+                    append("</t></is></c>")
+                }
+                append("</row>")
             }
-            append("</row></sheetData></worksheet>")
+            excelRow(1, headers)
+            questions.forEachIndexed { index, question ->
+                excelRow(
+                    index + 2,
+                    listOf(
+                        question.category,
+                        question.difficultyCode,
+                        question.question
+                    ) + question.options + listOf(
+                        ('A' + question.answerIndex).toString(),
+                        question.explanation
+                    )
+                )
+            }
+            append("</sheetData></worksheet>")
         }
         ZipOutputStream(output).use { zip ->
             fun entry(name: String, data: String) {
@@ -70,6 +105,19 @@ internal object QuestionExcelFile {
                 "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/>" +
                 "</Relationships>")
             entry("xl/worksheets/sheet1.xml", sheet)
+        }
+    }
+
+    private fun escapeXml(input: String): String = buildString {
+        input.forEach { c ->
+            when (c) {
+                '&' -> append("&amp;")
+                '<' -> append("&lt;")
+                '>' -> append("&gt;")
+                '"' -> append("&quot;")
+                '\'' -> append("&apos;")
+                else -> if (c.code >= 0x20 || c == '\n' || c == '\r' || c == '\t') append(c)
+            }
         }
     }
 

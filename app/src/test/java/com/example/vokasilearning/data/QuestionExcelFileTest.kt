@@ -124,6 +124,55 @@ class QuestionExcelFileTest {
         expectedError({ read(listOf(badKey)) }, "Baris 2: Kunci")
     }
 
+
+    @Test fun exportedWorkbookRoundTripsMultipleCategoriesAndEveryRow() {
+        val original = existing().filter {
+            it.category == "Perkalian" || it.category == "Pembagian"
+        }
+        assertTrue(original.size > 10)
+        val bytes = ByteArrayOutputStream().also {
+            QuestionExcelFile.writeExport(it, original)
+        }.toByteArray()
+        val parsed = QuestionExcelFile.read(ByteArrayInputStream(bytes))
+        assertEquals(original.size, parsed.size)
+        assertEquals(setOf("Perkalian", "Pembagian"), parsed.map { it.category }.toSet())
+        original.zip(parsed).forEach { (q, draft) ->
+            assertEquals(q.category, draft.category)
+            assertEquals(q.difficultyCode, draft.code)
+            assertEquals(q.question, draft.question)
+            assertEquals(q.options, draft.options)
+            assertEquals(q.answerIndex, draft.answerIndex)
+            assertEquals(q.explanation, draft.explanation)
+        }
+    }
+
+    @Test fun workbookEscapesXmlSpecialCharactersAndKeepsLiteralFormulas() {
+        val question = Question(
+            782, "Perkalian", "Berapa nilai <x> & y? =SUM(3,4)",
+            listOf("A&B", "<12>", "\"nilai\"", "'hasil'"),
+            1, "K1", 8,
+            "Penjelasan dengan <simbol> & tanda kutip \"contoh\".",
+            "<12>"
+        )
+        val output = ByteArrayOutputStream()
+        QuestionExcelFile.writeExport(output, listOf(question))
+        val parsed = QuestionExcelFile.read(ByteArrayInputStream(output.toByteArray()))
+        assertEquals(1, parsed.size)
+        assertEquals(question.question, parsed[0].question)
+        assertEquals(question.options, parsed[0].options)
+        assertEquals(question.explanation, parsed[0].explanation)
+        assertEquals(1, parsed[0].answerIndex)
+    }
+
+    @Test fun exportRejectsEmptyAndInvalidQuestionRecords() {
+        expectedError({ QuestionExcelFile.writeExport(ByteArrayOutputStream(), emptyList()) },
+            "Tidak ada soal")
+        val bad = Question(1, "Perkalian", "Coba?",
+            listOf("A", "B"), 3, "K1")
+        expectedError({ QuestionExcelFile.writeExport(ByteArrayOutputStream(), listOf(bad)) },
+            "tidak memiliki empat pilihan")
+    }
+
     private fun List<String>.copyWithQuestion(value: String): List<String> =
         toMutableList().apply { set(2, value) }
 }

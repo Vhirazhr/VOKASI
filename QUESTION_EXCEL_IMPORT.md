@@ -28,3 +28,17 @@ Menu: **Admin → Soal → Template Excel** untuk menyimpan template `.xlsx`, la
 **Batasan**: penyimpanan saat ini hanya pada perangkat admin yang melakukan impor, belum menyinkronkan bank soal antarperangkat atau menggunakan backend sekolah. Tidak ada impor parsial dan tidak mengubah kuota 100 soal latihan wajib yang berlaku.
 
 **Catatan:** kategori materi mengikuti versi aplikasi yang ada di repository saat ini. Penambahan kategori Pengurangan perlu perubahan tersendiri pada aturan bank soal dan pengaturan sesi.
+
+
+## Ekspor soal berdasarkan filter (satu atau lebih materi)
+
+Pada **Admin → Soal**, chip materi kini mendukung pemilihan **lebih dari satu**:
+- Ketuk **Perkalian** untuk memilih hanya soal perkalian.
+- Ketuk **Pembagian** tanpa mematikan pilihan Perkalian untuk menggabungkan **Perkalian + Pembagian**.
+- Ketuk kategori lain untuk menambah atau menghapus pilihan; ketuk **Semua** untuk menampilkan semua kategori lagi.
+
+Kotak pencarian juga termasuk filter aktif. Tekan **Ekspor Excel (N soal)** untuk menyimpan file `.xlsx` sesuai semua hasil filter saat itu, **bukan hanya 10 entri pada halaman daftar**. Jika tidak ada hasil, tombol ekspor dinonaktifkan.
+
+File berisi satu sheet dengan kolom persis seperti template impor: `Materi, Kode, Pertanyaan, A, B, C, D, Kunci, Pembahasan`. Kunci dan pembahasan disertakan. Soal bawaan dan soal tambahan yang cocok dengan filter sama-sama dapat diekspor; sumber bank soal di aplikasi tidak diubah oleh proses ekspor. Berkas tersebut bisa dibuka di Excel dan formatnya dapat dipakai untuk mengimpor ulang soal, mengikuti batas serta aturan validasi impor.
+
+Contoh nama file: `VOKASI_Soal_Perkalian_Pembagian.xlsx`. Ekspor berhasil dicatat di Log Aktivitas admin.

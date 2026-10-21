@@ -330,6 +330,12 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     Page.ADMIN_QUESTIONS -> AdminQuestionsScreen(
                         questions = questions.toList(), bundledIds = bundledIds,
                         onAdd = { page = Page.ADMIN_ADD },
+                        onExport = { count, categories ->
+                            recordAdmin(
+                                "Soal",
+                                "Ekspor Excel: " + count + " soal • " + categories.joinToString(", ")
+                            )
+                        },
                         onImport = { drafts ->
                             try {
                                 val imported = QuestionExcelFile.prepare(questions.toList(), drafts)

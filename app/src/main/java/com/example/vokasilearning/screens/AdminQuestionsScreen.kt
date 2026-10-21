@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.example.vokasilearning.logic.AdminPagination
+import com.example.vokasilearning.logic.AdminQuestionFilter
 import com.example.vokasilearning.ui.*
 
 @Composable
@@ -33,11 +34,12 @@ internal fun AdminQuestionsScreen(
     bundledIds: Set<Int>,
     onAdd: () -> Unit,
     onImport: (List<QuestionExcelFile.Draft>) -> String,
+    onExport: (Int, List<String>) -> Unit,
     onDelete: (Int) -> Boolean,
     notice: String?,
     onDismissNotice: () -> Unit
 ) {
-    var category by remember { mutableStateOf("Semua") }
+    var selectedCategories by remember { mutableStateOf(emptySet<String>()) }
     var search by remember { mutableStateOf("") }
     var page by remember { mutableIntStateOf(0) }
     var pagingActivated by remember { mutableStateOf(false) }
@@ -46,6 +48,7 @@ internal fun AdminQuestionsScreen(
     var localNotice by remember { mutableStateOf<String?>(null) }
     var expandedId by remember { mutableStateOf<Int?>(null) }
     var excelBusy by remember { mutableStateOf(false) }
+    var pendingExport by remember { mutableStateOf<List<Question>>(emptyList()) }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val excelMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -94,13 +97,34 @@ internal fun AdminQuestionsScreen(
             }
         }
     }
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(excelMime)
+    ) { uri ->
+        val batch = pendingExport
+        pendingExport = emptyList()
+        if (uri != null && batch.isNotEmpty() && !excelBusy) {
+            coroutineScope.launch {
+                excelBusy = true
+                localNotice = try {
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(uri)?.use { output ->
+                            QuestionExcelFile.writeExport(output, batch)
+                        } ?: throw IllegalArgumentException("Lokasi penyimpanan tidak dapat dibuka.")
+                    }
+                    onExport(batch.size, batch.map { it.category }.distinct())
+                    "Ekspor Excel berhasil: " + batch.size + " soal tersimpan."
+                } catch (e: IllegalArgumentException) {
+                    e.message ?: "Data soal tidak dapat diekspor."
+                } catch (_: Exception) {
+                    "Gagal mengekspor Excel. Periksa lokasi penyimpanan."
+                } finally {
+                    excelBusy = false
+                }
+            }
+        }
+    }
     val categories = listOf("Semua", "Perkalian", "Pembagian", "Penjumlahan", "Konversi Satuan")
-    val found = questions.filter { q ->
-        (category == "Semua" || q.category == category) &&
-            (search.isBlank() || q.question.contains(search.trim(), true) ||
-                q.difficultyCode.contains(search.trim(), true) ||
-                q.id.toString() == search.trim())
-    }.sortedBy { it.id }
+    val found = AdminQuestionFilter.apply(questions, selectedCategories, search)
     val pageSize = AdminPagination.PAGE_SIZE
     val pageCount = AdminPagination.count(found.size, pageSize)
     val activePage = AdminPagination.active(page, found.size, pageSize)
@@ -179,14 +203,36 @@ internal fun AdminQuestionsScreen(
                 ) {
                     categories.forEach { value ->
                         FilterChip(
-                            selected = value == category,
-                            onClick = { category = value; page = 0; pagingActivated = false; expandedId = null },
+                            selected = if (value == "Semua") selectedCategories.isEmpty()
+                                else value in selectedCategories,
+                            onClick = {
+                                selectedCategories = AdminQuestionFilter.toggle(selectedCategories, value)
+                                page = 0
+                                pagingActivated = false
+                                expandedId = null
+                            },
                             label = { Text(value, fontSize = 12.sp) }
                         )
                     }
                 }
-                Text("${found.size} soal ditemukan • Maksimal $pageSize per halaman",
+                Text("Pilih satu atau beberapa materi. Semua untuk reset filter.",
                     color = Subtle, fontSize = 11.sp)
+                Text(found.size.toString() + " soal ditemukan • Maksimal " + pageSize + " per halaman",
+                    color = Subtle, fontSize = 11.sp)
+                OutlinedButton(
+                    onClick = {
+                        pendingExport = found.toList()
+                        val suffix = if (selectedCategories.isEmpty()) "Semua" else
+                            categories.filter { it in selectedCategories }
+                                .joinToString("_") { it.replace(" ", "_") }
+                        exportLauncher.launch("VOKASI_Soal_" + suffix + ".xlsx")
+                    },
+                    enabled = !excelBusy && found.isNotEmpty(),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Ekspor Excel (" + found.size + " soal)", color = Navy, fontSize = 12.sp)
+                }
             }
         }
         if (found.isEmpty()) {
@@ -283,9 +329,11 @@ internal fun AdminQuestionsScreen(
                 localNotice = null
                 if (notice != null) onDismissNotice()
             },
-            title = { Text(if (alertText.contains("berhasil", ignoreCase = true))
-                "Bank Soal Diperbarui" else "Tindakan Gagal",
-                fontWeight = FontWeight.ExtraBold) },
+            title = { Text(when {
+                alertText.startsWith("Ekspor Excel berhasil") -> "Ekspor Excel"
+                alertText.contains("berhasil", ignoreCase = true) -> "Bank Soal Diperbarui"
+                else -> "Tindakan Gagal"
+            }, fontWeight = FontWeight.ExtraBold) },
             text = { Text(alertText) },
             confirmButton = {
                 TextButton(onClick = {
