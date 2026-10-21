@@ -162,9 +162,39 @@ internal object SupabaseSchoolRepository {
      * username generation, password setup, Auth user creation, and role checks.
      */
     suspend fun syncDirectory(directory: SchoolDirectory): SchoolDirectory {
-        require(directory.roster.isNotEmpty()) {
-            "Belum ada daftar siswa. Impor data siswa terlebih dahulu."
+        require(directory.roster.isNotEmpty() || directory.classes.isNotEmpty() ||
+            directory.majors.isNotEmpty()) {
+            "Belum ada data sekolah untuk disinkronkan."
         }
+
+        val payloadMajors = directory.majors.map { name ->
+            val major = resolveMajor(name)
+                ?: throw IllegalArgumentException(
+                    "Jurusan ‘$name’ belum dikenali. Gunakan salah satu dari 11 kode jurusan resmi."
+                )
+            buildJsonObject {
+                put("code", major.first)
+                put("name", major.second)
+            }
+        }.distinctBy { it["code"]?.toString() }
+
+        val payloadClasses = directory.classes.map { classroom ->
+            val major = resolveMajor(classroom.major)
+                ?: throw IllegalArgumentException(
+                    "Jurusan ‘${classroom.major}’ belum dikenali. Gunakan salah satu dari 11 kode jurusan resmi."
+                )
+            val grade = gradeLevel(classroom.label)
+                ?: throw IllegalArgumentException(
+                    "Tingkat kelas ‘${classroom.label}’ tidak terbaca. Gunakan format X, XI, atau XII."
+                )
+            buildJsonObject {
+                put("majorCode", major.first)
+                put("majorName", major.second)
+                put("gradeLevel", grade)
+                put("classLabel", classroom.label.trim().replace(Regex("\\s+"), " "))
+                put("schoolYear", DEFAULT_SCHOOL_YEAR)
+            }
+        }.distinctBy { "${it["majorCode"]}|${it["classLabel"]}" }
 
         val payloadRows = directory.roster.map { entry ->
             val major = resolveMajor(entry.major)
@@ -186,11 +216,16 @@ internal object SupabaseSchoolRepository {
             }
         }
 
-        payloadRows.chunked(MAX_BATCH).forEachIndexed { batchIndex, batch ->
+        val batches = payloadRows.chunked(MAX_BATCH).ifEmpty { listOf(emptyList()) }
+        batches.forEachIndexed { batchIndex, batch ->
             val response = vokasiSupabase.functions.invoke(
                 function = "provision-students",
                 body = buildJsonObject {
                     put("students", buildJsonArray { batch.forEach { add(it) } })
+                    if (batchIndex == 0) {
+                        put("majors", buildJsonArray { payloadMajors.forEach { add(it) } })
+                        put("classes", buildJsonArray { payloadClasses.forEach { add(it) } })
+                    }
                 }
             )
             val result = JSONObject(response.bodyAsText())
