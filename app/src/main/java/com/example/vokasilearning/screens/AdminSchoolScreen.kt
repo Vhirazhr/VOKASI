@@ -662,7 +662,7 @@ internal fun AdminSchoolScreen(
                             }
                             else -> {
                                 schoolImportBusy = true
-                                schoolImportNotice = "Menyinkronkan data sekolah ke server..."
+                                schoolImportNotice = "Mengirim " + preview.next.roster.size + " data siswa ke server. Akun dibuat otomatis; jangan tutup aplikasi sampai selesai."
                                 exportScope.launch {
                                     val error = try {
                                         onImport(preview.next)
