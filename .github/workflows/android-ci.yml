@@ -2,7 +2,7 @@ name: Android Build & Unit Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, "security/**"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -26,4 +26,4 @@ jobs:
       - name: Unit tests, debug APK, and UI-test APK compilation
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest --no-configuration-cache
+          ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease --no-configuration-cache

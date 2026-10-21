@@ -389,7 +389,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         onLogin = { u, p ->
                             val username = u.trim()
                             // Demo-only role detection. Production authentication must be server-side.
-                            if (username == "admin.demo" && p == "admin123") {
+                            if (BuildConfig.DEBUG && username == "admin.demo" && p == "admin123") {
                                 currentId = null
                                 isAdmin = true
                                 page = Page.ADMIN_HOME
