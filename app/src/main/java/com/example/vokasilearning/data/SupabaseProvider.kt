@@ -9,8 +9,8 @@ import io.github.jan.supabase.postgrest.Postgrest
 /**
  * Shared Supabase client for VOKASI.
  *
- * Set supabase.url and supabase.publishableKey in the local, git-ignored
- * local.properties file. Never put a Supabase secret/service_role key in the app.
+ * Uses the VOKASI project URL and client-safe publishable key configured in BuildConfig.
+ * Local properties may override these values for development. Never embed a secret/service_role key.
  */
 object SupabaseProvider {
     private val projectUrl: String
