@@ -79,9 +79,9 @@ internal object SupabaseSchoolRepository {
      */
     suspend fun loadDirectory(): SchoolDirectory {
         val remoteMajors = vokasiSupabase.from("majors")
-            .select().decodeList<RemoteMajor>().filter { it.isActive }
+            .select().decodeList<RemoteMajor>()
         val remoteClasses = vokasiSupabase.from("classes")
-            .select().decodeList<RemoteClass>().filter { it.isActive }
+            .select().decodeList<RemoteClass>()
         val majorsById = remoteMajors.associateBy { it.id }
         val classesById = remoteClasses.associateBy { it.id }
 
@@ -146,7 +146,8 @@ internal object SupabaseSchoolRepository {
         return SchoolDirectory(
             majors = (remote.majors + local.majors).distinctBy { normalized(it) },
             classes = (remote.classes + local.classes).distinctBy {
-                normalized(it.major) + "|" + normalized(it.label)
+                (resolveMajor(it.major)?.second?.let(::normalized) ?: normalized(it.major)) +
+                    "|" + normalized(it.label)
             },
             roster = roster.sortedWith(
                 compareBy<SchoolRosterEntry> { it.major }
@@ -279,8 +280,11 @@ internal object SupabaseSchoolRepository {
     }
 
     private fun identity(entry: SchoolRosterEntry): String =
-        listOf(normalized(entry.fullName), normalized(entry.major), entry.admissionYear.toString())
-            .joinToString("|")
+        listOf(
+            normalized(entry.fullName),
+            resolveMajor(entry.major)?.second?.let(::normalized) ?: normalized(entry.major),
+            entry.admissionYear.toString()
+        ).joinToString("|")
 
     private fun normalized(value: String): String =
         value.trim().replace(Regex("\\s+"), " ").lowercase()
