@@ -146,7 +146,7 @@ internal object SupabaseSchoolRepository {
         return SchoolDirectory(
             majors = (remote.majors + local.majors).distinctBy { normalized(it) },
             classes = (remote.classes + local.classes).distinctBy {
-                (resolveMajor(it.major)?.second?.let(::normalized) ?: normalized(it.major)) +
+                (resolveMajor(it.major)?.second?.let { name -> normalized(name) } ?: normalized(it.major)) +
                     "|" + normalized(it.label)
             },
             roster = roster.sortedWith(
@@ -333,7 +333,7 @@ internal object SupabaseSchoolRepository {
     private fun identity(entry: SchoolRosterEntry): String =
         listOf(
             normalized(entry.fullName),
-            resolveMajor(entry.major)?.second?.let(::normalized) ?: normalized(entry.major),
+            resolveMajor(entry.major)?.second?.let { name -> normalized(name) } ?: normalized(entry.major),
             entry.admissionYear.toString()
         ).joinToString("|")
 
