@@ -1,6 +1,6 @@
 # Supabase setup for VOKASI Android
 
-This repository now includes the first database migration and the server-side account-provisioning function. The existing Android screens still use local storage until a later integration step; adding these files does not automatically move local data online.
+This repository now includes the first database migration and the server-side account-provisioning function. School directory import, class-template import, and student authentication are connected to Supabase. Quiz attempts, question-bank changes, profile photos, and some notification/log data still use local storage and are not yet shared across devices.
 
 ## 1. Apply the database schema
 
@@ -15,7 +15,7 @@ It creates/updates the school master tables, seeds the 11 confirmed major codes,
 - Admin imports a verified school roster in batches of up to 25 rows through the server-side `provision-students` Edge Function.
 - The function creates a Supabase Auth account and a roster row for each valid student. Username is generated from the full name; collisions receive a numeric suffix.
 - Initial password is read from the Edge Function secret `VOKASI_INITIAL_STUDENT_PASSWORD`. For the currently agreed policy, set that secret to `12345678`. It is only applied when an account is first created; importing again does not reset a student's changed password.
-- Login alias is `<username>@students.vokasi.invalid`. This is a non-deliverable internal Auth identifier; students still enter only their username in the VOKASI UI. The Android sign-in integration must derive the same alias.
+- Login alias is `<username>@students.vokasi.invalid`. This is a non-deliverable internal Auth identifier; students still enter only their username in the VOKASI UI. The Android app derives the alias during login and authenticates against Supabase Auth.
 - Never use the service-role key in Android or commit it to GitHub.
 
 ## 3. Deploy the Edge Function
