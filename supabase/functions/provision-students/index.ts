@@ -36,6 +36,14 @@ type StudentInput = {
   admissionYear: number;
   schoolYear?: string;
 };
+type MajorInput = { code: string; name?: string };
+type ClassInput = {
+  majorCode: string;
+  majorName?: string;
+  gradeLevel?: number;
+  classLabel: string;
+  schoolYear?: string;
+};
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -80,6 +88,82 @@ async function findAuthUserByEmail(admin: ReturnType<typeof createClient>, email
     if (data.users.length < 1000) break;
   }
   return null;
+}
+
+
+function validateMajor(raw: MajorInput) {
+  const code = String(raw?.code ?? "").trim().toUpperCase();
+  const providedName = String(raw?.name ?? "").trim();
+  const name = MAJOR_NAMES[code] ?? providedName;
+  if (!/^[A-Z0-9]{2,8}$/.test(code)) throw new Error("Kode jurusan tidak valid.");
+  if (!name || name.length > 100) throw new Error("Nama jurusan tidak valid.");
+  return { code, name };
+}
+
+function validateClass(raw: ClassInput) {
+  const majorCode = String(raw?.majorCode ?? "").trim().toUpperCase();
+  const majorName = MAJOR_NAMES[majorCode] ?? String(raw?.majorName ?? "").trim();
+  const rawLabel = String(raw?.classLabel ?? "").trim().replace(/\\s+/g, " ");
+  const schoolYear = String(raw?.schoolYear ?? DEFAULT_SCHOOL_YEAR).trim();
+  const gradeMatch = rawLabel.match(/^(XII|XI|X)\\s+(.+)$/i);
+  const gradeFromLabel = gradeMatch
+    ? (gradeMatch[1].toUpperCase() === "X" ? 10
+      : gradeMatch[1].toUpperCase() === "XI" ? 11 : 12)
+    : Number(raw?.gradeLevel);
+  const gradeLevel = Number(raw?.gradeLevel ?? gradeFromLabel);
+  const classLabel = gradeMatch ? `${gradeMatch[1].toUpperCase()} ${gradeMatch[2]}`
+    : `${romanForGrade(gradeLevel)} ${rawLabel}`;
+  if (!/^[A-Z0-9]{2,8}$/.test(majorCode) || !majorName) {
+    throw new Error("Jurusan kelas tidak valid.");
+  }
+  if (![10, 11, 12].includes(gradeLevel)) throw new Error("Tingkat harus X, XI, atau XII.");
+  if (!classLabel || classLabel.length < 3 || classLabel.length > 80 ||
+      !/^[A-Za-z0-9 .-]+$/.test(classLabel)) {
+    throw new Error("Nama rombel tidak valid.");
+  }
+  if (gradeMatch && gradeLevel !== gradeFromLabel) throw new Error("Tingkat tidak sesuai dengan nama rombel.");
+  if (!/^\\d{4}\\/\\d{4}$/.test(schoolYear)) throw new Error("Tahun ajaran harus berformat 2026/2027.");
+  return { majorCode, majorName, gradeLevel, classLabel, schoolYear };
+}
+
+async function ensureMajor(admin: ReturnType<typeof createClient>, raw: MajorInput) {
+  const parsed = validateMajor(raw);
+  const { data: found, error: readError } = await admin.from("majors")
+    .select("id,code,name").eq("code", parsed.code).maybeSingle();
+  if (readError) throw new Error("Gagal membaca daftar jurusan.");
+  if (found) {
+    if (found.name !== parsed.name) {
+      const { error } = await admin.from("majors")
+        .update({ name: parsed.name, is_active: true }).eq("id", found.id);
+      if (error) throw new Error("Gagal memperbarui nama jurusan.");
+    }
+    return { ...found, name: parsed.name };
+  }
+  const { data, error } = await admin.from("majors")
+    .insert({ code: parsed.code, name: parsed.name, is_active: true })
+    .select("id,code,name").single();
+  if (error || !data) throw new Error("Gagal menyimpan jurusan.");
+  return data;
+}
+
+async function ensureClass(admin: ReturnType<typeof createClient>, raw: ClassInput) {
+  const parsed = validateClass(raw);
+  const major = await ensureMajor(admin, { code: parsed.majorCode, name: parsed.majorName });
+  const { data: found, error: readError } = await admin.from("classes")
+    .select("id").eq("major_id", major.id).eq("grade_level", parsed.gradeLevel)
+    .eq("class_name", parsed.classLabel).eq("school_year", parsed.schoolYear).maybeSingle();
+  if (readError) throw new Error("Gagal membaca daftar kelas.");
+  if (found) return found;
+  const { data, error } = await admin.from("classes").insert({
+    major_id: major.id, grade_level: parsed.gradeLevel, class_name: parsed.classLabel,
+    school_year: parsed.schoolYear, is_active: true,
+  }).select("id").single();
+  if (!error && data) return data;
+  const retry = await admin.from("classes").select("id")
+    .eq("major_id", major.id).eq("grade_level", parsed.gradeLevel)
+    .eq("class_name", parsed.classLabel).eq("school_year", parsed.schoolYear).maybeSingle();
+  if (retry.error || !retry.data) throw new Error("Gagal menyimpan kelas.");
+  return retry.data;
 }
 
 function validateStudent(raw: StudentInput) {
@@ -139,18 +223,37 @@ Deno.serve(async (req) => {
     .select("user_id").eq("user_id", userData.user.id).eq("is_active", true).maybeSingle();
   if (adminCheckError || !adminRow) return json(403, { error: "Akun ini tidak terdaftar sebagai admin sekolah aktif." });
 
-  let body: { students?: StudentInput[] };
+  let body: { students?: StudentInput[]; classes?: ClassInput[]; majors?: MajorInput[] };
   try { body = await req.json(); } catch { return json(400, { error: "Body JSON tidak valid." }); }
-  if (!Array.isArray(body.students) || body.students.length < 1 || body.students.length > MAX_BATCH) {
-    return json(400, { error: `Kirim 1–${MAX_BATCH} siswa per batch.` });
+  const students = Array.isArray(body.students) ? body.students : [];
+  const classes = Array.isArray(body.classes) ? body.classes : [];
+  const majors = Array.isArray(body.majors) ? body.majors : [];
+  if (students.length > MAX_BATCH || classes.length > 500 || majors.length > 50 ||
+      (students.length === 0 && classes.length === 0 && majors.length === 0)) {
+    return json(400, { error: `Kirim maksimal ${MAX_BATCH} siswa, 500 kelas, dan 50 jurusan per batch.` });
   }
 
   const created: Array<{ fullName: string; username: string; status: string }> = [];
   const existing: Array<{ fullName: string; username: string; status: string }> = [];
   const failures: Array<{ row: number; fullName: string; error: string }> = [];
 
-  for (let i = 0; i < body.students.length; i++) {
-    const raw = body.students[i];
+  for (let i = 0; i < majors.length; i++) {
+    try { await ensureMajor(admin, majors[i]); }
+    catch (e) {
+      failures.push({ row: i + 1, fullName: `Jurusan ${String(majors[i]?.code ?? "")}`,
+        error: e instanceof Error ? e.message : "Gagal menyimpan jurusan." });
+    }
+  }
+  for (let i = 0; i < classes.length; i++) {
+    try { await ensureClass(admin, classes[i]); }
+    catch (e) {
+      failures.push({ row: i + 1, fullName: `Kelas ${String(classes[i]?.classLabel ?? "")}`,
+        error: e instanceof Error ? e.message : "Gagal menyimpan kelas." });
+    }
+  }
+
+  for (let i = 0; i < students.length; i++) {
+    const raw = students[i];
     let parsed: ReturnType<typeof validateStudent>;
     try { parsed = validateStudent(raw); }
     catch (e) {
@@ -257,17 +360,17 @@ Deno.serve(async (req) => {
 
   const { error: auditError } = await admin.from("school_import_batches").insert({
     created_by: userData.user.id,
-    rows_received: body.students.length,
+    rows_received: students.length + classes.length + majors.length,
     accounts_created: created.length,
     accounts_existing: existing.length,
     failed_rows: failures.length,
-    result_details: { created, existing, failures },
+    result_details: { created, existing, failures, classes_received: classes.length, majors_received: majors.length },
   });
   if (auditError) console.error("Import audit could not be saved:", auditError.message);
 
   return json(200, {
     success: failures.length === 0,
-    received: body.students.length,
+    received: students.length + classes.length + majors.length,
     created: created.length,
     existing: existing.length,
     failed: failures.length,
