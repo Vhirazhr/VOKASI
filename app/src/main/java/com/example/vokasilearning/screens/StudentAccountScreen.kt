@@ -28,7 +28,6 @@ internal fun StudentAccountScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    var username by remember(me.username) { mutableStateOf(me.username) }
     var oldPass by remember { mutableStateOf("") }
     var newPass by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
@@ -80,11 +79,11 @@ internal fun StudentAccountScreen(
             WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                 Text("Keamanan Akun", color = Ink, fontSize = 17.sp,
                     fontWeight = FontWeight.ExtraBold)
-                Text("Untuk mengubah username atau password, konfirmasi password saat ini.",
+                Text("Username tidak dapat diubah. Gunakan email terverifikasi untuk pemulihan akun setelah fitur email diaktifkan.",
                     color = Subtle, fontSize = 12.sp)
                 OutlinedTextField(
-                    value = username, onValueChange = { username = it; notice = "" },
-                    label = { Text("Username") }, singleLine = true,
+                    value = me.username, onValueChange = {},
+                    label = { Text("Username (tetap)") }, readOnly = true, singleLine = true,
                     modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)
                 )
                 OutlinedTextField(
@@ -97,7 +96,7 @@ internal fun StudentAccountScreen(
                 )
                 OutlinedTextField(
                     value = newPass, onValueChange = { newPass = it; notice = "" },
-                    label = { Text("Password baru (kosongkan jika tidak diganti)") },
+                    label = { Text("Password baru (minimal 8 karakter)") },
                     visualTransformation = if (reveal) VisualTransformation.None
                         else PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
@@ -119,13 +118,11 @@ internal fun StudentAccountScreen(
                         color = Subtle, fontSize = 12.sp)
                 }
                 VokasiButton(
-                    text = "Simpan Perubahan",
-                    enabled = oldPass.isNotBlank() &&
-                        (username.trim() != me.username || newPass.isNotBlank()) &&
-                        (newPass.isBlank() || (newPass.length >= 8 && confirm == newPass)),
+                    text = "Simpan Password Baru",
+                    enabled = oldPass.isNotBlank() && newPass.length >= 8 && confirm == newPass,
                     onClick = {
-                        val error = onSave(username.trim(), oldPass, newPass)
-                        notice = error ?: "Pengaturan akun berhasil disimpan."
+                        val error = onSave(me.username, oldPass, newPass)
+                        notice = error ?: "Password berhasil diperbarui."
                         if (error == null) {
                             oldPass = ""; newPass = ""; confirm = ""
                         }
