@@ -153,10 +153,11 @@ internal fun AdminSchoolScreen(
                         SchoolClassExcel.read(it, directory)
                     } ?: throw IllegalArgumentException("File tidak dapat dibuka.")
                 }
-                if (onUpdate(directory.copy(classes = directory.classes + added))) {
+                val syncError = onImport(directory.copy(classes = directory.classes + added))
+                if (syncError == null) {
                     classPage = 0
-                    "Berhasil menambahkan " + added.size + " kelas."
-                } else "Gagal menyimpan data kelas."
+                    "Berhasil menambahkan dan menyinkronkan " + added.size + " kelas ke server."
+                } else syncError
             } catch (e: IllegalArgumentException) {
                 e.message ?: "Excel tidak valid."
             } catch (_: Exception) {
