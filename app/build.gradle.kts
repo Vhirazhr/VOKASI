@@ -13,8 +13,8 @@ val localProperties = Properties().apply {
     }
 }
 
-val supabaseUrl = localProperties.getProperty("supabase.url", "")
-val supabasePublishableKey = localProperties.getProperty("supabase.publishableKey", "")
+val supabaseUrl = localProperties.getProperty("supabase.url", "https://vztvdpcbtrarrcmpzzqe.supabase.co")
+val supabasePublishableKey = localProperties.getProperty("supabase.publishableKey", "sb_publishable_VxqBB5cioMmLDbIDit9w_w_hcCY7R7t")
 
 android {
     namespace = "com.example.vokasilearning"
