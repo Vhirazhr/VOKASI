@@ -30,8 +30,8 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "SUPABASE_URL", "\"\${supabaseUrl}\"")
-        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"\${supabasePublishableKey}\"")
+        buildConfigField("String", "SUPABASE_URL", "\"${supabaseUrl}\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${supabasePublishableKey}\"")
     }
 
     buildTypes {
