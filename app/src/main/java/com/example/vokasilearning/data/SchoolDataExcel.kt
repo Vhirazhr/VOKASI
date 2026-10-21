@@ -17,7 +17,8 @@ internal object SchoolDataExcel {
     private const val XML = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
     private val headers = listOf("Jurusan", "Tingkat", "Kelas", "Angkatan", "Nama Lengkap")
     data class Preview(val original: SchoolDirectory, val next: SchoolDirectory,
-        val newMajors: Int, val newClasses: Int, val newStudents: Int, val skipped: Int)
+        val newMajors: Int, val newClasses: Int, val newStudents: Int,
+        val movedStudents: Int, val skipped: Int)
 
     fun template(output: OutputStream) {
         val sheet = XML + "<worksheet xmlns=\"" + NS + "\"><sheetData><row r=\"1\">" +
@@ -131,14 +132,25 @@ internal object SchoolDataExcel {
             val classNames = classes.associateByTo(mutableMapOf()) {
                 normalized(it.major) to normalized(it.label)
             }
-            val knownStudents = roster.mapTo(mutableSetOf()) {
-                listOf(normalized(it.fullName), normalized(it.major), normalized(it.classLabel),
-                    it.admissionYear.toString()).joinToString("|")
+            // Identity is independent of active class, so a new class updates the
+            // roster entry instead of creating a second account.
+            fun identity(name: String, major: String, year: Int): String =
+                listOf(normalized(name), normalized(major), year.toString()).joinToString("|")
+            val inputClassByIdentity = mutableMapOf<String, String>()
+            val rosterByIdentity = roster.groupBy {
+                identity(it.fullName, it.major, it.admissionYear)
+            }
+            fun gradeIndex(label: String): Int = when (label.substringBefore(' ').uppercase()) {
+                "X" -> 0
+                "XI" -> 1
+                "XII" -> 2
+                else -> -1
             }
             var nextId = (roster.maxOfOrNull { it.id } ?: 0L) + 1L
             var newMajors = 0
             var newClasses = 0
             var newStudents = 0
+            var movedStudents = 0
             var skipped = 0
             var hasHeader = false
 
@@ -213,21 +225,49 @@ internal object SchoolDataExcel {
                 require(name.length in 5..120 && name.contains(' ')) {
                     "Baris " + number + ": nama siswa harus nama lengkap minimal dua kata."
                 }
-                val studentKey = listOf(normalized(name), normalized(major),
-                    normalized(classroom.label), year.toString()).joinToString("|")
-                if (!knownStudents.add(studentKey)) {
+                val studentKey = identity(name, major, year)
+                val requestedClass = normalized(classroom.label)
+                val otherClassInFile = inputClassByIdentity.putIfAbsent(studentKey, requestedClass)
+                require(otherClassInFile == null || otherClassInFile == requestedClass) {
+                    "Baris " + number + ": siswa yang sama memiliki dua kelas berbeda di Excel. " +
+                        "Pilih hanya kelas aktif terakhir."
+                }
+                if (otherClassInFile != null) {
                     skipped++
                     continue
                 }
-                roster.add(SchoolRosterEntry(nextId++, name, classroom.label, classroom.major, year))
-                newStudents++
+                val matching = rosterByIdentity[studentKey].orEmpty()
+                require(matching.size <= 1) {
+                    "Baris " + number + ": identitas '" + name + "' ambigu di daftar lama. " +
+                        "Periksa data ganda atau gunakan perpindahan kelas manual."
+                }
+                val previous = matching.singleOrNull()
+                if (previous == null) {
+                    roster.add(SchoolRosterEntry(nextId++, name, classroom.label, classroom.major, year))
+                    newStudents++
+                } else if (normalized(previous.classLabel) == requestedClass) {
+                    skipped++
+                } else {
+                    val before = gradeIndex(previous.classLabel)
+                    val after = gradeIndex(classroom.label)
+                    require(before == -1 || after >= before) {
+                        "Baris " + number + ": kelas '" + name + "' turun dari " +
+                            previous.classLabel + " ke " + classroom.label +
+                            ". Periksa Excel atau ubah manual."
+                    }
+                    val rowIndex = roster.indexOfFirst { it.id == previous.id }
+                    require(rowIndex >= 0) { "Baris " + number + ": data siswa tidak konsisten." }
+                    // Preserve ID, username, password hash, and admission year.
+                    roster[rowIndex] = roster[rowIndex].copy(classLabel = classroom.label)
+                    movedStudents++
+                }
             }
             require(hasHeader) { "Header Excel tidak ditemukan." }
-            require(newMajors + newClasses + newStudents > 0 || skipped > 0) {
+            require(newMajors + newClasses + newStudents + movedStudents > 0 || skipped > 0) {
                 "Tidak ada data untuk diimpor. Isi Excel mulai baris kedua."
             }
             return Preview(existing, existing.copy(majors = majors, classes = classes,
-                roster = roster), newMajors, newClasses, newStudents, skipped)
+                roster = roster), newMajors, newClasses, newStudents, movedStudents, skipped)
         } catch (e: IllegalArgumentException) {
             throw e
         } catch (_: Exception) {

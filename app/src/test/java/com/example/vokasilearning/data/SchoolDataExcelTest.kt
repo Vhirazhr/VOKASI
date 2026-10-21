@@ -111,6 +111,81 @@ class SchoolDataExcelTest {
         assertEquals(1, original.roster.size)
     }
 
+    @Test fun reimportAutomaticallyPromotesStudentAndKeepsCredentials() {
+        val result = parse(listOf(
+            listOf("Pemesinan","XI","TPM 1","2026","Andi Pratama")
+        ))
+        assertEquals(0, result.newStudents)
+        assertEquals(1, result.newClasses)
+        assertEquals(1, result.movedStudents)
+        val promoted = result.next.roster.single()
+        assertEquals(42L, promoted.id)
+        assertEquals("XI TPM 1", promoted.classLabel)
+        assertEquals(2026, promoted.admissionYear)
+        assertEquals("andi", promoted.username)
+        assertEquals("pbkdf2\$salt\$hash", promoted.passwordHash)
+        assertTrue(promoted.registered)
+        assertEquals("X TPM 1", original.roster.single().classLabel)
+        val repeat = parse(listOf(
+            listOf("Pemesinan","XI","TPM 1","2026","Andi Pratama")
+        ), result.next)
+        assertEquals(0, repeat.movedStudents)
+        assertEquals(0, repeat.newStudents)
+        assertEquals(1, repeat.skipped)
+    }
+
+    @Test fun importCanMoveStudentWithinSameGradeWithoutMakingDuplicate() {
+        val result = parse(listOf(
+            listOf("Pemesinan","X","TPM 2","2026","Andi Pratama")
+        ))
+        assertEquals(1, result.movedStudents)
+        assertEquals(0, result.newStudents)
+        assertEquals(1, result.next.roster.size)
+        assertEquals("X TPM 2", result.next.roster.single().classLabel)
+    }
+
+    @Test fun rejectsConflictingClassesForSameStudentInWorkbook() {
+        try {
+            parse(listOf(
+                listOf("Pemesinan","XI","TPM 1","2026","Andi Pratama"),
+                listOf("Pemesinan","XI","TPM 2","2026","Andi Pratama")
+            ))
+            fail("two active classes for one identity should reject workbook")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message.orEmpty(), e.message.orEmpty().contains("Baris 3"))
+        }
+        assertEquals("X TPM 1", original.roster.single().classLabel)
+    }
+
+    @Test fun rejectsAmbiguousNameInOldRosterWithoutTouchingAccounts() {
+        val ambiguous = original.copy(roster = original.roster +
+            SchoolRosterEntry(77L, "Andi Pratama", "X TPM 2", "Pemesinan", 2026,
+                "andipratama2", "hash2"))
+        try {
+            parse(listOf(
+                listOf("Pemesinan","XI","TPM 2","2026","Andi Pratama")
+            ), ambiguous)
+            fail("ambiguous school identity should reject")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message.orEmpty(), e.message.orEmpty().contains("ambigu"))
+        }
+    }
+
+    @Test fun rejectsGradeDowngradeWhenImportingUpdates() {
+        val older = original.copy(
+            roster = listOf(original.roster.single().copy(classLabel = "XI TPM 1")),
+            classes = original.classes + Classroom("XI TPM 1", "Pemesinan")
+        )
+        try {
+            parse(listOf(
+                listOf("Pemesinan","X","TPM 1","2026","Andi Pratama")
+            ), older)
+            fail("downgrade must be rejected")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message.orEmpty(), e.message.orEmpty().contains("turun"))
+        }
+    }
+
     @Test fun exportedTemplateHasCorrectFiveColumnHeader() {
         val bytes = ByteArrayOutputStream().also { SchoolDataExcel.template(it) }.toByteArray()
         assertEquals('P'.code.toByte(), bytes[0])

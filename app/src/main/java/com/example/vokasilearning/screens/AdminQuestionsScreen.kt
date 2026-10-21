@@ -39,7 +39,7 @@ internal fun AdminQuestionsScreen(
     notice: String?,
     onDismissNotice: () -> Unit
 ) {
-    var selectedCategories by remember { mutableStateOf(emptySet<String>()) }
+    var selectedCategory by remember { mutableStateOf("Semua") }
     var showExportDialog by remember { mutableStateOf(false) }
     var exportCategories by remember { mutableStateOf(emptySet<String>()) }
     var search by remember { mutableStateOf("") }
@@ -126,7 +126,8 @@ internal fun AdminQuestionsScreen(
         }
     }
     val categories = listOf("Semua", "Perkalian", "Pembagian", "Penjumlahan", "Konversi Satuan")
-    val found = AdminQuestionFilter.apply(questions, selectedCategories, search)
+    val found = AdminQuestionFilter.apply(questions,
+        if (selectedCategory == "Semua") emptySet() else setOf(selectedCategory), search)
     val pageSize = AdminPagination.PAGE_SIZE
     val pageCount = AdminPagination.count(found.size, pageSize)
     val activePage = AdminPagination.active(page, found.size, pageSize)
@@ -182,8 +183,7 @@ internal fun AdminQuestionsScreen(
                         }
                         OutlinedButton(
                             onClick = {
-                                exportCategories = if (selectedCategories.isEmpty())
-                                    categories.drop(1).toSet() else selectedCategories.toSet()
+                                exportCategories = categories.drop(1).toSet()
                                 showExportDialog = true
                             },
                             enabled = !excelBusy && questions.isNotEmpty(),
@@ -215,10 +215,9 @@ internal fun AdminQuestionsScreen(
                 ) {
                     categories.forEach { value ->
                         FilterChip(
-                            selected = if (value == "Semua") selectedCategories.isEmpty()
-                                else value in selectedCategories,
+                            selected = selectedCategory == value,
                             onClick = {
-                                selectedCategories = AdminQuestionFilter.toggle(selectedCategories, value)
+                                selectedCategory = value
                                 page = 0
                                 pagingActivated = false
                                 expandedId = null
@@ -227,7 +226,7 @@ internal fun AdminQuestionsScreen(
                         )
                     }
                 }
-                Text("Pilih satu atau beberapa materi. Semua untuk reset filter.",
+                Text("Pilih satu materi untuk menyaring daftar. Ekspor multi-materi ada di atas.",
                     color = Subtle, fontSize = 11.sp)
                 Text(found.size.toString() + " soal ditemukan • Maksimal " + pageSize + " per halaman",
                     color = Subtle, fontSize = 11.sp)

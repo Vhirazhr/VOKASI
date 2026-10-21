@@ -51,6 +51,7 @@ internal fun AdminSchoolScreen(
     var filterClass by remember { mutableStateOf("") }
     var filterYear by remember { mutableStateOf("") }
     var filterStatus by remember { mutableStateOf("Semua") }
+    var advancedStudentFilters by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var page by remember { mutableIntStateOf(0) }
     var exportNotice by remember { mutableStateOf("") }
@@ -179,30 +180,13 @@ internal fun AdminSchoolScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Box {
-                AdminHero("Data Sekolah", "Manajemen jurusan, kelas, angkatan, dan siswa", compact = true)
-                Card(Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(top = 198.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)) {
-                    Column(Modifier.padding(18.dp)) {
-                        TextButton(onClick = onBack) { Text("‹ Ringkasan", color = Navy) }
-                        Text(directory.majors.size.toString() + " jurusan • " +
-                            directory.classes.size + " kelas • " + directory.roster.size + " siswa",
-                            color = Ink, fontWeight = FontWeight.Bold)
-                        Text(directory.registeredCount.toString() + " terdaftar • " +
-                            directory.pendingCount + " belum terdaftar",
-                            color = Subtle, fontSize = 12.sp)
-                        Text("Penyimpanan lokal. Sinkronisasi antar HP memerlukan server sekolah.",
-                            color = Subtle, fontSize = 11.sp)
-                    }
-                }
-            }
+            AdminHero("Data Sekolah", "Jurusan, kelas, angkatan, dan siswa", compact = true)
         }
         item {
             WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                 Text("Impor Data Sekolah", color = Ink, fontSize = 17.sp,
                     fontWeight = FontWeight.ExtraBold)
-                Text("Sekali impor untuk jurusan, kelas X/XI/XII, angkatan, dan daftar nama siswa.",
+                Text("Tambah data baru atau perbarui kelas siswa yang naik tingkat lewat satu file Excel.",
                     color = Subtle, fontSize = 12.sp)
                 OutlinedButton(
                     onClick = { schoolTemplateLauncher.launch("Template_Data_Sekolah_VOKASI.xlsx") },
@@ -220,7 +204,7 @@ internal fun AdminSchoolScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text("Kolom A–E: Jurusan, Tingkat, Kelas, Angkatan, Nama Lengkap. " +
-                    "Periksa ringkasan sebelum simpan. Data lama dan akun siswa tidak ditimpa.",
+                    "Preview sebelum simpan. Akun, username, password dan angkatan tetap dijaga.",
                     color = Subtle, fontSize = 11.sp)
                 if (schoolImportNotice.isNotBlank()) {
                     Text(schoolImportNotice, color = if (schoolImportNotice.startsWith("Berhasil") ||
@@ -374,57 +358,45 @@ internal fun AdminSchoolScreen(
         } else {
             item {
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                    Text("Daftar nama siswa resmi", color = Ink, fontWeight = FontWeight.Bold)
-                    AdminSelect("Jurusan", major, directory.majors.sorted(), {
-                        major = it; selectedClass = ""
-                    }, Modifier.fillMaxWidth())
-                    AdminSelect("Kelas", selectedClass, classOptions, { selectedClass = it },
-                        Modifier.fillMaxWidth())
-                    val now = Calendar.getInstance().get(Calendar.YEAR)
-                    AdminSelect("Angkatan", cohort, (now downTo now - 8).map { it.toString() },
-                        { cohort = it }, Modifier.fillMaxWidth())
-                    OutlinedTextField(value = fullName, onValueChange = { fullName = it },
-                        label = { Text("Nama lengkap sesuai data sekolah") },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        shape = RoundedCornerShape(12.dp))
-                    VokasiButton("Tambah siswa", enabled = major.isNotBlank() &&
-                        selectedClass in classOptions && fullName.trim().contains(" ") &&
-                        cohort.toIntOrNull() != null, onClick = {
-                            val name = fullName.trim().replace(Regex("\\s+"), " ")
-                            if (directory.roster.any {
-                                it.fullName.equals(name, true) &&
-                                    it.classLabel == selectedClass && it.major == major &&
-                                    it.admissionYear == cohort.toInt()
-                            }) notice = "Siswa sudah tercatat di kelas dan angkatan tersebut."
-                            else {
-                                val id = (directory.roster.maxOfOrNull { it.id } ?: 0L) + 1L
-                                commit(directory.copy(roster = directory.roster +
-                                    SchoolRosterEntry(id, name, selectedClass, major, cohort.toInt())),
-                                    "Siswa ditambahkan.")
-                                fullName = ""
-                            }
-                        }, modifier = Modifier.fillMaxWidth())
-                }
-            }
-            item {
-                WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                    Text("Status pendaftaran siswa", color = Ink, fontWeight = FontWeight.Bold)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Daftar Siswa", color = Ink, fontWeight = FontWeight.ExtraBold,
+                                fontSize = 18.sp)
+                            Text(results.size.toString() + " dari " + directory.roster.size +
+                                " siswa • Maks. " + AdminPagination.PAGE_SIZE + " per halaman",
+                                color = Subtle, fontSize = 11.sp)
+                        }
+                        TextButton(onClick = { advancedStudentFilters = !advancedStudentFilters }) {
+                            Text(if (advancedStudentFilters) "Tutup Filter" else "Filter",
+                                color = Navy, fontSize = 12.sp)
+                        }
+                    }
                     OutlinedTextField(value = query, onValueChange = { query = it; page = 0 },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        label = { Text("Cari nama / username") }, shape = RoundedCornerShape(12.dp))
-                    AdminSelect("Jurusan", filterMajor, listOf("") + directory.majors.sorted(), {
-                        filterMajor = it; filterClass = ""; page = 0
-                    }, Modifier.fillMaxWidth())
-                    AdminSelect("Kelas", filterClass, listOf("") + filteredClasses, {
-                        filterClass = it; page = 0
-                    }, Modifier.fillMaxWidth())
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        placeholder = { Text("Cari nama atau username siswa") },
+                        shape = RoundedCornerShape(12.dp))
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("Semua", "Terdaftar", "Belum Terdaftar").forEach { status ->
+                            FilterChip(selected = filterStatus == status,
+                                onClick = { filterStatus = status; page = 0 },
+                                label = { Text(status, fontSize = 12.sp) })
+                        }
+                    }
+                    if (advancedStudentFilters) {
+                        AdminSelect("Jurusan", filterMajor, listOf("") + directory.majors.sorted(), {
+                            filterMajor = it; filterClass = ""; page = 0
+                        }, Modifier.fillMaxWidth())
+                        AdminSelect("Kelas", filterClass, listOf("") + filteredClasses, {
+                            filterClass = it; page = 0
+                        }, Modifier.fillMaxWidth())
                         AdminSelect("Angkatan", filterYear, listOf("") +
                             directory.roster.map { it.admissionYear.toString() }.distinct().sortedDescending(),
-                            { filterYear = it; page = 0 }, Modifier.weight(1f))
-                        AdminSelect("Status", filterStatus,
-                            listOf("Semua", "Terdaftar", "Belum Terdaftar"),
-                            { filterStatus = it; page = 0 }, Modifier.weight(1f))
+                            { filterYear = it; page = 0 }, Modifier.fillMaxWidth())
+                        TextButton(onClick = {
+                            filterMajor = ""; filterClass = ""; filterYear = "";
+                            filterStatus = "Semua"; query = ""; page = 0
+                        }) { Text("Reset semua filter", color = Navy, fontSize = 12.sp) }
                     }
                 }
             }
@@ -464,6 +436,41 @@ internal fun AdminSchoolScreen(
                     onNext = { page = active + 1 },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp))
             }
+            item {
+                WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                    Text("Tambah Siswa", color = Ink, fontWeight = FontWeight.ExtraBold,
+                        fontSize = 17.sp)
+                    OutlinedTextField(value = fullName, onValueChange = { fullName = it },
+                        label = { Text("Nama lengkap sesuai data sekolah") },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        shape = RoundedCornerShape(12.dp))
+                    AdminSelect("Jurusan", major, directory.majors.sorted(), {
+                        major = it; selectedClass = ""
+                    }, Modifier.fillMaxWidth())
+                    AdminSelect("Kelas", selectedClass, classOptions, { selectedClass = it },
+                        Modifier.fillMaxWidth())
+                    val now = Calendar.getInstance().get(Calendar.YEAR)
+                    AdminSelect("Angkatan", cohort, (now downTo now - 8).map { it.toString() },
+                        { cohort = it }, Modifier.fillMaxWidth())
+                    VokasiButton("Tambah siswa", enabled = major.isNotBlank() &&
+                        selectedClass in classOptions && fullName.trim().contains(" ") &&
+                        cohort.toIntOrNull() != null, onClick = {
+                            val name = fullName.trim().replace(Regex("\\s+"), " ")
+                            if (directory.roster.any {
+                                it.fullName.trim().equals(name, true) && it.major == major &&
+                                    it.admissionYear == cohort.toInt()
+                            }) notice = "Nama dan angkatan sudah tercatat di jurusan ini. " +
+                                "Gunakan Pindah / Naik Kelas jika perlu."
+                            else {
+                                val id = (directory.roster.maxOfOrNull { it.id } ?: 0L) + 1L
+                                commit(directory.copy(roster = directory.roster +
+                                    SchoolRosterEntry(id, name, selectedClass, major, cohort.toInt())),
+                                    "Siswa ditambahkan.")
+                                fullName = ""
+                            }
+                        }, modifier = Modifier.fillMaxWidth())
+                }
+            }
         }
         if (notice.isNotBlank()) {
             item {
@@ -474,16 +481,19 @@ internal fun AdminSchoolScreen(
         }
     }
     schoolPreview?.let { preview ->
-        val changes = preview.newMajors + preview.newClasses + preview.newStudents
+        val changes = preview.newMajors + preview.newClasses +
+            preview.newStudents + preview.movedStudents
         AlertDialog(
             onDismissRequest = { schoolPreview = null },
             title = { Text("Konfirmasi Impor Sekolah", fontWeight = FontWeight.ExtraBold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Data baru yang akan ditambahkan:", color = Ink, fontSize = 13.sp)
+                    Text("Ringkasan perubahan pada data sekolah:", color = Ink, fontSize = 13.sp)
                     Text(preview.newMajors.toString() + " jurusan", color = Navy)
                     Text(preview.newClasses.toString() + " kelas", color = Navy)
-                    Text(preview.newStudents.toString() + " siswa (status Belum Terdaftar)", color = Navy)
+                    Text(preview.newStudents.toString() + " siswa baru (Belum Terdaftar)", color = Navy)
+                    Text(preview.movedStudents.toString() +
+                        " siswa lama pindah/naik kelas (akun tetap)", color = Navy)
                     Text(preview.skipped.toString() + " data siswa duplikat dilewati",
                         color = Subtle, fontSize = 12.sp)
                     Text("Akun, username, dan password yang sudah ada tetap aman. " +
@@ -502,7 +512,8 @@ internal fun AdminSchoolScreen(
                             classPage = 0
                             "Berhasil impor: " + preview.newMajors + " jurusan, " +
                                 preview.newClasses + " kelas, " +
-                                preview.newStudents + " siswa."
+                                preview.newStudents + " siswa baru, " +
+                                preview.movedStudents + " siswa pindah kelas."
                         }
                         else -> "Gagal menyimpan impor data sekolah."
                     }
