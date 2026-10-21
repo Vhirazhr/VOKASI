@@ -258,7 +258,10 @@ internal object SupabaseSchoolRepository {
                 email = cleanUsername + STUDENT_LOGIN_DOMAIN
                 this.password = password
             }
-            val userId = vokasiSupabase.auth.currentUserOrNull()?.id ?: return null
+            val userId = vokasiSupabase.auth.currentUserOrNull()?.id ?: run {
+                vokasiSupabase.auth.signOut()
+                return null
+            }
             val roster = vokasiSupabase.from("student_roster")
                 .select().decodeList<RemoteRoster>()
                 .singleOrNull {
