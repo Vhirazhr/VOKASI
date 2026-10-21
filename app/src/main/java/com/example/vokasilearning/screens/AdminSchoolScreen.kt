@@ -56,6 +56,9 @@ internal fun AdminSchoolScreen(
     var exportNotice by remember { mutableStateOf("") }
     var importBusy by remember { mutableStateOf(false) }
     var importNotice by remember { mutableStateOf("") }
+    var schoolImportBusy by remember { mutableStateOf(false) }
+    var schoolImportNotice by remember { mutableStateOf("") }
+    var schoolPreview by remember { mutableStateOf<SchoolDataExcel.Preview?>(null) }
     val context = LocalContext.current
     val exportScope = rememberCoroutineScope()
     val rosterLauncher = rememberLauncherForActivityResult(
@@ -75,6 +78,42 @@ internal fun AdminSchoolScreen(
             } catch (_: Exception) {
                 "Ekspor Excel gagal. Periksa izin penyimpanan."
             }
+        }
+    }
+
+    val schoolTemplateLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    ) { uri ->
+        if (uri != null) exportScope.launch {
+            schoolImportNotice = try {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use {
+                        SchoolDataExcel.template(it)
+                    } ?: throw IllegalArgumentException("Lokasi tidak dapat dibuka.")
+                }
+                "Template Data Sekolah berhasil disimpan."
+            } catch (_: Exception) { "Gagal menyimpan template sekolah." }
+        }
+    }
+    val schoolImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null && !schoolImportBusy) exportScope.launch {
+            schoolImportBusy = true
+            schoolImportNotice = ""
+            try {
+                schoolPreview = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use {
+                        SchoolDataExcel.read(it, directory)
+                    } ?: throw IllegalArgumentException("File tidak dapat dibuka.")
+                }
+            } catch (e: IllegalArgumentException) {
+                schoolImportNotice = e.message ?: "Data sekolah tidak valid."
+            } catch (_: Exception) {
+                schoolImportNotice = "Gagal membuka Excel. Gunakan Template Data Sekolah."
+            } finally { schoolImportBusy = false }
         }
     }
 
@@ -159,6 +198,38 @@ internal fun AdminSchoolScreen(
                 }
             }
         }
+        item {
+            WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                Text("Impor Data Sekolah", color = Ink, fontSize = 17.sp,
+                    fontWeight = FontWeight.ExtraBold)
+                Text("Sekali impor untuk jurusan, kelas X/XI/XII, angkatan, dan daftar nama siswa.",
+                    color = Subtle, fontSize = 12.sp)
+                OutlinedButton(
+                    onClick = { schoolTemplateLauncher.launch("Template_Data_Sekolah_VOKASI.xlsx") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("Unduh Template Data Sekolah", color = Navy, fontSize = 12.sp) }
+                VokasiButton(
+                    text = if (schoolImportBusy) "Memeriksa Excel..." else "Impor Data Sekolah (Excel)",
+                    enabled = !schoolImportBusy,
+                    onClick = {
+                        schoolImportLauncher.launch(
+                            arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text("Kolom A–E: Jurusan, Tingkat, Kelas, Angkatan, Nama Lengkap. " +
+                    "Periksa ringkasan sebelum simpan. Data lama dan akun siswa tidak ditimpa.",
+                    color = Subtle, fontSize = 11.sp)
+                if (schoolImportNotice.isNotBlank()) {
+                    Text(schoolImportNotice, color = if (schoolImportNotice.startsWith("Berhasil") ||
+                            schoolImportNotice.startsWith("Template")) Good else Bad,
+                        fontSize = 12.sp)
+                }
+            }
+        }
+
         item {
             WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                 Text("Arsip Data Sekolah", color = Ink, fontWeight = FontWeight.Bold)
@@ -402,6 +473,52 @@ internal fun AdminSchoolScreen(
             }
         }
     }
+    schoolPreview?.let { preview ->
+        val changes = preview.newMajors + preview.newClasses + preview.newStudents
+        AlertDialog(
+            onDismissRequest = { schoolPreview = null },
+            title = { Text("Konfirmasi Impor Sekolah", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Data baru yang akan ditambahkan:", color = Ink, fontSize = 13.sp)
+                    Text(preview.newMajors.toString() + " jurusan", color = Navy)
+                    Text(preview.newClasses.toString() + " kelas", color = Navy)
+                    Text(preview.newStudents.toString() + " siswa (status Belum Terdaftar)", color = Navy)
+                    Text(preview.skipped.toString() + " data siswa duplikat dilewati",
+                        color = Subtle, fontSize = 12.sp)
+                    Text("Akun, username, dan password yang sudah ada tetap aman. " +
+                        "Tidak ada data yang berubah sebelum menekan Simpan.",
+                        color = Subtle, fontSize = 11.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    schoolImportNotice = when {
+                        directory != preview.original ->
+                            "Data sekolah berubah saat pratinjau. Buka Excel kembali."
+                        changes == 0 -> "Tidak ada data baru. Semua siswa sudah tercatat."
+                        onUpdate(preview.next) -> {
+                            page = 0
+                            classPage = 0
+                            "Berhasil impor: " + preview.newMajors + " jurusan, " +
+                                preview.newClasses + " kelas, " +
+                                preview.newStudents + " siswa."
+                        }
+                        else -> "Gagal menyimpan impor data sekolah."
+                    }
+                    schoolPreview = null
+                }, enabled = changes > 0) {
+                    Text("Simpan Data", color = Navy)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { schoolPreview = null }) {
+                    Text("Batal", color = Subtle)
+                }
+            }
+        )
+    }
+
     promotion?.let { entry ->
         val validTargets = directory.classes.filter {
             it.major == entry.major && it.label != entry.classLabel
