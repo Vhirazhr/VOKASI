@@ -639,19 +639,6 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     )
                     Page.ADMIN_SCHOOL -> AdminSchoolScreen(
                         directory = schoolDirectory,
-                        onUpdate = { next ->
-                            try {
-                                SchoolDirectoryStore.save(activity, next)
-                                schoolDirectory = next
-                                val nextStudents = next.roster.mapNotNull { entry ->
-                                    entry.asStudent()?.copy(photo =
-                                        StudentAccountStore.photo(activity, entry.id))
-                                }
-                                students.clear(); students.addAll(nextStudents)
-                                recordAdmin("Sekolah", "Memperbarui data sekolah lokal")
-                                true
-                            } catch (_: Exception) { false }
-                        },
                         onImport = { next ->
                             try {
                                 val remote = SupabaseSchoolRepository.syncDirectory(next)
