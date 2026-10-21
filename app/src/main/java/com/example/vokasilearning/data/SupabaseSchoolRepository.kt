@@ -85,12 +85,12 @@ internal object SupabaseSchoolRepository {
         val majorsById = remoteMajors.associateBy { it.id }
         val classesById = remoteClasses.associateBy { it.id }
 
-        // Query roster per class so a large school is not silently truncated by
-        // PostgREST's default maximum response size.
+        // Query roster per major so a school with more than 1,000 students is not
+        // silently truncated by PostgREST's default maximum response size.
         val remoteRoster = mutableListOf<RemoteRoster>()
-        remoteClasses.forEach { classroom ->
+        remoteMajors.forEach { major ->
             remoteRoster += vokasiSupabase.from("student_roster").select {
-                filter { eq("class_id", classroom.id) }
+                filter { eq("major_id", major.id) }
             }.decodeList<RemoteRoster>()
         }
 
@@ -267,13 +267,26 @@ internal object SupabaseSchoolRepository {
                     vokasiSupabase.auth.signOut()
                     return null
                 }
-            val directory = loadDirectory()
-            val entry = directory.roster.singleOrNull { it.remoteId == roster.id }
-                ?: run {
-                    vokasiSupabase.auth.signOut()
-                    return null
-                }
-            entry.asStudent()
+            val remoteClass = vokasiSupabase.from("classes").select {
+                filter { eq("id", roster.classId) }
+            }.decodeList<RemoteClass>().singleOrNull() ?: run {
+                vokasiSupabase.auth.signOut()
+                return null
+            }
+            val majorId = roster.majorId ?: remoteClass.majorId
+            val major = vokasiSupabase.from("majors").select {
+                filter { eq("id", majorId) }
+            }.decodeList<RemoteMajor>().singleOrNull() ?: run {
+                vokasiSupabase.auth.signOut()
+                return null
+            }
+            Student(
+                username = roster.username ?: cleanUsername,
+                password = "",
+                name = roster.fullName,
+                classroom = Classroom(remoteClass.className, major.name),
+                admissionYear = roster.admissionYear
+            )
         } catch (_: Exception) {
             try { vokasiSupabase.auth.signOut() } catch (_: Exception) { }
             null
