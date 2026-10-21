@@ -90,6 +90,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
     ) }
     var currentId by remember { mutableStateOf<String?>(null) }
     var isAdmin by remember { mutableStateOf(false) }
+    var isRemoteStudent by remember { mutableStateOf(false) }
     var adminMajorFilter by remember { mutableStateOf("") }
     var adminStudentMajor by remember { mutableStateOf("") }
     var adminClassFilter by remember { mutableStateOf("") }
@@ -121,14 +122,15 @@ internal fun VokasiApp(activity: ComponentActivity) {
     val me = students.firstOrNull { it.username == currentId }
 
     fun logout() {
-        if (isAdmin) {
-            recordAdmin("Masuk", "Admin keluar dari aplikasi")
+        if (isAdmin) recordAdmin("Masuk", "Admin keluar dari aplikasi")
+        if (isAdmin || isRemoteStudent) {
             appScope.launch {
                 try { vokasiSupabase.auth.signOut() } catch (_: Exception) { }
             }
         }
         currentId = null
         isAdmin = false
+        isRemoteStudent = false
         page = Page.LOGIN
     }
     fun saveQuizCheckpoint() {
@@ -358,67 +360,112 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             }
                         },
                         onSave = { username, oldPassword, newPassword ->
-                            try {
-                                val current = students.first { it.username == me.username }
-                                val next = StudentAccountStore.updatedRoster(
-                                    schoolDirectory, current, oldPassword, username, newPassword
-                                )
-                                val newId = next.roster.first {
-                                    it.registered && it.fullName == current.name &&
-                                        it.admissionYear == current.admissionYear &&
-                                        it.classLabel == current.classroom.label
-                                }.username
-                                val updatedAttempts = attempts.map {
-                                    if (it.studentId == current.username) it.copy(studentId = newId)
-                                    else it
+                            if (isRemoteStudent) {
+                                try {
+                                    SupabaseSchoolRepository.updateStudentPassword(
+                                        username, oldPassword, newPassword
+                                    )
+                                    null
+                                } catch (e: IllegalArgumentException) {
+                                    e.message ?: "Password tidak berhasil diperbarui."
+                                } catch (_: Exception) {
+                                    "Gagal memperbarui password di server. Periksa koneksi."
                                 }
-                                // Roster is the authoritative local account identity.
-                                SchoolDirectoryStore.save(activity, next)
-                                if (newId != current.username) {
-                                    LocalAttemptStore.save(activity, updatedAttempts)
-                                    QuizProgressStore.moveOwner(activity, current.username, newId)
-                                    StudentNoticeStore.migrate(activity, current.username, newId)
-                                }
-                                schoolDirectory = next
-                                if (newId != current.username) {
-                                    attempts.clear(); attempts.addAll(updatedAttempts)
-                                }
-                                val account = next.roster.first { it.username == newId }
-                                val i = students.indexOfFirst { it.username == current.username }
-                                if (i >= 0) students[i] = current.copy(
-                                    username = newId, password = account.passwordHash
-                                )
-                                currentId = newId
-                                null
-                            } catch (e: IllegalArgumentException) {
-                                e.message ?: "Data akun tidak valid."
-                            } catch (_: Exception) { "Pengaturan akun gagal disimpan." }
+                            } else {
+                                try {
+                                    val current = students.first { it.username == me.username }
+                                    val next = StudentAccountStore.updatedRoster(
+                                        schoolDirectory, current, oldPassword, username, newPassword
+                                    )
+                                    val newId = next.roster.first {
+                                        it.registered && it.fullName == current.name &&
+                                            it.admissionYear == current.admissionYear &&
+                                            it.classLabel == current.classroom.label
+                                    }.username
+                                    val updatedAttempts = attempts.map {
+                                        if (it.studentId == current.username) it.copy(studentId = newId)
+                                        else it
+                                    }
+                                    SchoolDirectoryStore.save(activity, next)
+                                    if (newId != current.username) {
+                                        LocalAttemptStore.save(activity, updatedAttempts)
+                                        QuizProgressStore.moveOwner(activity, current.username, newId)
+                                        StudentNoticeStore.migrate(activity, current.username, newId)
+                                    }
+                                    schoolDirectory = next
+                                    if (newId != current.username) {
+                                        attempts.clear(); attempts.addAll(updatedAttempts)
+                                    }
+                                    val account = next.roster.first { it.username == newId }
+                                    val i = students.indexOfFirst { it.username == current.username }
+                                    if (i >= 0) students[i] = current.copy(
+                                        username = newId, password = account.passwordHash
+                                    )
+                                    currentId = newId
+                                    null
+                                } catch (e: IllegalArgumentException) {
+                                    e.message ?: "Data akun tidak valid."
+                                } catch (_: Exception) { "Pengaturan akun gagal disimpan." }
+                            }
                         }
                     )
                     Page.LOGIN -> LoginScreen(
                         onLogin = { u, p ->
                             val login = u.trim()
                             if (login.contains("@")) {
-                                // Admin login uses Supabase Auth and a server-side role check.
                                 if (authenticateSchoolAdmin(login, p)) {
+                                    // Load shared school data after server-side admin verification.
+                                    try {
+                                        val remote = SupabaseSchoolRepository.loadDirectory()
+                                        val merged = SupabaseSchoolRepository.mergeRemoteWithLocal(
+                                            remote, schoolDirectory
+                                        )
+                                        SchoolDirectoryStore.save(activity, merged)
+                                        schoolDirectory = merged
+                                        students.clear()
+                                        students.addAll(merged.roster.mapNotNull { entry ->
+                                            entry.asStudent()?.copy(
+                                                photo = StudentAccountStore.photo(activity, entry.id)
+                                            )
+                                        })
+                                    } catch (_: Exception) {
+                                        // Authentication still succeeds if a temporary data read fails.
+                                    }
                                     currentId = null
                                     isAdmin = true
+                                    isRemoteStudent = false
                                     page = Page.ADMIN_HOME
                                     recordAdmin("Masuk", "Admin masuk ke panel VOKASI")
                                     true
                                 } else false
                             } else {
-                                // Student login remains local until student roster sync is connected.
-                                val found = students.firstOrNull {
-                                    it.username.equals(login, true) &&
-                                        SchoolCredentials.verify(p, it.password)
-                                }
-                                if (found != null) {
-                                    currentId = found.username
+                                // Prefer the shared Supabase account; fall back only to local prototype accounts.
+                                val remoteStudent = SupabaseSchoolRepository.authenticateStudent(login, p)
+                                if (remoteStudent != null) {
+                                    val existingIndex = students.indexOfFirst {
+                                        it.username.equals(remoteStudent.username, true)
+                                    }
+                                    if (existingIndex >= 0) students[existingIndex] = remoteStudent
+                                    else students.add(remoteStudent)
+                                    currentId = remoteStudent.username
                                     isAdmin = false
-                                    page = if (restoreQuiz(found.username)) Page.QUIZ else Page.HOME
+                                    isRemoteStudent = true
+                                    page = if (restoreQuiz(remoteStudent.username)) Page.QUIZ else Page.HOME
                                     true
-                                } else false
+                                } else {
+                                    val found = students.firstOrNull {
+                                        it.username.equals(login, true) &&
+                                            it.password.isNotBlank() &&
+                                            SchoolCredentials.verify(p, it.password)
+                                    }
+                                    if (found != null) {
+                                        currentId = found.username
+                                        isAdmin = false
+                                        isRemoteStudent = false
+                                        page = if (restoreQuiz(found.username)) Page.QUIZ else Page.HOME
+                                        true
+                                    } else false
+                                }
                             }
                         },
                         onRegister = { page = Page.REGISTER }
@@ -440,6 +487,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                         students.add(registered.asStudent()!!.copy(photo = ph))
                                         currentId = u
                                         isAdmin = false
+                                        isRemoteStudent = false
                                         page = Page.HOME
                                         recordAdmin("Profil", "Pendaftaran akun siswa: " + n)
                                         true
@@ -595,15 +643,34 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             try {
                                 SchoolDirectoryStore.save(activity, next)
                                 schoolDirectory = next
-                                // Keep each active student in the roster's current school class.
                                 val nextStudents = next.roster.mapNotNull { entry ->
                                     entry.asStudent()?.copy(photo =
                                         StudentAccountStore.photo(activity, entry.id))
                                 }
                                 students.clear(); students.addAll(nextStudents)
-                                recordAdmin("Sekolah", "Memperbarui data sekolah")
+                                recordAdmin("Sekolah", "Memperbarui data sekolah lokal")
                                 true
                             } catch (_: Exception) { false }
+                        },
+                        onImport = { next ->
+                            try {
+                                val remote = SupabaseSchoolRepository.syncDirectory(next)
+                                val merged = SupabaseSchoolRepository.mergeRemoteWithLocal(remote, next)
+                                SchoolDirectoryStore.save(activity, merged)
+                                schoolDirectory = merged
+                                students.clear()
+                                students.addAll(merged.roster.mapNotNull { entry ->
+                                    entry.asStudent()?.copy(
+                                        photo = StudentAccountStore.photo(activity, entry.id)
+                                    )
+                                })
+                                recordAdmin("Sekolah", "Sinkronisasi data sekolah ke Supabase: ${merged.roster.size} siswa")
+                                null
+                            } catch (e: IllegalArgumentException) {
+                                e.message ?: "Data sekolah tidak valid."
+                            } catch (e: Exception) {
+                                e.message ?: "Sinkronisasi gagal. Pastikan Edge Function provision-students sudah di-deploy dan secret password awal sudah disetel."
+                            }
                         },
                         onBack = { page = Page.ADMIN_HOME },
                         onRosterExport = { count ->
