@@ -17,9 +17,12 @@ internal data class SchoolRosterEntry(
     val major: String,
     val admissionYear: Int,
     val username: String = "",
-    val passwordHash: String = ""
+    val passwordHash: String = "",
+    val remoteId: String? = null,
+    val remoteRegistered: Boolean = false
 ) {
-    val registered: Boolean get() = username.isNotBlank() && passwordHash.isNotBlank()
+    val registered: Boolean get() =
+        remoteRegistered || (username.isNotBlank() && passwordHash.isNotBlank())
     fun asStudent(): Student? = if (!registered) null else
         Student(username, passwordHash, fullName, Classroom(classLabel, major),
             admissionYear = admissionYear)
@@ -87,7 +90,9 @@ internal object SchoolDirectoryStore {
                     classLabel = e.getString("classLabel"), major = e.getString("major"),
                     admissionYear = e.getInt("admissionYear"),
                     username = e.optString("username", ""),
-                    passwordHash = e.optString("passwordHash", "")
+                    passwordHash = e.optString("passwordHash", ""),
+                    remoteId = e.optString("remoteId").takeIf { it.isNotBlank() && it != "null" },
+                    remoteRegistered = e.optBoolean("remoteRegistered", false)
                 )
             }
         )
@@ -108,7 +113,9 @@ internal object SchoolDirectoryStore {
                 put(JSONObject().put("id", e.id).put("fullName", e.fullName)
                     .put("classLabel", e.classLabel).put("major", e.major)
                     .put("admissionYear", e.admissionYear).put("username", e.username)
-                    .put("passwordHash", e.passwordHash))
+                    .put("passwordHash", e.passwordHash)
+                    .put("remoteId", e.remoteId)
+                    .put("remoteRegistered", e.remoteRegistered))
             }
         })
         val target = context.getFileStreamPath(FILE)
