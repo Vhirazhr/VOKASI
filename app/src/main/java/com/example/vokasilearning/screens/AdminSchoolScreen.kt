@@ -619,6 +619,8 @@ internal fun AdminSchoolScreen(
     schoolPreview?.let { preview ->
         val changes = preview.newMajors + preview.newClasses +
             preview.newStudents + preview.movedStudents
+        val hasDataToSync = preview.next.roster.isNotEmpty() ||
+            preview.next.classes.isNotEmpty() || preview.next.majors.isNotEmpty()
         AlertDialog(
             onDismissRequest = { schoolPreview = null },
             title = { Text("Konfirmasi " + schoolImportMode + " Data Sekolah",
@@ -654,11 +656,10 @@ internal fun AdminSchoolScreen(
                                 schoolImportNotice = "Data sekolah berubah saat pratinjau. Buka Excel kembali."
                                 schoolPreview = null
                             }
-                            changes == 0 -> {
-                                schoolImportNotice = "Tidak ada data baru. Semua siswa sudah tercatat."
-                                schoolPreview = null
-                            }
                             schoolImportBusy -> Unit
+                            !hasDataToSync -> {
+                                schoolImportNotice = "Belum ada data sekolah untuk disinkronkan."
+                            }
                             else -> {
                                 schoolImportBusy = true
                                 schoolImportNotice = "Menyinkronkan data sekolah ke server..."
@@ -671,11 +672,15 @@ internal fun AdminSchoolScreen(
                                     if (error == null) {
                                         page = 0
                                         classPage = 0
-                                        schoolImportNotice = "Berhasil sinkron: " +
-                                            preview.newMajors + " jurusan, " +
-                                            preview.newClasses + " kelas, " +
-                                            preview.newStudents + " siswa baru, " +
-                                            preview.movedStudents + " siswa pindah/naik kelas."
+                                        schoolImportNotice = if (changes == 0) {
+                                            "Data sekolah yang sudah ada berhasil disinkronkan ke server."
+                                        } else {
+                                            "Berhasil sinkron: " +
+                                                preview.newMajors + " jurusan, " +
+                                                preview.newClasses + " kelas, " +
+                                                preview.newStudents + " siswa baru, " +
+                                                preview.movedStudents + " siswa pindah/naik kelas."
+                                        }
                                         schoolPreview = null
                                     } else {
                                         schoolImportNotice = error
@@ -685,9 +690,16 @@ internal fun AdminSchoolScreen(
                             }
                         }
                     },
-                    enabled = changes > 0 && !schoolImportBusy
+                    enabled = !schoolImportBusy && (changes > 0 || hasDataToSync)
                 ) {
-                    Text(if (schoolImportBusy) "Menyimpan..." else "Simpan Data", color = Navy)
+                    Text(
+                        when {
+                            schoolImportBusy -> "Menyimpan..."
+                            changes == 0 -> "Sinkronkan Data"
+                            else -> "Simpan & Sinkronkan"
+                        },
+                        color = Navy
+                    )
                 }
             },
             dismissButton = {
