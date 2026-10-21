@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.model.Question
+import com.example.vokasilearning.logic.AdminPagination
 import com.example.vokasilearning.ui.*
 
 @Composable
@@ -43,9 +44,9 @@ internal fun AdminQuestionsScreen(
                 q.difficultyCode.contains(search.trim(), true) ||
                 q.id.toString() == search.trim())
     }.sortedBy { it.id }
-    val pageSize = 15
-    val pageCount = maxOf(1, (found.size + pageSize - 1) / pageSize)
-    val activePage = page.coerceIn(0, pageCount - 1)
+    val pageSize = AdminPagination.PAGE_SIZE
+    val pageCount = AdminPagination.count(found.size, pageSize)
+    val activePage = AdminPagination.active(page, found.size, pageSize)
     val visibleQuestions = found.drop(activePage * pageSize).take(pageSize)
     LaunchedEffect(activePage, pagingActivated) {
         if (pagingActivated) listState.scrollToItem(2)
@@ -108,7 +109,7 @@ internal fun AdminQuestionsScreen(
                         )
                     }
                 }
-                Text("${found.size} soal ditemukan • Maksimal 15 per halaman",
+                Text("${found.size} soal ditemukan • Maksimal $pageSize per halaman",
                     color = Subtle, fontSize = 11.sp)
             }
         }
@@ -169,29 +170,14 @@ internal fun AdminQuestionsScreen(
                 }
             }
             item {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        "Soal ${activePage * pageSize + 1}–${activePage * pageSize + visibleQuestions.size} dari ${found.size}",
-                        color = Subtle, fontSize = 11.sp
-                    )
-                    Row(Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedButton(
-                            enabled = activePage > 0,
-                            onClick = { page = activePage - 1; pagingActivated = true; expandedId = null },
-                            shape = RoundedCornerShape(12.dp)
-                        ) { Text("Sebelumnya", fontSize = 12.sp) }
-                        Text("${activePage + 1}/$pageCount",
-                            color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        OutlinedButton(
-                            enabled = activePage < pageCount - 1,
-                            onClick = { page = activePage + 1; pagingActivated = true; expandedId = null },
-                            shape = RoundedCornerShape(12.dp)
-                        ) { Text("Berikutnya", fontSize = 12.sp) }
-                    }
-                }
+                AdminPaginationFooter(
+                    label = "Soal",
+                    total = found.size,
+                    page = activePage,
+                    onPrevious = { page = activePage - 1; pagingActivated = true; expandedId = null },
+                    onNext = { page = activePage + 1; pagingActivated = true; expandedId = null },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
+                )
             }
         }
     }

@@ -108,9 +108,9 @@ internal fun AdminStudentsScreen(
         major != null -> listOf("X", "XI", "XII").count { level -> students.any { it.classroom.major == major && schoolGrade(it.classroom.label) == level } }
         else -> majors.size
     }
-    val pageSize = 10
-    val pageCount = maxOf(1, (listingSize + pageSize - 1) / pageSize)
-    val activePage = page.coerceIn(0, pageCount - 1)
+    val pageSize = AdminPagination.PAGE_SIZE
+    val pageCount = AdminPagination.count(listingSize, pageSize)
+    val activePage = AdminPagination.active(page, listingSize, pageSize)
     val dateFormat = remember {
         SimpleDateFormat("dd MMM yyyy • HH:mm", Locale("id", "ID")).apply {
             timeZone = TimeZone.getTimeZone("Asia/Jakarta")
@@ -343,27 +343,21 @@ internal fun AdminStudentsScreen(
             }
         }
 
-        if (listingSize > pageSize) {
-            item {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    OutlinedButton(
-                        onClick = { page = (activePage - 1).coerceAtLeast(0); pagingActivated = true },
-                        enabled = activePage > 0,
-                        shape = RoundedCornerShape(12.dp)
-                    ) { Text("Sebelumnya", fontSize = 12.sp) }
-                    Text("${activePage + 1}/$pageCount", fontSize = 12.sp,
-                        color = Ink, fontWeight = FontWeight.Bold)
-                    OutlinedButton(
-                        onClick = { page = (activePage + 1).coerceAtMost(pageCount - 1); pagingActivated = true },
-                        enabled = activePage < pageCount - 1,
-                        shape = RoundedCornerShape(12.dp)
-                    ) { Text("Berikutnya", fontSize = 12.sp) }
-                }
-            }
+        item {
+            AdminPaginationFooter(
+                label = when {
+                    selectedStudent != null && query.isBlank() -> "Riwayat"
+                    query.isNotBlank() || classroom != null -> "Siswa"
+                    grade != null -> "Kelas"
+                    major != null -> "Tingkat"
+                    else -> "Jurusan"
+                },
+                total = listingSize,
+                page = activePage,
+                onPrevious = { page = activePage - 1; pagingActivated = true },
+                onNext = { page = activePage + 1; pagingActivated = true },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
+            )
         }
     }
 

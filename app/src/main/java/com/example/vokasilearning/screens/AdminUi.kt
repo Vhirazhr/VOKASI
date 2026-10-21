@@ -156,6 +156,40 @@ internal fun AdminSelect(
     }
 }
 
+
+/** Shared pagination used by every data listing in the admin panel. */
+@Composable
+internal fun AdminPaginationFooter(
+    label: String,
+    total: Int,
+    page: Int,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    modifier: Modifier = Modifier,
+    pageSize: Int = AdminPagination.PAGE_SIZE
+) {
+    val current = AdminPagination.active(page, total, pageSize)
+    val count = AdminPagination.count(total, pageSize)
+    val start = if (total == 0) 0 else current * pageSize + 1
+    val end = minOf(total, (current + 1) * pageSize)
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("$label $start–$end dari $total • Maksimal $pageSize per halaman",
+            fontSize = 11.sp, color = Subtle)
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedButton(onClick = onPrevious, enabled = current > 0,
+                shape = RoundedCornerShape(12.dp)) { Text("Sebelumnya", fontSize = 12.sp) }
+            Text("${current + 1}/$count", color = Ink,
+                fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            OutlinedButton(onClick = onNext, enabled = current < count - 1,
+                shape = RoundedCornerShape(12.dp)) { Text("Berikutnya", fontSize = 12.sp) }
+        }
+    }
+}
+
 @Composable
 internal fun AdminDateSelect(
     date: String,

@@ -221,7 +221,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             Triple(Page.ADMIN_STUDENTS, "Siswa", "◉"),
                             Triple(Page.ADMIN_MONITOR, "Nilai", "◫"),
                             Triple(Page.ADMIN_QUESTIONS, "Soal", "▤"),
-                            Triple(Page.ADMIN_PROFILE, "Profil", "◉")
+                            Triple(Page.ADMIN_PROFILE, "Pengaturan", "⚙")
                         ),
                         currentPage = if (page == Page.ADMIN_LOG) Page.ADMIN_PROFILE else page,
                         onNavigate = {

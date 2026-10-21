@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.data.*
+import com.example.vokasilearning.logic.AdminPagination
 import com.example.vokasilearning.ui.*
 
 @Composable
@@ -22,8 +23,9 @@ internal fun AdminLogScreen(events: List<AdminLogEvent>, onBack: () -> Unit) {
     val types = listOf("Semua", "Masuk", "Nilai", "Soal", "Laporan", "Profil")
     val selected = events.filter { type == "Semua" || it.type == type }
         .sortedByDescending { it.timestamp }
-    val pages = maxOf(1, (selected.size + 9) / 10)
-    val current = page.coerceIn(0, pages - 1)
+    val pageSize = AdminPagination.PAGE_SIZE
+    val pages = AdminPagination.count(selected.size, pageSize)
+    val current = AdminPagination.active(page, selected.size, pageSize)
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
@@ -39,7 +41,7 @@ internal fun AdminLogScreen(events: List<AdminLogEvent>, onBack: () -> Unit) {
                     colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                        TextButton(onClick = onBack) { Text("‹ Dashboard", color = Navy) }
+                        TextButton(onClick = onBack) { Text("‹ Pengaturan", color = Navy) }
                         Text("${events.size} peristiwa tersimpan • Maksimal 500 terbaru",
                             fontSize = 12.sp, color = Subtle)
                         Text("Log lokal belum mencatat tindakan admin di perangkat lain.",
@@ -64,7 +66,7 @@ internal fun AdminLogScreen(events: List<AdminLogEvent>, onBack: () -> Unit) {
                 }
             }
         } else {
-            items(selected.drop(current * 10).take(10), key = { "${it.timestamp}_${it.type}_${it.detail}" }) { event ->
+            items(selected.drop(current * pageSize).take(pageSize), key = { "${it.timestamp}_${it.type}_${it.detail}" }) { event ->
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                     Row {
                         Text(event.type.uppercase(), color = NavyLight, fontSize = 10.sp,
@@ -75,20 +77,15 @@ internal fun AdminLogScreen(events: List<AdminLogEvent>, onBack: () -> Unit) {
                 }
             }
         }
-        if (selected.size > 10) {
-            item {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween) {
-                    OutlinedButton(onClick = { page = current - 1 }, enabled = current > 0) {
-                        Text("Sebelumnya", fontSize = 12.sp)
-                    }
-                    Text("${current + 1}/$pages", color = Navy, fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 13.dp))
-                    OutlinedButton(onClick = { page = current + 1 }, enabled = current < pages - 1) {
-                        Text("Berikutnya", fontSize = 12.sp)
-                    }
-                }
-            }
+        item {
+            AdminPaginationFooter(
+                label = "Aktivitas",
+                total = selected.size,
+                page = current,
+                onPrevious = { page = current - 1 },
+                onNext = { page = current + 1 },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
+            )
         }
     }
 }
@@ -113,7 +110,7 @@ internal fun AdminProfileScreen(
     ) {
         item {
             Box {
-                AdminHero("Profil Admin", "Identitas panel VOKASI", compact = true)
+                AdminHero("Pengaturan Panel", "Konfigurasi dan identitas admin", compact = true)
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(top = 198.dp),
                     shape = RoundedCornerShape(25.dp),

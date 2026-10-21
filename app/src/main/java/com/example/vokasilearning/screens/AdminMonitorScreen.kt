@@ -59,7 +59,7 @@ internal fun AdminMonitorScreen(
         .sortedWith(
             compareBy<Student> { if (latest[it.username] == null) 1 else 0 }.thenBy { it.name }
         )
-    val pageSize = 15
+    val pageSize = AdminPagination.PAGE_SIZE
     val pageCount = AdminPagination.count(members.size, pageSize)
     val activePage = AdminPagination.active(page, members.size, pageSize)
     val visibleMembers = AdminPagination.slice(members, activePage, pageSize)
@@ -193,33 +193,14 @@ internal fun AdminMonitorScreen(
                 }
             }
             item {
-                Column(
-                    Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        "Siswa ${activePage * pageSize + 1}–${activePage * pageSize + visibleMembers.size} dari ${members.size}",
-                        fontSize = 11.sp, color = Subtle
-                    )
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedButton(
-                            enabled = activePage > 0,
-                            onClick = { page = activePage - 1; pagingActivated = true },
-                            shape = RoundedCornerShape(12.dp)
-                        ) { Text("Sebelumnya", fontSize = 12.sp) }
-                        Text("${activePage + 1}/$pageCount",
-                            color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        OutlinedButton(
-                            enabled = activePage < pageCount - 1,
-                            onClick = { page = activePage + 1; pagingActivated = true },
-                            shape = RoundedCornerShape(12.dp)
-                        ) { Text("Berikutnya", fontSize = 12.sp) }
-                    }
-                }
+                AdminPaginationFooter(
+                    label = "Siswa",
+                    total = members.size,
+                    page = activePage,
+                    onPrevious = { page = activePage - 1; pagingActivated = true },
+                    onNext = { page = activePage + 1; pagingActivated = true },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
+                )
             }
         }
     }

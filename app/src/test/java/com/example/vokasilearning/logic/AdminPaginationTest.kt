@@ -4,6 +4,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AdminPaginationTest {
+    @Test fun adminDirectoriesLimitRowsToTen() {
+        val rows = (1..27).toList()
+        assertEquals(10, AdminPagination.PAGE_SIZE)
+        assertEquals(3, AdminPagination.count(rows.size, AdminPagination.PAGE_SIZE))
+        assertEquals((1..10).toList(), AdminPagination.slice(rows, 0, AdminPagination.PAGE_SIZE))
+        assertEquals((11..20).toList(), AdminPagination.slice(rows, 1, AdminPagination.PAGE_SIZE))
+        assertEquals((21..27).toList(), AdminPagination.slice(rows, 2, AdminPagination.PAGE_SIZE))
+    }
+
     @Test fun gradesAlwaysShowAtMostFifteenPerPage() {
         val ids = (1..137).toList()
         assertEquals(10, AdminPagination.count(ids.size, 15))

@@ -143,10 +143,18 @@ private fun MonochromeNavIcon(target: Page, active: Boolean) {
                 move(12f, 14f); line(12f, 19f)
                 move(8f, 20f); line(16f, 20f)
             }
-            Page.PROFILE, Page.ADMIN_STUDENTS, Page.ADMIN_PROFILE -> {
+            Page.PROFILE, Page.ADMIN_STUDENTS -> {
                 move(12f, 3f); line(13f, 3f)
                 move(6f, 21f); line(6f, 18f); line(9f, 15f)
                 line(15f, 15f); line(18f, 18f); line(18f, 21f); line(6f, 21f)
+            }
+            Page.ADMIN_PROFILE -> {
+                move(9f, 3f); line(10f, 5f); line(14f, 5f); line(15f, 3f)
+                line(19f, 6f); line(18f, 9f); line(20f, 11f); line(20f, 13f)
+                line(18f, 15f); line(19f, 18f); line(15f, 21f)
+                line(14f, 19f); line(10f, 19f); line(9f, 21f)
+                line(5f, 18f); line(6f, 15f); line(4f, 13f); line(4f, 11f)
+                line(6f, 9f); line(5f, 6f); line(9f, 3f)
             }
             Page.ADMIN_QUESTIONS -> {
                 move(5f, 3f); line(18f, 3f); line(18f, 21f); line(5f, 21f); line(5f, 3f)
@@ -171,7 +179,14 @@ private fun MonochromeNavIcon(target: Page, active: Boolean) {
                 join = StrokeJoin.Round
             )
         )
-        if (target == Page.PROFILE || target == Page.ADMIN_STUDENTS || target == Page.ADMIN_PROFILE) {
+        if (target == Page.ADMIN_PROFILE) {
+            drawCircle(
+                color = tint, radius = 3.5f * scale,
+                center = Offset(12f * scale, 12f * scale),
+                style = Stroke(width = 2.dp.toPx())
+            )
+        }
+        if (target == Page.PROFILE || target == Page.ADMIN_STUDENTS) {
             drawCircle(
                 color = tint, radius = 4.3f * scale,
                 center = Offset(12f * scale, 8f * scale),
