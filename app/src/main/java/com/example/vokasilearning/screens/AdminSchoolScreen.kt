@@ -30,7 +30,6 @@ import java.util.Calendar
 @Composable
 internal fun AdminSchoolScreen(
     directory: SchoolDirectory,
-    onUpdate: (SchoolDirectory) -> Boolean,
     onImport: suspend (SchoolDirectory) -> String?,
     onBack: () -> Unit,
     onRosterExport: (Int) -> Unit
@@ -64,6 +63,7 @@ internal fun AdminSchoolScreen(
     var query by remember { mutableStateOf("") }
     var page by remember { mutableIntStateOf(0) }
     var exportNotice by remember { mutableStateOf("") }
+    var manualSyncBusy by remember { mutableStateOf(false) }
     var importBusy by remember { mutableStateOf(false) }
     var importNotice by remember { mutableStateOf("") }
     var schoolImportBusy by remember { mutableStateOf(false) }
@@ -181,7 +181,24 @@ internal fun AdminSchoolScreen(
         .thenBy { it.classLabel }.thenBy { it.fullName })
     val active = AdminPagination.active(page, results.size, AdminPagination.PAGE_SIZE)
     fun commit(next: SchoolDirectory, label: String) {
-        notice = if (onUpdate(next)) label else "Gagal menyimpan data sekolah."
+        val removingRows = next.roster.size < directory.roster.size ||
+            next.classes.size < directory.classes.size || next.majors.size < directory.majors.size
+        if (removingRows) {
+            notice = "Penghapusan tersinkron belum diaktifkan. Tidak ada perubahan yang disimpan."
+            return
+        }
+        if (manualSyncBusy) return
+        exportScope.launch {
+            manualSyncBusy = true
+            notice = "Menyinkronkan perubahan ke server..."
+            val error = try {
+                onImport(next)
+            } catch (e: Exception) {
+                e.message ?: "Gagal menyinkronkan data sekolah."
+            }
+            notice = error ?: "$label Data berhasil disimpan di server."
+            manualSyncBusy = false
+        }
     }
 
     LazyColumn(
