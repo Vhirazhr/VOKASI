@@ -19,15 +19,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.model.Student
 import com.example.vokasilearning.ui.*
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun StudentAccountScreen(
     me: Student,
-    onSave: (String, String, String) -> String?,
+    onSave: suspend (String, String, String) -> String?,
     onPhoto: (android.graphics.Bitmap) -> String?,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val accountScope = rememberCoroutineScope()
+    var passwordBusy by remember { mutableStateOf(false) }
     var oldPass by remember { mutableStateOf("") }
     var newPass by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
@@ -118,13 +121,23 @@ internal fun StudentAccountScreen(
                         color = Subtle, fontSize = 12.sp)
                 }
                 VokasiButton(
-                    text = "Simpan Password Baru",
-                    enabled = oldPass.isNotBlank() && newPass.length >= 8 && confirm == newPass,
+                    text = if (passwordBusy) "Memperbarui..." else "Simpan Password Baru",
+                    enabled = !passwordBusy && oldPass.isNotBlank() &&
+                        newPass.length >= 8 && confirm == newPass,
                     onClick = {
-                        val error = onSave(me.username, oldPass, newPass)
-                        notice = error ?: "Password berhasil diperbarui."
-                        if (error == null) {
-                            oldPass = ""; newPass = ""; confirm = ""
+                        accountScope.launch {
+                            passwordBusy = true
+                            notice = ""
+                            val error = try {
+                                onSave(me.username, oldPass, newPass)
+                            } catch (_: Exception) {
+                                "Password tidak berhasil diperbarui."
+                            }
+                            notice = error ?: "Password berhasil diperbarui."
+                            if (error == null) {
+                                oldPass = ""; newPass = ""; confirm = ""
+                            }
+                            passwordBusy = false
                         }
                     }, modifier = Modifier.fillMaxWidth()
                 )
