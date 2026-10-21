@@ -163,6 +163,13 @@ private fun MonochromeNavIcon(target: Page, active: Boolean) {
                 move(8f, 10f); line(16f, 10f)
                 move(8f, 13f); line(14f, 13f)
             }
+            Page.ADMIN_SCHOOL -> {
+                move(3f, 21f); line(21f, 21f)
+                move(5f, 21f); line(5f, 9f); line(12f, 4f)
+                line(19f, 9f); line(19f, 21f)
+                move(9f, 21f); line(9f, 15f); line(15f, 15f); line(15f, 21f)
+                move(9f, 11f); line(15f, 11f)
+            }
             Page.ADMIN_QUESTIONS -> {
                 move(5f, 3f); line(18f, 3f); line(18f, 21f); line(5f, 21f); line(5f, 3f)
                 move(8f, 8f); line(15f, 8f)

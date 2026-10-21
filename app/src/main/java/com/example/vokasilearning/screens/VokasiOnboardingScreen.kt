@@ -39,6 +39,7 @@ import com.example.vokasilearning.ui.Navy
 import com.example.vokasilearning.ui.NavyLight
 import com.example.vokasilearning.ui.Good
 import com.example.vokasilearning.ui.Subtle
+import com.example.vokasilearning.ui.VokasiBrandMark
 
 // The three-page, first-launch Android onboarding. Other app screens are unchanged.
 private val SplashBackground = Color(0xFFF5F7FB)
@@ -80,20 +81,7 @@ internal fun VokasiOnboardingScreen(onFinish: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Only the official lion/gear icon is shown here. No book icon/LEARNING text.
-            Box(
-                modifier = Modifier.size(45.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Navy)
-                    .padding(4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.vokasi_logo),
-                    contentDescription = "Logo VOKASI",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+            VokasiBrandMark(size = 45.dp, cornerRadius = 14.dp)
             Spacer(Modifier.width(11.dp))
             Text(
                 text = "VOKASI",

@@ -76,6 +76,7 @@ internal fun QuizScreen(
         Column(Modifier.fillMaxWidth().background(Navy).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onQuit) { Text("‹ Keluar", color = Color.White, fontWeight = FontWeight.Bold) }
+                VokasiBrandMark(size = 28.dp, cornerRadius = 8.dp)
                 Spacer(Modifier.weight(1f))
                 // Animated timer color
                 val timerColor by animateColorAsState(

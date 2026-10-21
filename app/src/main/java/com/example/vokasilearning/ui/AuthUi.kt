@@ -43,15 +43,10 @@ internal fun AuthHero(title: String, subtitle: String) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Box(
-                Modifier.size(42.dp).clip(RoundedCornerShape(13.dp))
-                    .background(Color.White.copy(alpha = 0.13f)),
-                contentAlignment = Alignment.Center
-            ) { Image(painterResource(R.drawable.vokasi_logo), contentDescription = "Logo VOKASI", modifier = Modifier.size(38.dp)) }
+            VokasiBrandMark(size = 42.dp, cornerRadius = 13.dp)
             Column {
                 Text("VOKASI", color = Color.White, fontSize = 17.sp,
                     fontWeight = FontWeight.ExtraBold, letterSpacing = 1.3.sp)
-                Text("L E A R N I N G", color = Color.White.copy(alpha = 0.72f), fontSize = 8.sp)
             }
         }
         Column(

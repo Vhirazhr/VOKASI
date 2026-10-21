@@ -5,6 +5,11 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -31,6 +36,61 @@ import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
 
+internal data class AdminHeaderActions(
+    val onNotifications: () -> Unit,
+    val onSettings: () -> Unit,
+    val onAssistant: () -> Unit
+)
+
+internal val LocalAdminHeaderActions = staticCompositionLocalOf<AdminHeaderActions?> { null }
+
+@Composable
+private fun AdminTopIcon(kind: Int, description: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.size(39.dp).semantics { contentDescription = description }) {
+        Canvas(Modifier.size(21.dp)) {
+            val unit = size.minDimension / 24f
+            val path = Path()
+            fun m(x: Float, y: Float) { path.moveTo(x * unit, y * unit) }
+            fun l(x: Float, y: Float) { path.lineTo(x * unit, y * unit) }
+            when (kind) {
+                0 -> { // Notification bell
+                    m(5f, 17f); l(7f, 14f); l(7f, 10f)
+                    l(8.5f, 7f); l(11f, 6f); l(13f, 6f)
+                    l(15.5f, 7f); l(17f, 10f); l(17f, 14f)
+                    l(19f, 17f); l(5f, 17f)
+                    m(10f, 20f); l(14f, 20f)
+                }
+                1 -> { // Settings gear
+                    val radius = 8f * unit
+                    drawCircle(Color.White, radius,
+                        Offset(12f * unit, 12f * unit), style = Stroke(2.dp.toPx()))
+                    drawCircle(Color.White, 3f * unit,
+                        Offset(12f * unit, 12f * unit), style = Stroke(2.dp.toPx()))
+                    for (i in 0 until 8) {
+                        val radians = i * kotlin.math.PI.toFloat() / 4f
+                        val dx = kotlin.math.cos(radians)
+                        val dy = kotlin.math.sin(radians)
+                        drawLine(
+                            Color.White,
+                            Offset((12f + 8f * dx) * unit, (12f + 8f * dy) * unit),
+                            Offset((12f + 10.5f * dx) * unit, (12f + 10.5f * dy) * unit),
+                            strokeWidth = 2.dp.toPx()
+                        )
+                    }
+                }
+                2 -> { // Assistant message
+                    m(4f, 5f); l(20f, 5f); l(20f, 17f)
+                    l(11f, 17f); l(7f, 21f); l(7f, 17f)
+                    l(4f, 17f); l(4f, 5f)
+                    m(8f, 10f); l(16f, 10f)
+                    m(8f, 13f); l(14f, 13f)
+                }
+            }
+            drawPath(path, Color.White, style = Stroke(2.dp.toPx()))
+        }
+    }
+}
+
 /** Same navy header language, brand, background and rounded corners as student Home. */
 @Composable
 internal fun AdminHero(
@@ -50,28 +110,27 @@ internal fun AdminHero(
                 .offset(x = 124.dp, y = 25.dp)
                 .border(36.dp, Color.White.copy(alpha = 0.04f), CircleShape)
         )
+        val actions = LocalAdminHeaderActions.current
         Row(
             Modifier.fillMaxWidth().align(Alignment.TopStart),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
-                    .background(Color.White.copy(alpha = 0.13f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("▣", color = Color.White, fontSize = 24.sp)
-            }
+            VokasiBrandMark(size = 40.dp, cornerRadius = 12.dp)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text("VOKASI", color = Color.White, fontSize = 15.sp,
                     fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
-                Text("LEARNING", color = Color.White.copy(alpha = 0.72f),
-                    fontSize = 8.sp, letterSpacing = 2.sp)
             }
-            Text("ADMIN", color = Color(0xFFDAE5F3), fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.background(Color.White.copy(alpha = 0.10f),
-                    RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 9.dp))
+            if (actions != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(1.dp)
+                ) {
+                    AdminTopIcon(0, "Notifikasi", actions.onNotifications)
+                    AdminTopIcon(1, "Pengaturan", actions.onSettings)
+                    AdminTopIcon(2, "Asisten", actions.onAssistant)
+                }
+            }
         }
         Column(
             Modifier.align(Alignment.BottomStart)

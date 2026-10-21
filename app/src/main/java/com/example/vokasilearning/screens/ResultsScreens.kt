@@ -150,6 +150,7 @@ internal fun ResultPage(
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(onClick = onBack) { Text("‹ Kembali", color = Navy, fontWeight = FontWeight.Bold) }
+            VokasiBrandMark(size = 28.dp, cornerRadius = 8.dp)
             Spacer(Modifier.weight(1f))
             Text("Hasil Latihan", color = Ink, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
             Spacer(Modifier.weight(1f))

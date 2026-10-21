@@ -28,8 +28,7 @@ internal fun AdminHome(
     onMonitoring: (String, String, String) -> Unit,
     onExcelExport: (String, String, String) -> Unit,
     adminName: String,
-    schoolName: String,
-    onSettings: () -> Unit = {}
+    schoolName: String
 ) {
     val majors = students.map { it.classroom.major }.distinct().sorted()
     var major by remember { mutableStateOf(majors.firstOrNull().orEmpty()) }

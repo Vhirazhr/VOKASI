@@ -39,14 +39,20 @@ internal fun StudentScreenHeader(
                 .offset(x = 95.dp, y = 14.dp)
                 .border(30.dp, Color.White.copy(alpha = 0.035f), CircleShape)
         )
-        Text(
-            "VOKASI  /  LEARNING",
+        Row(
             modifier = Modifier.align(Alignment.TopStart),
-            color = Color.White.copy(alpha = 0.87f),
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 11.sp,
-            letterSpacing = 1.sp
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            VokasiBrandMark(size = 29.dp, cornerRadius = 8.dp)
+            Text(
+                "VOKASI",
+                color = Color.White.copy(alpha = 0.87f),
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 12.sp,
+                letterSpacing = 1.sp
+            )
+        }
         Text(
             seasonTitle(),
             modifier = Modifier.align(Alignment.TopEnd)

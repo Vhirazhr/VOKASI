@@ -120,34 +120,12 @@ internal fun AdminProfileScreen(
     onSave: (AdminPreferences) -> Boolean,
     onBack: () -> Unit,
     onLog: () -> Unit,
-    onSchool: () -> Unit,
-    roster: List<SchoolRosterEntry>,
-    onRosterExport: (Int) -> Unit,
     onLogout: () -> Unit
 ) {
     var name by remember(config) { mutableStateOf(config.displayName) }
     var school by remember(config) { mutableStateOf(config.school) }
     var result by remember { mutableStateOf<String?>(null) }
     var confirmLogout by remember { mutableStateOf(false) }
-    var exportNotice by remember { mutableStateOf("") }
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val excelType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    val rosterExport = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument(excelType)
-    ) { uri ->
-        if (uri != null) scope.launch {
-            exportNotice = try {
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use {
-                        SchoolRosterExcel.write(it, roster)
-                    } ?: throw IllegalArgumentException("Gagal membuka lokasi.")
-                }
-                onRosterExport(roster.size)
-                "Data sekolah berhasil diekspor."
-            } catch (_: Exception) { "Gagal menyimpan Excel data sekolah." }
-        }
-    }
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
@@ -175,26 +153,6 @@ internal fun AdminProfileScreen(
         }
         item {
             WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                Text("Administrasi Sekolah", color = Ink, fontSize = 17.sp,
-                    fontWeight = FontWeight.ExtraBold)
-                Text("Kelola data resmi dan pantau siswa yang belum mendaftar.",
-                    color = Subtle, fontSize = 12.sp)
-                OutlinedButton(onClick = onSchool,
-                    shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Text("Manajemen Jurusan, Kelas & Siswa", color = Navy, fontSize = 12.sp)
-                }
-                OutlinedButton(onClick = onLog,
-                    shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Text("Riwayat Aktivitas Admin", color = Navy, fontSize = 12.sp)
-                }
-                OutlinedButton(
-                    onClick = { rosterExport.launch("VOKASI_Data_Sekolah.xlsx") },
-                    enabled = roster.isNotEmpty(),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Unduh Data Sekolah (Excel)", color = Navy, fontSize = 12.sp) }
-                if (exportNotice.isNotBlank()) Text(exportNotice, color = Subtle, fontSize = 11.sp)
-                HorizontalDivider(color = Border)
                 Text("Profil & Tampilan Admin", color = Ink, fontSize = 17.sp,
                     fontWeight = FontWeight.ExtraBold)
                 OutlinedTextField(
@@ -226,6 +184,13 @@ internal fun AdminProfileScreen(
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
+                OutlinedButton(
+                    onClick = onLog,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Riwayat Aktivitas Admin", color = Navy, fontSize = 12.sp)
+                }
             }
         }
         item {

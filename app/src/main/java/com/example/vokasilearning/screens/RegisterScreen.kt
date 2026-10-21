@@ -1,91 +1,53 @@
 package com.example.vokasilearning.screens
 
-import android.graphics.BitmapFactory
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.data.SchoolRosterEntry
 import com.example.vokasilearning.model.Classroom
 import com.example.vokasilearning.logic.schoolGrade
-import java.util.Calendar
-import java.util.TimeZone
 import com.example.vokasilearning.ui.*
 
+/**
+ * A student may claim only an existing, unregistered admin roster entry.
+ * Name search is a selector, not a free-text registration field.
+ */
 @Composable
 internal fun RegisterScreen(
     onBack: () -> Unit,
     availableRoster: List<SchoolRosterEntry>,
-    onRegister: (String, String, String, Classroom, Int, ImageBitmap?) -> Boolean
+    onRegister: (String, String, String, Classroom, Int, androidx.compose.ui.graphics.ImageBitmap?) -> Boolean
 ) {
-    val context = LocalContext.current
-    var name by remember { mutableStateOf("") }
+    var nameSearch by remember { mutableStateOf("") }
+    var selectedRosterId by remember { mutableStateOf<Long?>(null) }
+    var nameMenu by remember { mutableStateOf(false) }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    val currentYear = remember {
-        Calendar.getInstance(TimeZone.getTimeZone("Asia/Jakarta")).get(Calendar.YEAR)
-    }
-    var selectedMajor by remember { mutableStateOf("") }
-    var selectedGrade by remember { mutableStateOf("X") }
-    var admissionYear by remember { mutableIntStateOf(currentYear) }
-    var selectedClass by remember { mutableStateOf<Classroom?>(null) }
-    var majorSearch by remember { mutableStateOf("") }
-    var majorMenu by remember { mutableStateOf(false) }
-    var classMenu by remember { mutableStateOf(false) }
-    var image by remember { mutableStateOf<ImageBitmap?>(null) }
-    var duplicate by remember { mutableStateOf(false) }
-
+    var error by remember { mutableStateOf(false) }
     val pending = availableRoster.filter { !it.registered }
-    val majors = pending.map { it.major }.distinct().sorted()
-    val availableClasses = pending.filter {
-        it.major == selectedMajor && schoolGrade(it.classLabel) == selectedGrade
-    }.map { Classroom(it.classLabel, it.major) }.distinct().sortedBy { it.label }
-    val allowedYears = pending.filter {
-        it.major == selectedMajor && it.classLabel == selectedClass?.label
-    }.map { it.admissionYear }.distinct().sortedDescending()
-    LaunchedEffect(availableClasses) {
-        if (selectedClass !in availableClasses) selectedClass = availableClasses.firstOrNull()
-    }
-    LaunchedEffect(allowedYears) {
-        if (admissionYear !in allowedYears) admissionYear = allowedYears.firstOrNull() ?: currentYear
-    }
-    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let {
-            try {
-                val bitmap = context.contentResolver.openInputStream(it)?.use { stream ->
-                    BitmapFactory.decodeStream(stream)
-                }
-                if (bitmap != null) image = bitmap.asImageBitmap()
-            } catch (_: Exception) { }
-        }
-    }
+    val selected = pending.firstOrNull { it.id == selectedRosterId }
+    val query = nameSearch.trim()
+    val matches = if (query.length < 2) emptyList() else pending.filter {
+        it.fullName.contains(query, ignoreCase = true)
+    }.sortedWith(compareBy<SchoolRosterEntry> { it.fullName }
+        .thenBy { it.classLabel }.thenBy { it.admissionYear }).take(8)
 
     LazyColumn(
-        Modifier.fillMaxSize().background(Color.White),
+        modifier = Modifier.fillMaxSize().background(Color.White),
         contentPadding = PaddingValues(bottom = 30.dp)
     ) {
-        item { AuthHero("Daftar Siswa", "Lengkapi akun dan identitas kelasmu.") }
+        item { AuthHero("Daftar Siswa", "Cari namamu di daftar resmi sekolah.") }
         item {
             Column(
                 Modifier.fillMaxWidth().offset(y = (-18).dp)
@@ -96,41 +58,94 @@ internal fun RegisterScreen(
                 TextButton(onClick = onBack, contentPadding = PaddingValues(0.dp)) {
                     Text("‹ Kembali ke Login", color = Navy, fontSize = 12.sp)
                 }
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (image == null) Avatar(null, 62.dp)
-                    else Image(
-                        image!!, contentDescription = "Foto profil",
-                        modifier = Modifier.size(62.dp).clip(CircleShape),
-                        contentScale = ContentScale.Crop
+                Text("Nama lengkap sesuai data sekolah", color = Ink,
+                    fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Box(Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = nameSearch,
+                        onValueChange = {
+                            nameSearch = it
+                            selectedRosterId = null
+                            error = false
+                            nameMenu = it.trim().length >= 2
+                        },
+                        placeholder = { Text("Ketik minimal 2 huruf namamu") },
+                        trailingIcon = { Text(if (selected != null) "✓" else "⌄", color = Navy) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(13.dp),
+                        colors = authFieldColors()
                     )
-                    Column {
-                        Text("Foto profil", color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        TextButton(onClick = { photoPicker.launch("image/*") },
-                            contentPadding = PaddingValues(0.dp)) {
-                            Text(if (image == null) "Tambah foto (opsional)" else "Ganti foto",
-                                color = Navy, fontSize = 12.sp)
+                    DropdownMenu(
+                        expanded = nameMenu && selected == null,
+                        onDismissRequest = { nameMenu = false },
+                        modifier = Modifier.heightIn(max = 320.dp)
+                    ) {
+                        if (matches.isEmpty()) {
+                            DropdownMenuItem(
+                                enabled = false,
+                                text = { Text("Nama belum ditemukan. Hubungi admin.", fontSize = 12.sp) },
+                                onClick = {}
+                            )
+                        } else matches.forEach { entry ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(entry.fullName, fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold, color = Ink)
+                                        Text(entry.major + " • " + entry.classLabel +
+                                            " • Angkatan " + entry.admissionYear,
+                                            fontSize = 11.sp, color = Subtle)
+                                    }
+                                },
+                                onClick = {
+                                    selectedRosterId = entry.id
+                                    nameSearch = entry.fullName
+                                    nameMenu = false
+                                    error = false
+                                }
+                            )
                         }
                     }
                 }
-                Text("Nama lengkap", color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                OutlinedTextField(
-                    value = name, onValueChange = { name = it; duplicate = false },
-                    placeholder = { Text("Nama sesuai identitas") },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true,
-                    shape = RoundedCornerShape(13.dp), colors = authFieldColors()
-                )
-                Text("Username", color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                if (selected != null) {
+                    Column(
+                        Modifier.fillMaxWidth()
+                            .background(PaleGreen, RoundedCornerShape(13.dp))
+                            .padding(13.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Text("✓ Identitas ditemukan", color = Good,
+                            fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("Jurusan: " + selected.major, color = Ink, fontSize = 12.sp)
+                        Text("Tingkat: " + schoolGrade(selected.classLabel) +
+                            "  •  Kelas: " + selected.classLabel, color = Ink, fontSize = 12.sp)
+                        Text("Angkatan: " + selected.admissionYear,
+                            color = Ink, fontSize = 12.sp)
+                        Text("Informasi sekolah terisi otomatis dan tidak perlu diketik.",
+                            color = Subtle, fontSize = 11.sp)
+                    }
+                } else {
+                    Text("Pilih nama dari daftar yang muncul agar identitas kelas terisi otomatis.",
+                        color = Subtle, fontSize = 11.sp)
+                }
+
+                HorizontalDivider(color = Border)
+                Text("Buat username", color = Ink,
+                    fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 OutlinedTextField(
                     value = username,
-                    onValueChange = { username = it.trim(); duplicate = false },
+                    onValueChange = { username = it.trim(); error = false },
                     placeholder = { Text("Minimal 3 karakter") },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true,
-                    shape = RoundedCornerShape(13.dp), colors = authFieldColors()
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true, shape = RoundedCornerShape(13.dp),
+                    colors = authFieldColors()
                 )
-                Text("Password", color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("Buat password", color = Ink,
+                    fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 OutlinedTextField(
-                    value = password, onValueChange = { password = it; duplicate = false },
+                    value = password,
+                    onValueChange = { password = it; error = false },
                     placeholder = { Text("Minimal 6 karakter") },
                     visualTransformation = if (passwordVisible) VisualTransformation.None
                         else PasswordVisualTransformation(),
@@ -139,133 +154,37 @@ internal fun RegisterScreen(
                             PasswordEyeIcon(passwordVisible)
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true,
-                    shape = RoundedCornerShape(13.dp), colors = authFieldColors()
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true, shape = RoundedCornerShape(13.dp),
+                    colors = authFieldColors()
                 )
-                HorizontalDivider(color = Border)
-                Text("Jurusan", color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Box(Modifier.fillMaxWidth()) {
-                    OutlinedButton(
-                        onClick = { majorSearch = ""; majorMenu = true },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                        shape = RoundedCornerShape(13.dp),
-                        contentPadding = PaddingValues(horizontal = 13.dp)
-                    ) {
-                        Text(selectedMajor, modifier = Modifier.weight(1f),
-                            maxLines = 1, overflow = TextOverflow.Ellipsis, color = Ink)
-                        Text("⌄", color = Navy)
-                    }
-                    DropdownMenu(
-                        expanded = majorMenu,
-                        onDismissRequest = { majorMenu = false },
-                        modifier = Modifier.heightIn(max = 360.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = majorSearch,
-                            onValueChange = { majorSearch = it },
-                            placeholder = { Text("Cari jurusan") },
-                            singleLine = true,
-                            modifier = Modifier.width(260.dp).padding(horizontal = 8.dp),
-                            shape = RoundedCornerShape(13.dp)
-                        )
-                        majors.filter { it.contains(majorSearch.trim(), ignoreCase = true) }
-                            .forEach { major ->
-                                DropdownMenuItem(text = { Text(major) }, onClick = {
-                                    selectedMajor = major
-                                    selectedClass = null
-                                    majorMenu = false
-                                })
-                            }
-                    }
+                if (pending.isEmpty()) {
+                    Text("Belum ada daftar siswa dari admin pada perangkat ini.",
+                        color = Bad, fontSize = 12.sp)
                 }
-                RegistrationSelect(
-                    label = "Tingkat kelas",
-                    value = selectedGrade,
-                    options = listOf("X", "XI", "XII"),
-                    onChange = { newGrade ->
-                        selectedGrade = newGrade
-                        selectedClass = null
-                    }
-                )
-                RegistrationSelect(
-                    label = "Angkatan (tahun masuk)",
-                    value = admissionYear.toString(),
-                    options = allowedYears.map { it.toString() },
-                    onChange = { admissionYear = it.toInt() }
-                )
-                Text("Kelas", color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Box(Modifier.fillMaxWidth()) {
-                    OutlinedButton(
-                        onClick = { classMenu = true },
-                        enabled = availableClasses.isNotEmpty(),
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = RoundedCornerShape(13.dp),
-                        contentPadding = PaddingValues(horizontal = 13.dp)
-                    ) {
-                        Text(selectedClass?.label ?: "Pilih kelas", modifier = Modifier.weight(1f), color = Ink)
-                        Text("⌄", color = Navy)
-                    }
-                    DropdownMenu(
-                        expanded = classMenu,
-                        onDismissRequest = { classMenu = false }
-                    ) {
-                        availableClasses.forEach { classroom ->
-                            DropdownMenuItem(
-                                text = { Text(classroom.label) },
-                                onClick = { selectedClass = classroom; classMenu = false }
+                if (error) {
+                    Text("Pendaftaran belum berhasil. Username mungkin sudah dipakai atau data berubah. Coba lagi atau hubungi admin.",
+                        color = Bad, fontSize = 12.sp)
+                }
+                Spacer(Modifier.height(4.dp))
+                VokasiButton(
+                    text = "Daftar Akun",
+                    onClick = {
+                        selected?.let { roster ->
+                            error = !onRegister(
+                                roster.fullName, username.trim(), password,
+                                Classroom(roster.classLabel, roster.major),
+                                roster.admissionYear, null
                             )
                         }
-                    }
-                }
-                if (pending.isEmpty()) Text("Belum ada siswa yang didaftarkan oleh admin sekolah di perangkat ini.",
-                    color = Bad, fontSize = 12.sp)
-                if (duplicate) Text("Nama lengkap, kelas, atau angkatan tidak cocok dengan data admin, atau akun sudah terdaftar.",
-                    color = Bad, fontSize = 12.sp)
-                Spacer(Modifier.height(3.dp))
-                VokasiButton(
-                    text = "Daftar",
-                    onClick = {
-                        duplicate = !onRegister(
-                            name.trim(), username.trim(), password,
-                            selectedClass!!, admissionYear, image
-                        )
                     },
-                    enabled = name.trim().contains(" ") && selectedClass != null &&
-                        admissionYear in allowedYears &&
+                    enabled = selected != null &&
                         username.matches(Regex("[A-Za-z0-9._]{3,}")) &&
                         password.length >= 6,
                     modifier = Modifier.fillMaxWidth()
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RegistrationSelect(
-    label: String,
-    value: String,
-    options: List<String>,
-    onChange: (String) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    Text(label, color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-    Box(Modifier.fillMaxWidth()) {
-        OutlinedButton(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(13.dp),
-            contentPadding = PaddingValues(horizontal = 13.dp)
-        ) {
-            Text(value, modifier = Modifier.weight(1f), color = Ink)
-            Text("⌄", color = Navy)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option) },
-                    onClick = { onChange(option); expanded = false }
-                )
+                Text("Status pendaftaran dan username akan tercatat di panel admin. Password tidak ditampilkan kepada admin.",
+                    color = Subtle, fontSize = 11.sp)
             }
         }
     }

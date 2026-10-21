@@ -100,17 +100,11 @@ internal fun StudentHome(
                         Modifier.fillMaxWidth().align(Alignment.TopStart),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
-                                .background(Color.White.copy(alpha = 0.13f)),
-                            contentAlignment = Alignment.Center
-                        ) { Text("▣", color = Color.White, fontSize = 24.sp) }
+                        VokasiBrandMark(size = 40.dp, cornerRadius = 12.dp)
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text("VOKASI", color = Color.White, fontSize = 15.sp,
                                 fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
-                            Text("LEARNING", color = Color.White.copy(alpha = 0.72f),
-                                fontSize = 8.sp, letterSpacing = 2.sp)
                         }
                         Text(seasonTitle(), color = Color(0xFFCBD7E5), fontSize = 10.sp,
                             modifier = Modifier.background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(12.dp))

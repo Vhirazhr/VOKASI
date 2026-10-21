@@ -1,6 +1,12 @@
 package com.example.vokasilearning.screens
 
 import androidx.compose.foundation.background
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
@@ -25,7 +31,8 @@ import java.util.Calendar
 internal fun AdminSchoolScreen(
     directory: SchoolDirectory,
     onUpdate: (SchoolDirectory) -> Boolean,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onRosterExport: (Int) -> Unit
 ) {
     var tab by remember { mutableStateOf("Siswa") }
     var notice by remember { mutableStateOf("") }
@@ -42,6 +49,28 @@ internal fun AdminSchoolScreen(
     var filterStatus by remember { mutableStateOf("Semua") }
     var query by remember { mutableStateOf("") }
     var page by remember { mutableIntStateOf(0) }
+    var exportNotice by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val exportScope = rememberCoroutineScope()
+    val rosterLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    ) { uri ->
+        if (uri != null) exportScope.launch {
+            exportNotice = try {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                        SchoolRosterExcel.write(stream, directory.roster)
+                    } ?: throw IllegalArgumentException("Gagal membuka lokasi file.")
+                }
+                onRosterExport(directory.roster.size)
+                "Data siswa berhasil disimpan ke Excel."
+            } catch (_: Exception) {
+                "Ekspor Excel gagal. Periksa izin penyimpanan."
+            }
+        }
+    }
 
     val classOptions = directory.classes.filter { it.major == major }.map { it.label }.sorted()
     val filteredClasses = directory.classes.filter { filterMajor.isBlank() || it.major == filterMajor }
@@ -73,7 +102,7 @@ internal fun AdminSchoolScreen(
                     shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White)) {
                     Column(Modifier.padding(18.dp)) {
-                        TextButton(onClick = onBack) { Text("‹ Pengaturan", color = Navy) }
+                        TextButton(onClick = onBack) { Text("‹ Ringkasan", color = Navy) }
                         Text(directory.majors.size.toString() + " jurusan • " +
                             directory.classes.size + " kelas • " + directory.roster.size + " siswa",
                             color = Ink, fontWeight = FontWeight.Bold)
@@ -84,6 +113,22 @@ internal fun AdminSchoolScreen(
                             color = Subtle, fontSize = 11.sp)
                     }
                 }
+            }
+        }
+        item {
+            WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                Text("Arsip Data Sekolah", color = Ink, fontWeight = FontWeight.Bold)
+                Text("Unduh daftar siswa beserta jurusan, kelas, angkatan dan status pendaftaran.",
+                    color = Subtle, fontSize = 11.sp)
+                OutlinedButton(
+                    onClick = { rosterLauncher.launch("VOKASI_Data_Sekolah.xlsx") },
+                    enabled = directory.roster.isNotEmpty(),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Unduh Data Siswa (Excel)", color = Navy, fontSize = 12.sp)
+                }
+                if (exportNotice.isNotBlank()) Text(exportNotice, color = Subtle, fontSize = 11.sp)
             }
         }
         item {
@@ -235,7 +280,11 @@ internal fun AdminSchoolScreen(
                             color = Subtle, fontSize = 11.sp)
                         Text(if (e.registered) "● Terdaftar" else "● Belum terdaftar",
                             color = if (e.registered) Good else Bad, fontSize = 12.sp)
-                        if (e.registered) Text("@" + e.username, color = Navy, fontSize = 11.sp)
+                        if (e.registered) {
+                            Text("Username: " + e.username, color = Navy, fontSize = 11.sp)
+                            Text("Password sudah dibuat (disimpan sebagai hash, tidak ditampilkan).",
+                                color = Subtle, fontSize = 10.sp)
+                        }
                         else TextButton(onClick = {
                             commit(directory.copy(roster = directory.roster - e),
                                 "Data siswa belum terdaftar dihapus.")

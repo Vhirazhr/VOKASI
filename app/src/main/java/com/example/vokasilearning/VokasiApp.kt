@@ -91,6 +91,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
     var adminClassFilter by remember { mutableStateOf("") }
     var adminDateFilter by remember { mutableStateOf("") }
     var adminQuestionNotice by remember { mutableStateOf<String?>(null) }
+    var adminHeaderReturn by remember { mutableStateOf(Page.ADMIN_HOME) }
     var adminPrefs by remember { mutableStateOf(LocalAdminPreferences.load(activity)) }
     val adminEvents = remember { mutableStateListOf<AdminLogEvent>().apply {
         addAll(LocalAdminLog.load(activity))
@@ -185,7 +186,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
         page = when (page) {
             Page.REGISTER -> Page.LOGIN
             Page.ADMIN_ADD -> Page.ADMIN_QUESTIONS
-            Page.ADMIN_LOG, Page.ADMIN_SCHOOL -> Page.ADMIN_PROFILE
+            Page.ADMIN_LOG -> Page.ADMIN_PROFILE
+            Page.ADMIN_NOTIFICATIONS, Page.ADMIN_PROFILE -> adminHeaderReturn
+            Page.ADMIN_SCHOOL -> Page.ADMIN_HOME
+            Page.ASSISTANT -> if (isAdmin) adminHeaderReturn else Page.HOME
             Page.RESULT -> if (reviewingHistory) Page.PROFILE else Page.HOME
             else -> if (isAdmin) Page.ADMIN_HOME else Page.HOME
         }
@@ -209,9 +213,32 @@ internal fun VokasiApp(activity: ComponentActivity) {
     val adminTabs = page == Page.ADMIN_HOME || page == Page.ADMIN_STUDENTS ||
         page == Page.ADMIN_QUESTIONS || page == Page.ADMIN_MONITOR ||
         page == Page.ADMIN_PROFILE || page == Page.ADMIN_LOG ||
-        page == Page.ADMIN_SCHOOL || (page == Page.ASSISTANT && isAdmin)
+        page == Page.ADMIN_SCHOOL || page == Page.ADMIN_NOTIFICATIONS ||
+        (page == Page.ASSISTANT && isAdmin)
 
     AdaptiveAppFrame {
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalAdminHeaderActions provides if (isAdmin) AdminHeaderActions(
+            onNotifications = {
+                if (page != Page.ADMIN_NOTIFICATIONS) {
+                    if (page != Page.ADMIN_PROFILE && page != Page.ASSISTANT) adminHeaderReturn = page
+                    page = Page.ADMIN_NOTIFICATIONS
+                }
+            },
+            onSettings = {
+                if (page != Page.ADMIN_PROFILE) {
+                    if (page != Page.ADMIN_NOTIFICATIONS && page != Page.ASSISTANT) adminHeaderReturn = page
+                    page = Page.ADMIN_PROFILE
+                }
+            },
+            onAssistant = {
+                if (page != Page.ASSISTANT) {
+                    if (page != Page.ADMIN_PROFILE && page != Page.ADMIN_NOTIFICATIONS) adminHeaderReturn = page
+                    page = Page.ASSISTANT
+                }
+            }
+        ) else null
+    ) {
     Scaffold(
         containerColor = Canvas,
         bottomBar = {
@@ -238,10 +265,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             Triple(Page.ADMIN_STUDENTS, "Siswa", "◉"),
                             Triple(Page.ADMIN_MONITOR, "Nilai", "◫"),
                             Triple(Page.ADMIN_QUESTIONS, "Soal", "▤"),
-                            Triple(Page.ASSISTANT, "Asisten", "◇")
+                            Triple(Page.ADMIN_SCHOOL, "Sekolah", "⌂")
                         ),
                         currentPage = when (page) {
-                            Page.ADMIN_LOG, Page.ADMIN_SCHOOL -> Page.ADMIN_HOME
+                            Page.ADMIN_LOG, Page.ADMIN_NOTIFICATIONS, Page.ADMIN_PROFILE, Page.ASSISTANT -> Page.ADMIN_HOME
                             else -> page
                         },
                         onNavigate = {
@@ -363,8 +390,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             recordAdmin("Laporan", "Ekspor Excel: $major • $classroom • $date")
                         },
                         adminName = adminPrefs.displayName,
-                        schoolName = adminPrefs.school,
-                        onSettings = { page = Page.ADMIN_PROFILE }
+                        schoolName = adminPrefs.school
                     )
                     Page.ADMIN_STUDENTS -> AdminStudentsScreen(
                         students = students.toList(), attempts = attempts.toList(),
@@ -470,7 +496,16 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                 true
                             } catch (_: Exception) { false }
                         },
-                        onBack = { page = Page.ADMIN_PROFILE }
+                        onBack = { page = Page.ADMIN_HOME },
+                        onRosterExport = { count ->
+                            recordAdmin("Laporan", "Ekspor data sekolah: " + count + " siswa")
+                        }
+                    )
+                    Page.ADMIN_NOTIFICATIONS -> AdminNotificationsScreen(
+                        directory = schoolDirectory,
+                        events = adminEvents.toList(),
+                        onSchool = { page = Page.ADMIN_SCHOOL },
+                        onBack = { page = adminHeaderReturn }
                     )
                     Page.ADMIN_LOG -> AdminLogScreen(
                         events = adminEvents.toList(),
@@ -488,13 +523,8 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                 success
                             } catch (_: Exception) { false }
                         },
-                        onBack = { page = Page.ADMIN_HOME },
+                        onBack = { page = adminHeaderReturn },
                         onLog = { page = Page.ADMIN_LOG },
-                        onSchool = { page = Page.ADMIN_SCHOOL },
-                        roster = schoolDirectory.roster,
-                        onRosterExport = { count ->
-                            recordAdmin("Laporan", "Ekspor data sekolah: " + count + " siswa")
-                        },
                         onLogout = { logout() }
                     )
                     Page.ADMIN_MONITOR -> AdminMonitorScreen(
@@ -509,6 +539,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                 }
             }
         }
+    }
     }
 
     }
