@@ -18,11 +18,22 @@ It creates/updates the school master tables, seeds the 11 confirmed major codes,
 - Login alias is `<username>@students.vokasi.invalid`. This is a non-deliverable internal Auth identifier; students still enter only their username in the VOKASI UI. The Android sign-in integration must derive the same alias.
 - Never use the service-role key in Android or commit it to GitHub.
 
-## 3. Configure and deploy the Edge Function (not yet connected to the Android import UI)
+## 3. Deploy the Edge Function
 
-Deploy `supabase/functions/provision-students/index.ts` to the same existing Supabase project. Supabase supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to the Edge Function runtime. Configure the additional secret `VOKASI_INITIAL_STUDENT_PASSWORD=12345678` in Edge Function secrets.
+The Android app now calls `provision-students` when an admin confirms an Excel import or imports a class template. Deploy the function to the same existing Supabase project before using those actions.
 
-The caller must already be signed in through Supabase Auth and have an active row in `public.school_admins`. The existing local-only demo admin does not satisfy this check until admin authentication is migrated. Do not bypass this check or expose the service-role key.
+From the VOKASI project root in Android Studio's Terminal, run:
+
+```bash
+npx supabase login
+npx supabase link --project-ref vztvdpcbtrarrcmpzzqe
+npx supabase secrets set VOKASI_INITIAL_STUDENT_PASSWORD=12345678
+npx supabase functions deploy provision-students
+```
+
+The CLI may ask you to authenticate in a browser and link the existing project. Do not create a new Supabase project. Supabase supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to the Edge Function runtime. Never put the service-role key in Android or GitHub.
+
+The caller must already be signed in through Supabase Auth and have an active row in `public.school_admins`. The function verifies that role on the server. It can sync the 11 official majors, classes, and student rows; it provisions student Auth accounts in batches of up to 25. Re-importing the same roster is safe and does not reset existing passwords.
 
 Input body:
 
