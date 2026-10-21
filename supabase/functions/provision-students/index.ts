@@ -103,9 +103,9 @@ function validateMajor(raw: MajorInput) {
 function validateClass(raw: ClassInput) {
   const majorCode = String(raw?.majorCode ?? "").trim().toUpperCase();
   const majorName = MAJOR_NAMES[majorCode] ?? String(raw?.majorName ?? "").trim();
-  const rawLabel = String(raw?.classLabel ?? "").trim().replace(/\\s+/g, " ");
+  const rawLabel = String(raw?.classLabel ?? "").trim().replace(/\s+/g, " ");
   const schoolYear = String(raw?.schoolYear ?? DEFAULT_SCHOOL_YEAR).trim();
-  const gradeMatch = rawLabel.match(/^(XII|XI|X)\\s+(.+)$/i);
+  const gradeMatch = rawLabel.match(/^(XII|XI|X)\s+(.+)$/i);
   const gradeFromLabel = gradeMatch
     ? (gradeMatch[1].toUpperCase() === "X" ? 10
       : gradeMatch[1].toUpperCase() === "XI" ? 11 : 12)
@@ -122,7 +122,7 @@ function validateClass(raw: ClassInput) {
     throw new Error("Nama rombel tidak valid.");
   }
   if (gradeMatch && gradeLevel !== gradeFromLabel) throw new Error("Tingkat tidak sesuai dengan nama rombel.");
-  if (!/^\\d{4}\\/\\d{4}$/.test(schoolYear)) throw new Error("Tahun ajaran harus berformat 2026/2027.");
+  if (!/^\d{4}\/\d{4}$/.test(schoolYear)) throw new Error("Tahun ajaran harus berformat 2026/2027.");
   return { majorCode, majorName, gradeLevel, classLabel, schoolYear };
 }
 
