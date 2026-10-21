@@ -330,6 +330,23 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     Page.ADMIN_QUESTIONS -> AdminQuestionsScreen(
                         questions = questions.toList(), bundledIds = bundledIds,
                         onAdd = { page = Page.ADMIN_ADD },
+                        onImport = { drafts ->
+                            try {
+                                val imported = QuestionExcelFile.prepare(questions.toList(), drafts)
+                                // Save once, then publish to the UI. Bundled questions stay read-only.
+                                LocalAdminQuestionStore.save(
+                                    activity,
+                                    questions.filter { it.id !in bundledIds } + imported
+                                )
+                                questions.addAll(imported)
+                                recordAdmin("Soal", "Impor Excel: " + imported.size + " soal")
+                                "Berhasil mengimpor " + imported.size + " soal dari Excel."
+                            } catch (e: IllegalArgumentException) {
+                                e.message ?: "Data soal tidak sesuai format."
+                            } catch (_: Exception) {
+                                "Impor gagal disimpan. Tidak ada soal baru yang ditambahkan."
+                            }
+                        },
                         onDelete = { id ->
                             if (id in bundledIds) {
                                 false

@@ -1,6 +1,8 @@
 package com.example.vokasilearning.screens
 
 import androidx.compose.foundation.background
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +19,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.model.Question
+import com.example.vokasilearning.data.QuestionExcelFile
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.example.vokasilearning.logic.AdminPagination
 import com.example.vokasilearning.ui.*
 
@@ -25,6 +32,7 @@ internal fun AdminQuestionsScreen(
     questions: List<Question>,
     bundledIds: Set<Int>,
     onAdd: () -> Unit,
+    onImport: (List<QuestionExcelFile.Draft>) -> String,
     onDelete: (Int) -> Boolean,
     notice: String?,
     onDismissNotice: () -> Unit
@@ -37,6 +45,55 @@ internal fun AdminQuestionsScreen(
     var deleteId by remember { mutableStateOf<Int?>(null) }
     var localNotice by remember { mutableStateOf<String?>(null) }
     var expandedId by remember { mutableStateOf<Int?>(null) }
+    var excelBusy by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val excelMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null && !excelBusy) {
+            coroutineScope.launch {
+                excelBusy = true
+                localNotice = try {
+                    val drafts = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.use { QuestionExcelFile.read(it) }
+                            ?: throw IllegalArgumentException("File Excel tidak dapat dibuka.")
+                    }
+                    onImport(drafts)
+                } catch (e: IllegalArgumentException) {
+                    e.message ?: "Format Excel tidak sesuai."
+                } catch (_: Exception) {
+                    "Impor gagal. Periksa izin akses dan format file .xlsx."
+                } finally {
+                    excelBusy = false
+                }
+            }
+        }
+    }
+    val templateLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(excelMime)
+    ) { uri ->
+        if (uri != null && !excelBusy) {
+            coroutineScope.launch {
+                excelBusy = true
+                localNotice = try {
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(uri)?.use {
+                            QuestionExcelFile.writeTemplate(it)
+                        } ?: throw IllegalArgumentException("Lokasi penyimpanan tidak dapat dibuka.")
+                    }
+                    "Template Excel berhasil disimpan."
+                } catch (e: IllegalArgumentException) {
+                    e.message ?: "Gagal membuat template Excel."
+                } catch (_: Exception) {
+                    "Gagal menyimpan template Excel."
+                } finally {
+                    excelBusy = false
+                }
+            }
+        }
+    }
     val categories = listOf("Semua", "Perkalian", "Pembagian", "Penjumlahan", "Konversi Satuan")
     val found = questions.filter { q ->
         (category == "Semua" || q.category == category) &&
@@ -80,6 +137,25 @@ internal fun AdminQuestionsScreen(
                             }
                         }
                         VokasiButton("Tambah Soal", onClick = onAdd, modifier = Modifier.fillMaxWidth())
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { importLauncher.launch(arrayOf(excelMime)) },
+                                enabled = !excelBusy,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Impor Excel", fontSize = 12.sp, color = Navy) }
+                            OutlinedButton(
+                                onClick = { templateLauncher.launch("Template_Soal_VOKASI.xlsx") },
+                                enabled = !excelBusy,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Template Excel", fontSize = 12.sp, color = Navy) }
+                        }
+                        Text("Format .xlsx • Kolom A–I • Semua baris diperiksa sebelum disimpan",
+                            color = Subtle, fontSize = 11.sp)
                         OutlinedTextField(
                             value = search,
                             onValueChange = { search = it; page = 0; pagingActivated = false; expandedId = null },
