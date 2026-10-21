@@ -17,6 +17,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.logic.seasonTitle
+import com.example.vokasilearning.screens.AdminTopIcon
+import com.example.vokasilearning.screens.LocalAdminHeaderActions
 
 /**
  * Header layar siswa yang memakai bahasa visual sama dengan StudentHome:
@@ -53,14 +55,16 @@ internal fun StudentScreenHeader(
                 letterSpacing = 1.sp
             )
         }
-        Text(
-            seasonTitle(),
-            modifier = Modifier.align(Alignment.TopEnd)
-                .background(Color.White.copy(alpha = 0.11f), RoundedCornerShape(12.dp))
-                .padding(horizontal = 10.dp, vertical = 7.dp),
-            color = Color(0xFFE0E9F4),
-            fontSize = 10.sp
-        )
+        val actions = LocalAdminHeaderActions.current
+        if (actions != null) {
+            Row(Modifier.align(Alignment.TopEnd),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+                AdminTopIcon(0, "Notifikasi", actions.onNotifications)
+                AdminTopIcon(1, "Pengaturan", actions.onSettings)
+                AdminTopIcon(2, "Asisten", actions.onAssistant)
+            }
+        }
         Column(
             Modifier.align(Alignment.BottomStart).padding(bottom = 10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)

@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.data.AdminLogEvent
 import com.example.vokasilearning.data.SchoolDirectory
-import com.example.vokasilearning.data.LocalAdminLog
+import com.example.vokasilearning.data.StudentNoticeStore
 import com.example.vokasilearning.ui.*
 
 /**
@@ -28,7 +28,7 @@ internal fun AdminNotificationsScreen(
     onBack: () -> Unit
 ) {
     val unregistered = directory.pendingCount
-    val latest = events.sortedByDescending { it.timestamp }.take(5)
+    val messages = StudentNoticeStore.forAdmin(directory)
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
         contentPadding = PaddingValues(bottom = 28.dp),
@@ -61,7 +61,7 @@ internal fun AdminNotificationsScreen(
                     color = if (unregistered > 0) Bad else Good,
                     fontWeight = FontWeight.Bold, fontSize = 13.sp
                 )
-                Text("Buka Manajemen Sekolah untuk memeriksa nama dan kelasnya.",
+                Text("Notifikasi berisi kondisi yang perlu ditindaklanjuti, bukan riwayat aktivitas.",
                     color = Subtle, fontSize = 12.sp)
                 OutlinedButton(
                     onClick = onSchool,
@@ -70,18 +70,18 @@ internal fun AdminNotificationsScreen(
                 ) { Text("Buka Manajemen Sekolah", color = Navy, fontSize = 12.sp) }
             }
         }
-        item {
+        items(messages.size) { index ->
+            val message = messages[index]
             WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                Text("Aktivitas Terbaru", color = Ink, fontSize = 17.sp,
+                Text(message.title, color = Ink, fontSize = 15.sp,
                     fontWeight = FontWeight.ExtraBold)
-                if (latest.isEmpty()) {
-                    Text("Belum ada aktivitas tercatat.", color = Subtle, fontSize = 12.sp)
-                } else latest.forEach { event ->
-                    HorizontalDivider(color = Border)
-                    Text(event.type + " • " + LocalAdminLog.date(event.timestamp),
-                        color = NavyLight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Text(event.detail, color = Ink, fontSize = 12.sp)
-                }
+                Text(message.description, color = Subtle, fontSize = 12.sp)
+            }
+        }
+        if (messages.isEmpty()) item {
+            WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                Text("Tidak ada pemberitahuan yang memerlukan tindakan saat ini.",
+                    color = Good, fontSize = 12.sp)
             }
         }
         item {

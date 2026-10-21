@@ -43,7 +43,7 @@ internal object VokasiHelp {
         listOf("ekspor", "export", "excel", "impor", "import") to
             "Pada Admin → Soal, pilih satu atau beberapa materi, lalu tekan Ekspor Excel. Ekspor mengambil seluruh hasil filter, bukan hanya 10 soal yang terlihat. Impor menggunakan Template Excel.",
         listOf("admin", "pengaturan", "sekolah", "kelola") to
-            "Admin dapat mengelola jurusan, kelas, angkatan, dan daftar nama siswa pada Pengaturan → Data Sekolah. Tanda hijau berarti sudah mendaftar, merah berarti belum. Data masih lokal perangkat.",
+            "Admin mengelola jurusan, kelas, angkatan, dan daftar siswa pada tab Sekolah. Status hijau berarti Terdaftar, merah berarti Belum Terdaftar. Kelas siswa diperbarui hanya oleh admin.",
         listOf("privasi", "offline", "internet", "api") to
             "Asisten ini berjalan offline, tidak mengakses API atau internet, dan hanya menyediakan bantuan tentang VOKASI. Data sekolah pada versi ini tersimpan lokal, bukan tersinkron antarperangkat."
     )
@@ -84,20 +84,39 @@ internal object VokasiHelp {
 }
 
 @Composable
-internal fun VokasiAssistantScreen() {
+internal fun VokasiAssistantScreen(isAdmin: Boolean) {
     val messages = remember { mutableStateListOf(
         "Asisten" to "Halo! Aku Asisten VOKASI offline. Tanyakan penggunaan aplikasi atau latihan hitung dasar. Aku tidak menjawab pertanyaan di luar VOKASI."
     ) }
     var prompt by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize().background(Canvas)) {
-        AdminHero("Asisten VOKASI", "Panduan numerasi dan fitur • 100% offline", compact = true)
+        if (isAdmin) AdminHero("Asisten VOKASI", "Panduan fitur sekolah • Offline", compact = true)
+        else StudentScreenHeader("Asisten VOKASI", "Tanya fitur aplikasi dan matematika dasar.")
         LazyColumn(Modifier.weight(1f).padding(horizontal = 18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             contentPadding = PaddingValues(vertical = 14.dp)) {
             items(messages) { (who, text) ->
-                WhiteCard(Modifier.fillMaxWidth()) {
-                    Text(who, color = Navy, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
-                    Text(text, color = Ink, fontSize = 13.sp)
+                val fromStudent = who == "Kamu"
+                Row(Modifier.fillMaxWidth(),
+                    horizontalArrangement = if (fromStudent) Arrangement.End else Arrangement.Start) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(0.87f),
+                        color = if (fromStudent) Navy else Color.White,
+                        shape = RoundedCornerShape(
+                            topStart = 17.dp, topEnd = 17.dp,
+                            bottomEnd = if (fromStudent) 4.dp else 17.dp,
+                            bottomStart = if (fromStudent) 17.dp else 4.dp
+                        ), shadowElevation = if (fromStudent) 0.dp else 4.dp
+                    ) {
+                        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Text(if (fromStudent) "Kamu" else "Asisten VOKASI",
+                                color = if (fromStudent) Color.White.copy(alpha = 0.8f) else NavyLight,
+                                fontWeight = FontWeight.ExtraBold, fontSize = 10.sp)
+                            Text(text, color = if (fromStudent) Color.White else Ink,
+                                fontSize = 13.sp, lineHeight = 19.sp)
+                        }
+                    }
                 }
             }
         }

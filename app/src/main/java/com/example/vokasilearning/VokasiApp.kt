@@ -67,7 +67,9 @@ internal fun VokasiApp(activity: ComponentActivity) {
     var schoolDirectory by remember { mutableStateOf(SchoolDirectoryStore.load(activity)) }
     val students = remember {
         mutableStateListOf<Student>().apply {
-            addAll(SchoolDirectoryStore.load(activity).roster.mapNotNull { it.asStudent() })
+            addAll(SchoolDirectoryStore.load(activity).roster.mapNotNull { entry ->
+                entry.asStudent()?.copy(photo = StudentAccountStore.photo(activity, entry.id))
+            })
         }
     }
     val bundledQuestions = remember { QuestionBankLoader.load(activity) }
@@ -92,6 +94,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
     var adminDateFilter by remember { mutableStateOf("") }
     var adminQuestionNotice by remember { mutableStateOf<String?>(null) }
     var adminHeaderReturn by remember { mutableStateOf(Page.ADMIN_HOME) }
+    var studentHeaderReturn by remember { mutableStateOf(Page.HOME) }
     var adminPrefs by remember { mutableStateOf(LocalAdminPreferences.load(activity)) }
     val adminEvents = remember { mutableStateListOf<AdminLogEvent>().apply {
         addAll(LocalAdminLog.load(activity))
@@ -189,7 +192,8 @@ internal fun VokasiApp(activity: ComponentActivity) {
             Page.ADMIN_LOG -> Page.ADMIN_PROFILE
             Page.ADMIN_NOTIFICATIONS, Page.ADMIN_PROFILE -> adminHeaderReturn
             Page.ADMIN_SCHOOL -> Page.ADMIN_HOME
-            Page.ASSISTANT -> if (isAdmin) adminHeaderReturn else Page.HOME
+            Page.STUDENT_SETTINGS, Page.STUDENT_NOTIFICATIONS -> studentHeaderReturn
+            Page.ASSISTANT -> if (isAdmin) adminHeaderReturn else studentHeaderReturn
             Page.RESULT -> if (reviewingHistory) Page.PROFILE else Page.HOME
             else -> if (isAdmin) Page.ADMIN_HOME else Page.HOME
         }
@@ -209,7 +213,9 @@ internal fun VokasiApp(activity: ComponentActivity) {
     }
 
     val studentTabs = page == Page.HOME || page == Page.LEADERBOARD ||
-        page == Page.PROFILE || page == Page.RESULT || (page == Page.ASSISTANT && !isAdmin)
+        page == Page.PROFILE || page == Page.RESULT ||
+        page == Page.STUDENT_SETTINGS || page == Page.STUDENT_NOTIFICATIONS ||
+        (page == Page.ASSISTANT && !isAdmin)
     val adminTabs = page == Page.ADMIN_HOME || page == Page.ADMIN_STUDENTS ||
         page == Page.ADMIN_QUESTIONS || page == Page.ADMIN_MONITOR ||
         page == Page.ADMIN_PROFILE || page == Page.ADMIN_LOG ||
@@ -237,7 +243,26 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     page = Page.ASSISTANT
                 }
             }
-        ) else null
+        ) else AdminHeaderActions(
+            onNotifications = {
+                if (page != Page.STUDENT_NOTIFICATIONS) {
+                    if (page != Page.STUDENT_SETTINGS && page != Page.ASSISTANT) studentHeaderReturn = page
+                    page = Page.STUDENT_NOTIFICATIONS
+                }
+            },
+            onSettings = {
+                if (page != Page.STUDENT_SETTINGS) {
+                    if (page != Page.STUDENT_NOTIFICATIONS && page != Page.ASSISTANT) studentHeaderReturn = page
+                    page = Page.STUDENT_SETTINGS
+                }
+            },
+            onAssistant = {
+                if (page != Page.ASSISTANT) {
+                    if (page != Page.STUDENT_SETTINGS && page != Page.STUDENT_NOTIFICATIONS) studentHeaderReturn = page
+                    page = Page.ASSISTANT
+                }
+            }
+        )
     ) {
     Scaffold(
         containerColor = Canvas,
@@ -252,10 +277,14 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         items = listOf(
                             Triple(Page.HOME, "Beranda", "⌂"),
                             Triple(Page.LEADERBOARD, "Peringkat", "🏆"),
-                            Triple(Page.ASSISTANT, "Asisten", "◇"),
                             Triple(Page.PROFILE, "Profil", "◉")
                         ),
-                        currentPage = when (page) { Page.RESULT -> Page.HOME; else -> page },
+                        currentPage = when (page) {
+                            Page.RESULT -> Page.HOME
+                            Page.STUDENT_SETTINGS, Page.STUDENT_NOTIFICATIONS, Page.ASSISTANT ->
+                                if (studentHeaderReturn == Page.PROFILE) Page.PROFILE else Page.HOME
+                            else -> page
+                        },
                         onNavigate = { page = it }
                     )
                 } else if (adminTabs) {
@@ -295,7 +324,67 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         onboardingPrefs.edit().putBoolean("seen_v1", true).apply()
                         page = Page.LOGIN
                     })
-                    Page.ASSISTANT -> VokasiAssistantScreen()
+                    Page.ASSISTANT -> VokasiAssistantScreen(isAdmin = isAdmin)
+                    Page.STUDENT_NOTIFICATIONS -> if (me != null) StudentNotificationsScreen(
+                        me = me, attempts = attempts.toList(),
+                        onOpenPractice = { page = Page.HOME },
+                        onOpenSettings = { page = Page.STUDENT_SETTINGS },
+                        onBack = { page = studentHeaderReturn }
+                    )
+                    Page.STUDENT_SETTINGS -> if (me != null) StudentAccountScreen(
+                        me = me,
+                        onBack = { page = studentHeaderReturn },
+                        onPhoto = { bitmap ->
+                            try {
+                                val roster = schoolDirectory.roster.firstOrNull {
+                                    it.username == me.username && it.registered
+                                } ?: throw IllegalArgumentException("Data siswa tidak ditemukan.")
+                                val photo = StudentAccountStore.savePhoto(activity, roster.id, bitmap)
+                                val i = students.indexOfFirst { it.username == me.username }
+                                if (i >= 0) students[i] = students[i].copy(photo = photo)
+                                null
+                            } catch (e: Exception) {
+                                e.message ?: "Gagal menyimpan foto."
+                            }
+                        },
+                        onSave = { username, oldPassword, newPassword ->
+                            try {
+                                val current = students.first { it.username == me.username }
+                                val next = StudentAccountStore.updatedRoster(
+                                    schoolDirectory, current, oldPassword, username, newPassword
+                                )
+                                val newId = next.roster.first {
+                                    it.registered && it.fullName == current.name &&
+                                        it.admissionYear == current.admissionYear &&
+                                        it.classLabel == current.classroom.label
+                                }.username
+                                val updatedAttempts = attempts.map {
+                                    if (it.studentId == current.username) it.copy(studentId = newId)
+                                    else it
+                                }
+                                // Roster is the authoritative local account identity.
+                                SchoolDirectoryStore.save(activity, next)
+                                if (newId != current.username) {
+                                    LocalAttemptStore.save(activity, updatedAttempts)
+                                    QuizProgressStore.moveOwner(activity, current.username, newId)
+                                    StudentNoticeStore.migrate(activity, current.username, newId)
+                                }
+                                schoolDirectory = next
+                                if (newId != current.username) {
+                                    attempts.clear(); attempts.addAll(updatedAttempts)
+                                }
+                                val account = next.roster.first { it.username == newId }
+                                val i = students.indexOfFirst { it.username == current.username }
+                                if (i >= 0) students[i] = current.copy(
+                                    username = newId, password = account.passwordHash
+                                )
+                                currentId = newId
+                                null
+                            } catch (e: IllegalArgumentException) {
+                                e.message ?: "Data akun tidak valid."
+                            } catch (_: Exception) { "Pengaturan akun gagal disimpan." }
+                        }
+                    )
                     Page.LOGIN -> LoginScreen(
                         onLogin = { u, p ->
                             val username = u.trim()
@@ -492,6 +581,12 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             try {
                                 SchoolDirectoryStore.save(activity, next)
                                 schoolDirectory = next
+                                // Keep each active student in the roster's current school class.
+                                val nextStudents = next.roster.mapNotNull { entry ->
+                                    entry.asStudent()?.copy(photo =
+                                        StudentAccountStore.photo(activity, entry.id))
+                                }
+                                students.clear(); students.addAll(nextStudents)
                                 recordAdmin("Sekolah", "Memperbarui data sekolah")
                                 true
                             } catch (_: Exception) { false }

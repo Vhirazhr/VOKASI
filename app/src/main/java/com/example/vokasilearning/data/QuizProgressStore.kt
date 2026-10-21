@@ -39,4 +39,13 @@ internal object QuizProgressStore {
     fun clear(context: Context, studentId: String) {
         file(context, studentId).delete()
     }
+
+    /** Preserve an unfinished session when the student changes their username. */
+    fun moveOwner(context: Context, oldUsername: String, newUsername: String) {
+        if (oldUsername == newUsername) return
+        val pending = load(context, oldUsername) ?: return
+        pending.put("owner", newUsername)
+        save(context, newUsername, pending)
+        clear(context, oldUsername)
+    }
 }

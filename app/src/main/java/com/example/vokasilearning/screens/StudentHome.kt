@@ -106,9 +106,13 @@ internal fun StudentHome(
                             Text("VOKASI", color = Color.White, fontSize = 15.sp,
                                 fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
                         }
-                        Text(seasonTitle(), color = Color(0xFFCBD7E5), fontSize = 10.sp,
-                            modifier = Modifier.background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(12.dp))
-                                .padding(horizontal = 9.dp, vertical = 8.dp))
+                        LocalAdminHeaderActions.current?.let { actions ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                AdminTopIcon(0, "Notifikasi", actions.onNotifications)
+                                AdminTopIcon(1, "Pengaturan", actions.onSettings)
+                                AdminTopIcon(2, "Asisten", actions.onAssistant)
+                            }
+                        }
                     }
                     Row(
                         Modifier.fillMaxWidth().align(Alignment.CenterStart).padding(bottom = 9.dp),

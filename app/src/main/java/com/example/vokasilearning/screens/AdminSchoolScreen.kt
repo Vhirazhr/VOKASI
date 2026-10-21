@@ -35,6 +35,10 @@ internal fun AdminSchoolScreen(
     onRosterExport: (Int) -> Unit
 ) {
     var tab by remember { mutableStateOf("Siswa") }
+    var classPage by remember { mutableIntStateOf(0) }
+    var classFilter by remember { mutableStateOf("") }
+    var promotion by remember { mutableStateOf<SchoolRosterEntry?>(null) }
+    var promotionTarget by remember { mutableStateOf("") }
     var notice by remember { mutableStateOf("") }
     var newMajor by remember { mutableStateOf("") }
     var major by remember { mutableStateOf("") }
@@ -50,6 +54,8 @@ internal fun AdminSchoolScreen(
     var query by remember { mutableStateOf("") }
     var page by remember { mutableIntStateOf(0) }
     var exportNotice by remember { mutableStateOf("") }
+    var importBusy by remember { mutableStateOf(false) }
+    var importNotice by remember { mutableStateOf("") }
     val context = LocalContext.current
     val exportScope = rememberCoroutineScope()
     val rosterLauncher = rememberLauncherForActivityResult(
@@ -69,6 +75,44 @@ internal fun AdminSchoolScreen(
             } catch (_: Exception) {
                 "Ekspor Excel gagal. Periksa izin penyimpanan."
             }
+        }
+    }
+
+    val classTemplateLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    ) { uri ->
+        if (uri != null) exportScope.launch {
+            importNotice = try {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { SchoolClassExcel.template(it) }
+                        ?: throw IllegalArgumentException("Gagal membuat template.")
+                }
+                "Template kelas Excel berhasil disimpan."
+            } catch (_: Exception) { "Gagal menyimpan template Excel." }
+        }
+    }
+    val classImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null && !importBusy) exportScope.launch {
+            importBusy = true
+            importNotice = try {
+                val added = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use {
+                        SchoolClassExcel.read(it, directory)
+                    } ?: throw IllegalArgumentException("File tidak dapat dibuka.")
+                }
+                if (onUpdate(directory.copy(classes = directory.classes + added))) {
+                    classPage = 0
+                    "Berhasil menambahkan " + added.size + " kelas."
+                } else "Gagal menyimpan data kelas."
+            } catch (e: IllegalArgumentException) {
+                e.message ?: "Excel tidak valid."
+            } catch (_: Exception) {
+                "Gagal impor kelas. Cek file Excel .xlsx."
+            } finally { importBusy = false }
         }
     }
 
@@ -132,12 +176,16 @@ internal fun AdminSchoolScreen(
             }
         }
         item {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("Jurusan", "Kelas", "Siswa").forEach { value ->
-                    FilterChip(selected = tab == value, onClick = {
-                        tab = value; page = 0; notice = ""
-                    }, label = { Text(value) })
+            WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                Text("Kelola Data Sekolah", color = Ink, fontSize = 17.sp,
+                    fontWeight = FontWeight.ExtraBold)
+                Text("Pilih bagian yang ingin dikelola.", color = Subtle, fontSize = 12.sp)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    listOf("Jurusan", "Kelas", "Siswa").forEach { value ->
+                        FilterChip(selected = tab == value, onClick = {
+                            tab = value; page = 0; classPage = 0; notice = ""
+                        }, label = { Text(value, fontSize = 12.sp) }, modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }
@@ -175,6 +223,29 @@ internal fun AdminSchoolScreen(
         } else if (tab == "Kelas") {
             item {
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                    Text("Impor Kelas Excel", color = Ink, fontWeight = FontWeight.ExtraBold,
+                        fontSize = 17.sp)
+                    Text("Tambahkan banyak kelas sekaligus. Pastikan jurusannya dibuat lebih dulu.",
+                        color = Subtle, fontSize = 12.sp)
+                    OutlinedButton(
+                        onClick = { classTemplateLauncher.launch("Template_Kelas_VOKASI.xlsx") },
+                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)
+                    ) { Text("Unduh Template Kelas", color = Navy) }
+                    VokasiButton(
+                        text = if (importBusy) "Memproses..." else "Impor Kelas dari Excel",
+                        enabled = !importBusy,
+                        onClick = { classImportLauncher.launch(
+                            arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                        ) }, modifier = Modifier.fillMaxWidth()
+                    )
+                    Text("Kolom: Jurusan • Tingkat (X/XI/XII) • Kelas. Duplikat dan data salah ditolak.",
+                        color = Subtle, fontSize = 11.sp)
+                    if (importNotice.isNotBlank()) Text(importNotice, color = Navy,
+                        fontSize = 12.sp)
+                }
+            }
+            item {
+                WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                     Text("Tambah kelas", color = Ink, fontWeight = FontWeight.Bold)
                     AdminSelect("Jurusan", major, directory.majors.sorted(), { major = it },
                         Modifier.fillMaxWidth())
@@ -198,7 +269,20 @@ internal fun AdminSchoolScreen(
                         }, modifier = Modifier.fillMaxWidth())
                 }
             }
-            items(directory.classes.sortedWith(compareBy<Classroom> { it.major }.thenBy { it.label })) { c ->
+            item {
+                WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                    Text("Daftar Kelas", color = Ink, fontSize = 17.sp,
+                        fontWeight = FontWeight.ExtraBold)
+                    AdminSelect("Filter jurusan", classFilter,
+                        listOf("") + directory.majors.sorted(),
+                        { classFilter = it; classPage = 0 }, Modifier.fillMaxWidth())
+                }
+            }
+            val classResults = directory.classes.filter {
+                classFilter.isBlank() || it.major == classFilter
+            }.sortedWith(compareBy<Classroom> { it.major }.thenBy { it.label })
+            val currentClassPage = AdminPagination.active(classPage, classResults.size, AdminPagination.PAGE_SIZE)
+            items(AdminPagination.slice(classResults, currentClassPage, AdminPagination.PAGE_SIZE)) { c ->
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                     Text(c.label, color = Ink, fontWeight = FontWeight.Bold)
                     Text(c.major, color = Subtle, fontSize = 12.sp)
@@ -209,6 +293,12 @@ internal fun AdminSchoolScreen(
                         }) { Text("Hapus kelas kosong", color = Bad) }
                     }
                 }
+            }
+            item {
+                AdminPaginationFooter("Kelas", classResults.size, currentClassPage,
+                    onPrevious = { classPage = currentClassPage - 1 },
+                    onNext = { classPage = currentClassPage + 1 },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp))
             }
         } else {
             item {
@@ -282,10 +372,15 @@ internal fun AdminSchoolScreen(
                             color = if (e.registered) Good else Bad, fontSize = 12.sp)
                         if (e.registered) {
                             Text("Username: " + e.username, color = Navy, fontSize = 11.sp)
-                            Text("Password sudah dibuat (disimpan sebagai hash, tidak ditampilkan).",
+                            Text("Password tidak dapat dilihat admin.",
                                 color = Subtle, fontSize = 10.sp)
                         }
-                        else TextButton(onClick = {
+                        OutlinedButton(
+                            onClick = { promotion = e; promotionTarget = "" },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Pindah / Naik Kelas", color = Navy, fontSize = 12.sp) }
+                        if (!e.registered) TextButton(onClick = {
                             commit(directory.copy(roster = directory.roster - e),
                                 "Data siswa belum terdaftar dihapus.")
                         }) { Text("Hapus data belum terdaftar", color = Bad, fontSize = 11.sp) }
@@ -306,5 +401,40 @@ internal fun AdminSchoolScreen(
                     fontSize = 12.sp)
             }
         }
+    }
+    promotion?.let { entry ->
+        val validTargets = directory.classes.filter {
+            it.major == entry.major && it.label != entry.classLabel
+        }.sortedBy { it.label }
+        AlertDialog(
+            onDismissRequest = { promotion = null },
+            title = { Text("Pindah / Naik Kelas", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text(entry.fullName + " • " + entry.classLabel, color = Ink, fontSize = 13.sp)
+                    Text("Admin memilih kelas tujuan. Tahun angkatan dan akun siswa tetap.",
+                        color = Subtle, fontSize = 12.sp)
+                    AdminSelect("Kelas tujuan", promotionTarget,
+                        validTargets.map { it.label },
+                        { promotionTarget = it }, Modifier.fillMaxWidth())
+                    if (validTargets.isEmpty()) Text("Buat kelas tujuan terlebih dahulu.",
+                        color = Bad, fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val next = directory.copy(roster = directory.roster.map {
+                        if (it.id == entry.id) it.copy(classLabel = promotionTarget) else it
+                    })
+                    commit(next, "Kelas siswa berhasil diperbarui.")
+                    promotion = null
+                }, enabled = validTargets.any { it.label == promotionTarget }) {
+                    Text("Simpan perpindahan", color = Navy)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { promotion = null }) { Text("Batal", color = Subtle) }
+            }
+        )
     }
 }

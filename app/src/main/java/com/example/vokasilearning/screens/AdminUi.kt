@@ -47,7 +47,7 @@ internal data class AdminHeaderActions(
 internal val LocalAdminHeaderActions = staticCompositionLocalOf<AdminHeaderActions?> { null }
 
 @Composable
-private fun AdminTopIcon(kind: Int, description: String, onClick: () -> Unit) {
+internal fun AdminTopIcon(kind: Int, description: String, onClick: () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.size(39.dp).semantics { contentDescription = description }) {
         Canvas(Modifier.size(21.dp)) {
             val unit = size.minDimension / 24f
