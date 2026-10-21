@@ -10,7 +10,6 @@ import java.io.OutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
-import javax.xml.XMLConstants
 import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
 
@@ -240,16 +239,27 @@ internal object QuestionExcelFile {
     }
 
     private fun xml(bytes: ByteArray): org.w3c.dom.Document {
+        // Android's DocumentBuilderFactory does not support FEATURE_SECURE_PROCESSING.
+        // Reject DTD/entity declarations before parsing, and forbid external resolution.
+        require(!(bytes.size >= 2 &&
+            ((bytes[0] == 0xFF.toByte() && bytes[1] == 0xFE.toByte()) ||
+                (bytes[0] == 0xFE.toByte() && bytes[1] == 0xFF.toByte())))) {
+            "XML UTF-16 tidak didukung. Simpan kembali sebagai Excel .xlsx."
+        }
+        val source = bytes.toString(Charsets.UTF_8)
+        require(!source.contains("<!DOCTYPE", ignoreCase = true) &&
+            !source.contains("<!ENTITY", ignoreCase = true)) {
+            "File Excel mengandung deklarasi XML yang tidak aman."
+        }
         try {
             val factory = DocumentBuilderFactory.newInstance()
             factory.isNamespaceAware = true
-            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-            factory.setFeature("http://xml.org/sax/features/external-general-entities", false)
-            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
             factory.isExpandEntityReferences = false
-            return factory.newDocumentBuilder().parse(ByteArrayInputStream(bytes))
+            val builder = factory.newDocumentBuilder()
+            builder.setEntityResolver { _, _ ->
+                throw org.xml.sax.SAXException("External XML entities are not allowed")
+            }
+            return builder.parse(ByteArrayInputStream(bytes))
         } catch (_: Exception) {
             throw IllegalArgumentException("Format XML Excel tidak didukung atau tidak aman.")
         }
