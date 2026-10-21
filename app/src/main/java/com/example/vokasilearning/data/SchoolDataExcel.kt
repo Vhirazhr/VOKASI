@@ -222,8 +222,8 @@ internal object SchoolDataExcel {
                     "Baris " + number + ": angkatan harus tahun masuk, contoh 2026."
                 }
                 val name = values[4].replace(Regex("\\s+"), " ")
-                require(name.length in 5..120 && name.contains(' ')) {
-                    "Baris " + number + ": nama siswa harus nama lengkap minimal dua kata."
+                require(name.length in 3..120) {
+                    "Baris " + number + ": nama siswa tidak valid."
                 }
                 val studentKey = identity(name, major, year)
                 val requestedClass = normalized(classroom.label)
