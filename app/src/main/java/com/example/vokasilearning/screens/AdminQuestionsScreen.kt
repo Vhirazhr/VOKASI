@@ -40,6 +40,8 @@ internal fun AdminQuestionsScreen(
     onDismissNotice: () -> Unit
 ) {
     var selectedCategories by remember { mutableStateOf(emptySet<String>()) }
+    var showExportDialog by remember { mutableStateOf(false) }
+    var exportCategories by remember { mutableStateOf(emptySet<String>()) }
     var search by remember { mutableStateOf("") }
     var page by remember { mutableIntStateOf(0) }
     var pagingActivated by remember { mutableStateOf(false) }
@@ -178,6 +180,16 @@ internal fun AdminQuestionsScreen(
                                 modifier = Modifier.weight(1f)
                             ) { Text("Template Excel", fontSize = 12.sp, color = Navy) }
                         }
+                        OutlinedButton(
+                            onClick = {
+                                exportCategories = if (selectedCategories.isEmpty())
+                                    categories.drop(1).toSet() else selectedCategories.toSet()
+                                showExportDialog = true
+                            },
+                            enabled = !excelBusy && questions.isNotEmpty(),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Ekspor Soal Excel", color = Navy, fontSize = 12.sp) }
                         Text("Format .xlsx • Kolom A–I • Semua baris diperiksa sebelum disimpan",
                             color = Subtle, fontSize = 11.sp)
                         OutlinedTextField(
@@ -219,20 +231,6 @@ internal fun AdminQuestionsScreen(
                     color = Subtle, fontSize = 11.sp)
                 Text(found.size.toString() + " soal ditemukan • Maksimal " + pageSize + " per halaman",
                     color = Subtle, fontSize = 11.sp)
-                OutlinedButton(
-                    onClick = {
-                        pendingExport = found.toList()
-                        val suffix = if (selectedCategories.isEmpty()) "Semua" else
-                            categories.filter { it in selectedCategories }
-                                .joinToString("_") { it.replace(" ", "_") }
-                        exportLauncher.launch("VOKASI_Soal_" + suffix + ".xlsx")
-                    },
-                    enabled = !excelBusy && found.isNotEmpty(),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Ekspor Excel (" + found.size + " soal)", color = Navy, fontSize = 12.sp)
-                }
             }
         }
         if (found.isEmpty()) {
@@ -302,6 +300,60 @@ internal fun AdminQuestionsScreen(
                 )
             }
         }
+    }
+    if (showExportDialog) {
+        val options = categories.drop(1)
+        val selected = questions.filter { it.category in exportCategories }.sortedBy { it.id }
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = { Text("Ekspor Soal Excel", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("Pilih materi yang akan dimasukkan ke satu file Excel.",
+                        color = Subtle, fontSize = 12.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = exportCategories.size == options.size,
+                            onCheckedChange = { all ->
+                                exportCategories = if (all) options.toSet() else emptySet()
+                            }
+                        )
+                        Text("Semua materi", color = Ink, fontWeight = FontWeight.SemiBold)
+                    }
+                    HorizontalDivider(color = Border)
+                    options.forEach { subject ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = subject in exportCategories,
+                                onCheckedChange = { checked ->
+                                    exportCategories = if (checked) exportCategories + subject
+                                        else exportCategories - subject
+                                }
+                            )
+                            Text(subject, color = Ink, fontSize = 13.sp)
+                        }
+                    }
+                    Text(selected.size.toString() + " soal akan diekspor.",
+                        fontWeight = FontWeight.Bold, color = Navy, fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingExport = selected
+                    showExportDialog = false
+                    val suffix = if (exportCategories.size == options.size) "Semua"
+                        else options.filter { it in exportCategories }.joinToString("_") {
+                            it.replace(" ", "_")
+                        }
+                    exportLauncher.launch("VOKASI_Soal_" + suffix + ".xlsx")
+                }, enabled = selected.isNotEmpty()) { Text("Simpan Excel", color = Navy) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExportDialog = false }) {
+                    Text("Batal", color = Subtle)
+                }
+            }
+        )
     }
     deleteId?.let { id ->
         AlertDialog(
