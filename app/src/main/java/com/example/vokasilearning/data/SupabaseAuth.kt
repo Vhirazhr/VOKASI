@@ -5,8 +5,7 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.Postgrest
-import io.github.jan.supabase.postgrest.rpc
-import io.github.jan.supabase.postgrest.result.decodeAs
+import io.github.jan.supabase.postgrest.postgrest
 
 /**
  * Public client for Android only. The publishable key is intended for client use;
