@@ -17,24 +17,28 @@ import androidx.compose.ui.unit.sp
 import java.util.Calendar
 import java.util.Locale
 import com.example.vokasilearning.logic.*
+import com.example.vokasilearning.data.SchoolRosterEntry
 import com.example.vokasilearning.model.*
 import com.example.vokasilearning.ui.*
 
-/** Grade-first home: exactly one selected major/class/date at a time. */
+/** School-wide admin overview; grade export defaults to all majors/classes. */
 @Composable
 internal fun AdminHome(
     students: List<Student>, questions: List<Question>, attempts: List<Attempt>,
+    roster: List<SchoolRosterEntry>,
     onStudents: (String) -> Unit,
     onMonitoring: (String, String, String) -> Unit,
     onExcelExport: (String, String, String) -> Unit,
     adminName: String,
     schoolName: String
 ) {
-    val majors = students.map { it.classroom.major }.distinct().sorted()
-    var major by remember { mutableStateOf(majors.firstOrNull().orEmpty()) }
-    val classOptions = students.filter { it.classroom.major == major }
-        .map { it.classroom.label }.distinct().sorted()
-    var classroom by remember(major) { mutableStateOf(classOptions.firstOrNull().orEmpty()) }
+    val majors = (students.map { it.classroom.major } + roster.map { it.major })
+        .distinct().sorted()
+    var major by remember { mutableStateOf("") }
+    val classOptions = (students.filter { major.isBlank() || it.classroom.major == major }
+        .map { it.classroom.label } + roster.filter { major.isBlank() || it.major == major }
+        .map { it.classLabel }).distinct().sorted()
+    var classroom by remember(major) { mutableStateOf("") }
     var date by remember { mutableStateOf(dayKey(System.currentTimeMillis())) }
     var statsMajor by remember { mutableStateOf("") }
     var statsGrade by remember { mutableStateOf("") }
@@ -89,29 +93,30 @@ internal fun AdminHome(
                                 fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
                             Pill("Data lokal", PaleGold, Warning)
                         }
-                        Text("Cek nilai siswa", color = Ink, fontSize = 25.sp,
+                        Text("Unduh Hasil Siswa", color = Ink, fontSize = 25.sp,
                             fontWeight = FontWeight.ExtraBold)
-                        Text("Pilih jurusan, kelas, dan tanggal.",
+                        Text("Semua jurusan dan kelas aktif secara default. Pilih tanggal laporan.",
                             color = Subtle, fontSize = 12.sp)
-                        AdminSelect("Jurusan", major, majors, { major = it },
+                        AdminSelect("Jurusan", major, listOf("") + majors, { major = it },
                             Modifier.fillMaxWidth())
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AdminSelect("Kelas", classroom, classOptions, { classroom = it },
+                            AdminSelect("Kelas", classroom, listOf("") + classOptions, { classroom = it },
                                 Modifier.weight(1f))
                             AdminDateSelect(date, { date = it }, Modifier.weight(1f))
                         }
                         VokasiButton(
                             text = "Lihat Hasil Siswa",
                             onClick = { onMonitoring(major, classroom, date) },
-                            enabled = classroom.isNotBlank(),
+                            enabled = students.isNotEmpty(),
                             modifier = Modifier.fillMaxWidth()
                         )
-                        AdminExcelAction(
-                            students, attempts, major, classroom, date,
-                            modifier = Modifier.fillMaxWidth(),
-                            text = "Unduh Excel Kelas",
-                            onExport = onExcelExport
+                        AdminBulkExcelAction(
+                            roster = roster, students = students, attempts = attempts,
+                            major = major, classroom = classroom, date = date,
+                            modifier = Modifier.fillMaxWidth(), onExport = onExcelExport
                         )
+                        Text("Satu file Excel berisi seluruh siswa sesuai filter, termasuk yang belum mendaftar atau belum mengerjakan.",
+                            color = Subtle, fontSize = 11.sp)
                     }
                 }
             }

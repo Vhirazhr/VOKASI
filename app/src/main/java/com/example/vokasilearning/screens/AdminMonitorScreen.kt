@@ -30,12 +30,12 @@ internal fun AdminMonitorScreen(
 ) {
     val majors = students.map { it.classroom.major }.distinct().sorted()
     var major by remember(initialMajor) {
-        mutableStateOf(initialMajor.takeIf { it in majors } ?: majors.firstOrNull().orEmpty())
+        mutableStateOf(initialMajor.takeIf { it in majors }.orEmpty())
     }
-    val classes = students.filter { it.classroom.major == major }
+    val classes = students.filter { major.isBlank() || it.classroom.major == major }
         .map { it.classroom.label }.distinct().sorted()
     var classroom by remember(initialMajor, initialClass, major) {
-        mutableStateOf(initialClass.takeIf { it in classes } ?: classes.firstOrNull().orEmpty())
+        mutableStateOf(initialClass.takeIf { it in classes }.orEmpty())
     }
     var date by remember(initialDate) {
         mutableStateOf(initialDate.ifBlank { dayKey(System.currentTimeMillis()) })
@@ -49,12 +49,25 @@ internal fun AdminMonitorScreen(
     val listState = rememberLazyListState()
     var reviewing by remember { mutableStateOf<Attempt?>(null) }
 
-    val summary = AdminAnalytics.classSummary(classroom, students, attempts, date, major)
     val latest = AdminAnalytics.latestCompulsoryByStudent(attempts, date)
-    val members = students.filter {
-        it.classroom.major == major && it.classroom.label == classroom &&
-            (search.isBlank() || it.name.contains(search.trim(), true) ||
-                it.username.contains(search.trim(), true))
+    val scopeMembers = students.filter {
+        (major.isBlank() || it.classroom.major == major) &&
+            (classroom.isBlank() || it.classroom.label == classroom)
+    }
+    val scopeIds = scopeMembers.mapTo(HashSet()) { it.username }
+    val scores = scopeMembers.mapNotNull { latest[it.username]?.score }
+    val summary = ClassDailySummary(
+        classroom = classroom,
+        studentCount = scopeMembers.size,
+        completedCount = scores.size,
+        averageScore = scores.takeIf { it.isNotEmpty() }?.average()?.toInt(),
+        sessions = AdminAnalytics.compulsoryOnDate(attempts, date)
+            .count { it.studentId in scopeIds },
+        major = major
+    )
+    val members = scopeMembers.filter {
+        search.isBlank() || it.name.contains(search.trim(), true) ||
+            it.username.contains(search.trim(), true)
     }.filter { !onlyMissing || latest[it.username] == null }
         .sortedWith(
             compareBy<Student> { if (latest[it.username] == null) 1 else 0 }.thenBy { it.name }
@@ -75,7 +88,7 @@ internal fun AdminMonitorScreen(
     ) {
         item {
             Box(Modifier.fillMaxWidth()) {
-                AdminHero("Nilai Siswa", "Rekap latihan wajib per kelas dan tanggal", compact = true)
+                AdminHero("Nilai Siswa", "Rekap latihan wajib menurut jurusan, kelas, dan tanggal", compact = true)
                 Card(
                     modifier = Modifier.fillMaxWidth()
                         .padding(horizontal = 18.dp)
@@ -89,14 +102,14 @@ internal fun AdminMonitorScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("LAPORAN KELAS", color = NavyLight, fontSize = 11.sp,
+                            Text("HASIL LATIHAN WAJIB", color = NavyLight, fontSize = 11.sp,
                                 fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
                             Pill("Lokal / demo", PaleGold, Warning)
                         }
-                        AdminSelect("Jurusan", major, majors, { major = it },
+                        AdminSelect("Jurusan", major, listOf("") + majors, { major = it },
                             Modifier.fillMaxWidth())
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AdminSelect("Kelas", classroom, classes, { classroom = it },
+                            AdminSelect("Kelas", classroom, listOf("") + classes, { classroom = it },
                                 Modifier.weight(1f))
                             AdminDateSelect(date, { date = it }, Modifier.weight(1f))
                         }
@@ -107,11 +120,16 @@ internal fun AdminMonitorScreen(
                             AdminSummaryMetric("Rata-rata", summary.averageScore?.toString() ?: "—",
                                 Navy, Modifier.weight(1f))
                         }
-                        AdminExcelAction(
-                            students, attempts, major, classroom, date,
-                            modifier = Modifier.fillMaxWidth(), text = "Unduh Excel Kelas",
-                            onExport = onExcelExport
-                        )
+                        if (major.isNotBlank() && classroom.isNotBlank()) {
+                            AdminExcelAction(
+                                students, attempts, major, classroom, date,
+                                modifier = Modifier.fillMaxWidth(), text = "Unduh Excel Kelas",
+                                onExport = onExcelExport
+                            )
+                        } else {
+                            Text("Untuk ekspor gabungan semua jurusan/kelas, gunakan tombol Unduh Hasil Siswa di Ringkasan.",
+                                color = Subtle, fontSize = 11.sp)
+                        }
                         Text("Nilai wajib terakhir pada tanggal terpilih • ${summary.studentCount} siswa",
                             color = Subtle, fontSize = 11.sp)
                     }

@@ -465,6 +465,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     )
                     Page.ADMIN_HOME -> AdminHome(
                         students.toList(), questions.toList(), attempts.toList(),
+                        roster = schoolDirectory.roster,
                         onStudents = { chosenMajor ->
                             adminStudentMajor = chosenMajor
                             page = Page.ADMIN_STUDENTS
