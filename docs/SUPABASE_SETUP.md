@@ -26,12 +26,11 @@ From the VOKASI project root in Android Studio's Terminal, run:
 
 ```bash
 npx supabase login
-npx supabase link --project-ref vztvdpcbtrarrcmpzzqe
-npx supabase secrets set VOKASI_INITIAL_STUDENT_PASSWORD=12345678
-npx supabase functions deploy provision-students
+npx supabase secrets set VOKASI_INITIAL_STUDENT_PASSWORD=12345678 --project-ref vztvdpcbtrarrcmpzzqe
+npx supabase functions deploy provision-students --project-ref vztvdpcbtrarrcmpzzqe
 ```
 
-The CLI may ask you to authenticate in a browser and link the existing project. Do not create a new Supabase project. Supabase supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to the Edge Function runtime. Never put the service-role key in Android or GitHub.
+The CLI opens a browser for authentication. The commands target the existing project directly; do not create a new Supabase project. Supabase supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to the Edge Function runtime. Never put the service-role key in Android or GitHub.
 
 The caller must already be signed in through Supabase Auth and have an active row in `public.school_admins`. The function verifies that role on the server. It can sync the 11 official majors, classes, and student rows; it provisions student Auth accounts in batches of up to 25. Re-importing the same roster is safe and does not reset existing passwords.
 
