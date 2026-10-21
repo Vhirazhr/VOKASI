@@ -31,6 +31,7 @@ import java.util.Calendar
 internal fun AdminSchoolScreen(
     directory: SchoolDirectory,
     onUpdate: (SchoolDirectory) -> Boolean,
+    onImport: suspend (SchoolDirectory) -> String?,
     onBack: () -> Unit,
     onRosterExport: (Int) -> Unit
 ) {
@@ -620,24 +621,47 @@ internal fun AdminSchoolScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    schoolImportNotice = when {
-                        directory != preview.original ->
-                            "Data sekolah berubah saat pratinjau. Buka Excel kembali."
-                        changes == 0 -> "Tidak ada data baru. Semua siswa sudah tercatat."
-                        onUpdate(preview.next) -> {
-                            page = 0
-                            classPage = 0
-                            "Berhasil impor: " + preview.newMajors + " jurusan, " +
-                                preview.newClasses + " kelas, " +
-                                preview.newStudents + " siswa baru, " +
-                                preview.movedStudents + " siswa pindah kelas."
+                TextButton(
+                    onClick = {
+                        when {
+                            directory != preview.original -> {
+                                schoolImportNotice = "Data sekolah berubah saat pratinjau. Buka Excel kembali."
+                                schoolPreview = null
+                            }
+                            changes == 0 -> {
+                                schoolImportNotice = "Tidak ada data baru. Semua siswa sudah tercatat."
+                                schoolPreview = null
+                            }
+                            schoolImportBusy -> Unit
+                            else -> {
+                                schoolImportBusy = true
+                                schoolImportNotice = "Menyinkronkan data sekolah ke server..."
+                                exportScope.launch {
+                                    val error = try {
+                                        onImport(preview.next)
+                                    } catch (e: Exception) {
+                                        e.message ?: "Sinkronisasi data sekolah gagal."
+                                    }
+                                    if (error == null) {
+                                        page = 0
+                                        classPage = 0
+                                        schoolImportNotice = "Berhasil sinkron: " +
+                                            preview.newMajors + " jurusan, " +
+                                            preview.newClasses + " kelas, " +
+                                            preview.newStudents + " siswa baru, " +
+                                            preview.movedStudents + " siswa pindah/naik kelas."
+                                        schoolPreview = null
+                                    } else {
+                                        schoolImportNotice = error
+                                    }
+                                    schoolImportBusy = false
+                                }
+                            }
                         }
-                        else -> "Gagal menyimpan impor data sekolah."
-                    }
-                    schoolPreview = null
-                }, enabled = changes > 0) {
-                    Text("Simpan Data", color = Navy)
+                    },
+                    enabled = changes > 0 && !schoolImportBusy
+                ) {
+                    Text(if (schoolImportBusy) "Menyimpan..." else "Simpan Data", color = Navy)
                 }
             },
             dismissButton = {
