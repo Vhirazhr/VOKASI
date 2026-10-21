@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -110,6 +111,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
     }
 
     val quizSession = rememberQuizSession()
+    val appScope = rememberCoroutineScope()
 
     var currentAttempt by remember { mutableStateOf<Attempt?>(null) }
     var reviewingHistory by remember { mutableStateOf(false) }
@@ -118,8 +120,15 @@ internal fun VokasiApp(activity: ComponentActivity) {
     val me = students.firstOrNull { it.username == currentId }
 
     fun logout() {
-        if (isAdmin) recordAdmin("Masuk", "Admin keluar dari aplikasi")
-        currentId = null; isAdmin = false; page = Page.LOGIN
+        if (isAdmin) {
+            recordAdmin("Masuk", "Admin keluar dari aplikasi")
+            appScope.launch {
+                try { vokasiSupabase.auth.signOut() } catch (_: Exception) { }
+            }
+        }
+        currentId = null
+        isAdmin = false
+        page = Page.LOGIN
     }
     fun saveQuizCheckpoint() {
         val owner = currentId ?: return
@@ -387,17 +396,20 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     )
                     Page.LOGIN -> LoginScreen(
                         onLogin = { u, p ->
-                            val username = u.trim()
-                            // Demo-only role detection. Production authentication must be server-side.
-                            if (username == "admin.demo" && p == "admin123") {
-                                currentId = null
-                                isAdmin = true
-                                page = Page.ADMIN_HOME
-                                recordAdmin("Masuk", "Admin membuka panel VOKASI")
-                                true
+                            val login = u.trim()
+                            if (login.contains("@")) {
+                                // Admin login uses Supabase Auth and a server-side role check.
+                                if (authenticateSchoolAdmin(login, p)) {
+                                    currentId = null
+                                    isAdmin = true
+                                    page = Page.ADMIN_HOME
+                                    recordAdmin("Masuk", "Admin masuk ke panel VOKASI")
+                                    true
+                                } else false
                             } else {
+                                // Student login remains local until student roster sync is connected.
                                 val found = students.firstOrNull {
-                                    it.username.equals(username, true) &&
+                                    it.username.equals(login, true) &&
                                         SchoolCredentials.verify(p, it.password)
                                 }
                                 if (found != null) {

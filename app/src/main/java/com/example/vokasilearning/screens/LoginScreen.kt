@@ -15,16 +15,19 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.ui.*
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun LoginScreen(
-    onLogin: (String, String) -> Boolean,
+    onLogin: suspend (String, String) -> Boolean,
     onRegister: () -> Unit
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
     var visible by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(false) }
+    val loginScope = rememberCoroutineScope()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(Color.White),
@@ -38,11 +41,11 @@ internal fun LoginScreen(
                     .padding(horizontal = 22.dp, vertical = 25.dp),
                 verticalArrangement = Arrangement.spacedBy(13.dp)
             ) {
-                Text("Username", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Ink)
+                Text("Username / Email Admin", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Ink)
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it.trim(); error = false },
-                    placeholder = { Text("Username") },
+                    placeholder = { Text("Username siswa atau email admin") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(13.dp),
@@ -64,12 +67,24 @@ internal fun LoginScreen(
                     shape = RoundedCornerShape(13.dp),
                     colors = authFieldColors()
                 )
-                if (error) Text("Username atau password tidak cocok.", color = Bad, fontSize = 12.sp)
+                if (error) Text("Login gagal. Periksa akun, password, dan koneksi internet.", color = Bad, fontSize = 12.sp)
                 Spacer(Modifier.height(4.dp))
                 VokasiButton(
-                    text = "Masuk",
-                    onClick = { error = !onLogin(username, password) },
-                    enabled = username.isNotBlank() && password.isNotBlank(),
+                    text = if (loading) "Memeriksa..." else "Masuk",
+                    onClick = {
+                        loginScope.launch {
+                            loading = true
+                            error = false
+                            try {
+                                error = !onLogin(username, password)
+                            } catch (_: Exception) {
+                                error = true
+                            } finally {
+                                loading = false
+                            }
+                        }
+                    },
+                    enabled = username.isNotBlank() && password.isNotBlank() && !loading,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Row(
