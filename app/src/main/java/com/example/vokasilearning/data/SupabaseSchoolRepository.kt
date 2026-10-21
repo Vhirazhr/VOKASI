@@ -23,7 +23,6 @@ import java.util.UUID
  */
 internal object SupabaseSchoolRepository {
     private const val DEFAULT_SCHOOL_YEAR = "2026/2027"
-    private const val MAX_BATCH = 25
     private const val STUDENT_LOGIN_DOMAIN = "@students.vokasi.invalid"
 
     private val majorsByCode = linkedMapOf(
