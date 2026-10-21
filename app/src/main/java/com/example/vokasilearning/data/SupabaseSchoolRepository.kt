@@ -215,32 +215,31 @@ internal object SupabaseSchoolRepository {
             }
         }
 
-        val batches = payloadRows.chunked(MAX_BATCH).ifEmpty { listOf(emptyList()) }
-        batches.forEachIndexed { batchIndex, batch ->
-            val response = vokasiSupabase.functions.invoke(
-                function = "provision-students",
-                body = buildJsonObject {
-                    put("students", buildJsonArray { batch.forEach { add(it) } })
-                    if (batchIndex == 0) {
-                        put("majors", buildJsonArray { payloadMajors.forEach { add(it) } })
-                        put("classes", buildJsonArray { payloadClasses.forEach { add(it) } })
-                    }
-                }
-            )
-            val result = JSONObject(response.bodyAsText())
-            val failed = result.optInt("failed", 0)
-            if (failed > 0 || !result.optBoolean("success", false)) {
-                val failures = result.optJSONArray("failures")
-                val first = failures?.optJSONObject(0)
-                val row = first?.optInt("row", -1) ?: -1
-                val reason = first?.optString("error").orEmpty()
-                val prefix = "Batch ${batchIndex + 1}: ${failed} data gagal diproses."
-                throw IllegalStateException(
-                    if (reason.isNotBlank()) "$prefix Baris batch $row: $reason. " +
-                        "Data yang berhasil diproses tetap tersimpan; impor ulang aman dilakukan."
-                    else "$prefix Data yang berhasil diproses tetap tersimpan; impor ulang aman dilakukan."
-                )
+        // Send the whole roster in one authenticated request. The Edge Function
+        // handles account creation concurrently, so admins don't wait for ~100 small requests.
+        val response = vokasiSupabase.functions.invoke(
+            function = "provision-students",
+            body = buildJsonObject {
+                put("students", buildJsonArray { payloadRows.forEach { add(it) } })
+                put("majors", buildJsonArray { payloadMajors.forEach { add(it) } })
+                put("classes", buildJsonArray { payloadClasses.forEach { add(it) } })
             }
+        )
+        val result = JSONObject(response.bodyAsText())
+        val failed = result.optInt("failed", 0)
+        val created = result.optInt("created", 0)
+        val existing = result.optInt("existing", 0)
+        if (failed > 0 || !result.optBoolean("success", false)) {
+            val failures = result.optJSONArray("failures")
+            val first = failures?.optJSONObject(0)
+            val row = first?.optInt("row", -1) ?: -1
+            val reason = first?.optString("error").orEmpty()
+            val summary = "Proses server selesai: $created akun baru, $existing akun sudah ada, $failed gagal."
+            throw IllegalStateException(
+                if (reason.isNotBlank()) "$summary Contoh kendala pada baris $row: $reason. " +
+                    "Data yang sudah tersimpan tidak dihapus; impor ulang aman dilakukan setelah kendala diperbaiki."
+                else "$summary Data yang sudah tersimpan tidak dihapus; periksa riwayat impor di server."
+            )
         }
 
         return loadDirectory()
