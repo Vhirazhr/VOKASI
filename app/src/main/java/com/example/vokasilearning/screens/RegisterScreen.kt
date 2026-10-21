@@ -25,7 +25,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.vokasilearning.data.demoClasses
+import com.example.vokasilearning.data.SchoolRosterEntry
 import com.example.vokasilearning.model.Classroom
 import com.example.vokasilearning.logic.schoolGrade
 import java.util.Calendar
@@ -35,6 +35,7 @@ import com.example.vokasilearning.ui.*
 @Composable
 internal fun RegisterScreen(
     onBack: () -> Unit,
+    availableRoster: List<SchoolRosterEntry>,
     onRegister: (String, String, String, Classroom, Int, ImageBitmap?) -> Boolean
 ) {
     val context = LocalContext.current
@@ -45,19 +46,29 @@ internal fun RegisterScreen(
     val currentYear = remember {
         Calendar.getInstance(TimeZone.getTimeZone("Asia/Jakarta")).get(Calendar.YEAR)
     }
-    var selectedMajor by remember { mutableStateOf(demoClasses.first().major) }
-    var selectedGrade by remember { mutableStateOf(schoolGrade(demoClasses.first().label)) }
+    var selectedMajor by remember { mutableStateOf("") }
+    var selectedGrade by remember { mutableStateOf("X") }
     var admissionYear by remember { mutableIntStateOf(currentYear) }
-    var selectedClass by remember { mutableStateOf(demoClasses.first()) }
+    var selectedClass by remember { mutableStateOf<Classroom?>(null) }
     var majorSearch by remember { mutableStateOf("") }
     var majorMenu by remember { mutableStateOf(false) }
     var classMenu by remember { mutableStateOf(false) }
     var image by remember { mutableStateOf<ImageBitmap?>(null) }
     var duplicate by remember { mutableStateOf(false) }
 
-    val majors = remember { demoClasses.map { it.major }.distinct().sorted() }
-    val availableClasses = demoClasses.filter {
-        it.major == selectedMajor && schoolGrade(it.label) == selectedGrade
+    val pending = availableRoster.filter { !it.registered }
+    val majors = pending.map { it.major }.distinct().sorted()
+    val availableClasses = pending.filter {
+        it.major == selectedMajor && schoolGrade(it.classLabel) == selectedGrade
+    }.map { Classroom(it.classLabel, it.major) }.distinct().sortedBy { it.label }
+    val allowedYears = pending.filter {
+        it.major == selectedMajor && it.classLabel == selectedClass?.label
+    }.map { it.admissionYear }.distinct().sortedDescending()
+    LaunchedEffect(availableClasses) {
+        if (selectedClass !in availableClasses) selectedClass = availableClasses.firstOrNull()
+    }
+    LaunchedEffect(allowedYears) {
+        if (admissionYear !in allowedYears) admissionYear = allowedYears.firstOrNull() ?: currentYear
     }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
@@ -161,9 +172,7 @@ internal fun RegisterScreen(
                             .forEach { major ->
                                 DropdownMenuItem(text = { Text(major) }, onClick = {
                                     selectedMajor = major
-                                    selectedClass = demoClasses.first {
-                                        it.major == major && schoolGrade(it.label) == selectedGrade
-                                    }
+                                    selectedClass = null
                                     majorMenu = false
                                 })
                             }
@@ -175,27 +184,25 @@ internal fun RegisterScreen(
                     options = listOf("X", "XI", "XII"),
                     onChange = { newGrade ->
                         selectedGrade = newGrade
-                        admissionYear = currentYear - listOf("X", "XI", "XII").indexOf(newGrade)
-                        selectedClass = demoClasses.first {
-                            it.major == selectedMajor && schoolGrade(it.label) == newGrade
-                        }
+                        selectedClass = null
                     }
                 )
                 RegistrationSelect(
                     label = "Angkatan (tahun masuk)",
                     value = admissionYear.toString(),
-                    options = (currentYear downTo currentYear - 6).map { it.toString() },
+                    options = allowedYears.map { it.toString() },
                     onChange = { admissionYear = it.toInt() }
                 )
                 Text("Kelas", color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Box(Modifier.fillMaxWidth()) {
                     OutlinedButton(
                         onClick = { classMenu = true },
+                        enabled = availableClasses.isNotEmpty(),
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         shape = RoundedCornerShape(13.dp),
                         contentPadding = PaddingValues(horizontal = 13.dp)
                     ) {
-                        Text(selectedClass.label, modifier = Modifier.weight(1f), color = Ink)
+                        Text(selectedClass?.label ?: "Pilih kelas", modifier = Modifier.weight(1f), color = Ink)
                         Text("⌄", color = Navy)
                     }
                     DropdownMenu(
@@ -210,17 +217,21 @@ internal fun RegisterScreen(
                         }
                     }
                 }
-                if (duplicate) Text("Username sudah digunakan.", color = Bad, fontSize = 12.sp)
+                if (pending.isEmpty()) Text("Belum ada siswa yang didaftarkan oleh admin sekolah di perangkat ini.",
+                    color = Bad, fontSize = 12.sp)
+                if (duplicate) Text("Nama lengkap, kelas, atau angkatan tidak cocok dengan data admin, atau akun sudah terdaftar.",
+                    color = Bad, fontSize = 12.sp)
                 Spacer(Modifier.height(3.dp))
                 VokasiButton(
                     text = "Daftar",
                     onClick = {
                         duplicate = !onRegister(
                             name.trim(), username.trim(), password,
-                            selectedClass, admissionYear, image
+                            selectedClass!!, admissionYear, image
                         )
                     },
-                    enabled = name.isNotBlank() &&
+                    enabled = name.trim().contains(" ") && selectedClass != null &&
+                        admissionYear in allowedYears &&
                         username.matches(Regex("[A-Za-z0-9._]{3,}")) &&
                         password.length >= 6,
                     modifier = Modifier.fillMaxWidth()

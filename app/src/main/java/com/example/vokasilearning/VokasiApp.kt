@@ -64,7 +64,12 @@ import com.example.vokasilearning.ui.*
 
 @Composable
 internal fun VokasiApp(activity: ComponentActivity) {
-    val students = remember { mutableStateListOf<Student>().apply { addAll(initialStudents()) } }
+    var schoolDirectory by remember { mutableStateOf(SchoolDirectoryStore.load(activity)) }
+    val students = remember {
+        mutableStateListOf<Student>().apply {
+            addAll(SchoolDirectoryStore.load(activity).roster.mapNotNull { it.asStudent() })
+        }
+    }
     val bundledQuestions = remember { QuestionBankLoader.load(activity) }
     val bundledIds = remember { bundledQuestions.map { it.id }.toSet() }
     val questions = remember {
@@ -75,7 +80,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
     }
     val attempts = remember { mutableStateListOf<Attempt>().apply { addAll(LocalAttemptStore.load(activity)) } }
 
-    var page by remember { mutableStateOf(Page.LOGIN) }
+    val onboardingPrefs = remember { activity.getSharedPreferences("vokasi_onboarding", android.content.Context.MODE_PRIVATE) }
+    var page by remember { mutableStateOf(
+        if (onboardingPrefs.getBoolean("seen_v1", false)) Page.LOGIN else Page.ONBOARDING
+    ) }
     var currentId by remember { mutableStateOf<String?>(null) }
     var isAdmin by remember { mutableStateOf(false) }
     var adminMajorFilter by remember { mutableStateOf("") }
@@ -172,10 +180,12 @@ internal fun VokasiApp(activity: ComponentActivity) {
     }
 
     BackHandler(enabled = page == Page.QUIZ) { quitDialog = true }
-    BackHandler(enabled = page != Page.LOGIN && page != Page.QUIZ && page != Page.HOME && page != Page.ADMIN_HOME) {
+    BackHandler(enabled = page != Page.ONBOARDING && page != Page.LOGIN &&
+        page != Page.QUIZ && page != Page.HOME && page != Page.ADMIN_HOME) {
         page = when (page) {
             Page.REGISTER -> Page.LOGIN
             Page.ADMIN_ADD -> Page.ADMIN_QUESTIONS
+            Page.ADMIN_LOG, Page.ADMIN_SCHOOL -> Page.ADMIN_PROFILE
             Page.RESULT -> if (reviewingHistory) Page.PROFILE else Page.HOME
             else -> if (isAdmin) Page.ADMIN_HOME else Page.HOME
         }
@@ -194,10 +204,12 @@ internal fun VokasiApp(activity: ComponentActivity) {
         )
     }
 
-    val studentTabs = page == Page.HOME || page == Page.LEADERBOARD || page == Page.PROFILE || page == Page.RESULT
+    val studentTabs = page == Page.HOME || page == Page.LEADERBOARD ||
+        page == Page.PROFILE || page == Page.RESULT || (page == Page.ASSISTANT && !isAdmin)
     val adminTabs = page == Page.ADMIN_HOME || page == Page.ADMIN_STUDENTS ||
         page == Page.ADMIN_QUESTIONS || page == Page.ADMIN_MONITOR ||
-        page == Page.ADMIN_PROFILE || page == Page.ADMIN_LOG
+        page == Page.ADMIN_PROFILE || page == Page.ADMIN_LOG ||
+        page == Page.ADMIN_SCHOOL || (page == Page.ASSISTANT && isAdmin)
 
     AdaptiveAppFrame {
     Scaffold(
@@ -210,7 +222,12 @@ internal fun VokasiApp(activity: ComponentActivity) {
             ) {
                 if (studentTabs) {
                     VokasiBottomNav(
-                        items = listOf(Triple(Page.HOME, "Beranda", "⌂"), Triple(Page.LEADERBOARD, "Peringkat", "🏆"), Triple(Page.PROFILE, "Profil", "◉")),
+                        items = listOf(
+                            Triple(Page.HOME, "Beranda", "⌂"),
+                            Triple(Page.LEADERBOARD, "Peringkat", "🏆"),
+                            Triple(Page.ASSISTANT, "Asisten", "◇"),
+                            Triple(Page.PROFILE, "Profil", "◉")
+                        ),
                         currentPage = when (page) { Page.RESULT -> Page.HOME; else -> page },
                         onNavigate = { page = it }
                     )
@@ -221,9 +238,12 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             Triple(Page.ADMIN_STUDENTS, "Siswa", "◉"),
                             Triple(Page.ADMIN_MONITOR, "Nilai", "◫"),
                             Triple(Page.ADMIN_QUESTIONS, "Soal", "▤"),
-                            Triple(Page.ADMIN_PROFILE, "Pengaturan", "⚙")
+                            Triple(Page.ASSISTANT, "Asisten", "◇")
                         ),
-                        currentPage = if (page == Page.ADMIN_LOG) Page.ADMIN_PROFILE else page,
+                        currentPage = when (page) {
+                            Page.ADMIN_LOG, Page.ADMIN_SCHOOL -> Page.ADMIN_HOME
+                            else -> page
+                        },
                         onNavigate = {
                             if (it == Page.ADMIN_STUDENTS) adminStudentMajor = ""
                             page = it
@@ -244,6 +264,11 @@ internal fun VokasiApp(activity: ComponentActivity) {
                 label = "ScreenTransition"
             ) { targetPage ->
                 when (targetPage) {
+                    Page.ONBOARDING -> VokasiOnboardingScreen(onFinish = {
+                        onboardingPrefs.edit().putBoolean("seen_v1", true).apply()
+                        page = Page.LOGIN
+                    })
+                    Page.ASSISTANT -> VokasiAssistantScreen()
                     Page.LOGIN -> LoginScreen(
                         onLogin = { u, p ->
                             val username = u.trim()
@@ -256,7 +281,8 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                 true
                             } else {
                                 val found = students.firstOrNull {
-                                    it.username.equals(username, true) && it.password == p
+                                    it.username.equals(username, true) &&
+                                        SchoolCredentials.verify(p, it.password)
                                 }
                                 if (found != null) {
                                     currentId = found.username
@@ -270,10 +296,26 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     )
                     Page.REGISTER -> RegisterScreen(
                         onBack = { page = Page.LOGIN },
+                        availableRoster = schoolDirectory.roster,
                         onRegister = { n, u, p, c, admissionYear, ph ->
-                            if (students.any { it.username.equals(u, true) }) false else {
-                                students.add(Student(u, p, n, c, ph, admissionYear = admissionYear))
-                                currentId = u; isAdmin = false; page = Page.HOME; true
+                            if (students.any { it.username.equals(u, true) }) false
+                            else {
+                                try {
+                                    val next = SchoolDirectoryStore.claim(
+                                        schoolDirectory, n, u, p, c, admissionYear
+                                    )
+                                    if (next == null) false else {
+                                        SchoolDirectoryStore.save(activity, next)
+                                        schoolDirectory = next
+                                        val registered = next.roster.first { it.username == u }
+                                        students.add(registered.asStudent()!!.copy(photo = ph))
+                                        currentId = u
+                                        isAdmin = false
+                                        page = Page.HOME
+                                        recordAdmin("Profil", "Pendaftaran akun siswa: " + n)
+                                        true
+                                    }
+                                } catch (_: Exception) { false }
                             }
                         }
                     )
@@ -321,7 +363,8 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             recordAdmin("Laporan", "Ekspor Excel: $major • $classroom • $date")
                         },
                         adminName = adminPrefs.displayName,
-                        schoolName = adminPrefs.school
+                        schoolName = adminPrefs.school,
+                        onSettings = { page = Page.ADMIN_PROFILE }
                     )
                     Page.ADMIN_STUDENTS -> AdminStudentsScreen(
                         students = students.toList(), attempts = attempts.toList(),
@@ -417,6 +460,18 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             }
                         }
                     )
+                    Page.ADMIN_SCHOOL -> AdminSchoolScreen(
+                        directory = schoolDirectory,
+                        onUpdate = { next ->
+                            try {
+                                SchoolDirectoryStore.save(activity, next)
+                                schoolDirectory = next
+                                recordAdmin("Sekolah", "Memperbarui data sekolah")
+                                true
+                            } catch (_: Exception) { false }
+                        },
+                        onBack = { page = Page.ADMIN_PROFILE }
+                    )
                     Page.ADMIN_LOG -> AdminLogScreen(
                         events = adminEvents.toList(),
                         onBack = { page = Page.ADMIN_PROFILE }
@@ -435,6 +490,11 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         },
                         onBack = { page = Page.ADMIN_HOME },
                         onLog = { page = Page.ADMIN_LOG },
+                        onSchool = { page = Page.ADMIN_SCHOOL },
+                        roster = schoolDirectory.roster,
+                        onRosterExport = { count ->
+                            recordAdmin("Laporan", "Ekspor data sekolah: " + count + " siswa")
+                        },
                         onLogout = { logout() }
                     )
                     Page.ADMIN_MONITOR -> AdminMonitorScreen(

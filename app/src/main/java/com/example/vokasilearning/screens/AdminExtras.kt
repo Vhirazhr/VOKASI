@@ -1,12 +1,18 @@
 package com.example.vokasilearning.screens
 
 import androidx.compose.foundation.background
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -19,9 +25,11 @@ import com.example.vokasilearning.ui.*
 @Composable
 internal fun AdminLogScreen(events: List<AdminLogEvent>, onBack: () -> Unit) {
     var type by remember { mutableStateOf("Semua") }
+    var search by remember { mutableStateOf("") }
     var page by remember(type) { mutableIntStateOf(0) }
-    val types = listOf("Semua", "Masuk", "Nilai", "Soal", "Laporan", "Profil")
-    val selected = events.filter { type == "Semua" || it.type == type }
+    val types = listOf("Semua", "Masuk", "Nilai", "Soal", "Laporan", "Profil", "Sekolah")
+    val selected = events.filter { (type == "Semua" || it.type == type) &&
+        (search.isBlank() || it.detail.contains(search.trim(), ignoreCase = true)) }
         .sortedByDescending { it.timestamp }
     val pageSize = AdminPagination.PAGE_SIZE
     val pages = AdminPagination.count(selected.size, pageSize)
@@ -55,8 +63,16 @@ internal fun AdminLogScreen(events: List<AdminLogEvent>, onBack: () -> Unit) {
                 Modifier.padding(horizontal = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                AdminSectionTitle("Riwayat", "Aktivitas Admin")
+                AdminSectionTitle("Audit operasional", "Riwayat Aktivitas")
+                OutlinedTextField(
+                    value = search, onValueChange = { search = it; page = 0 },
+                    placeholder = { Text("Cari tindakan admin") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
                 AdminSelect("Jenis aktivitas", type, types, { type = it }, Modifier.fillMaxWidth())
+                Text("10 aktivitas per halaman • Diurutkan dari yang terbaru",
+                    color = Subtle, fontSize = 11.sp)
             }
         }
         if (selected.isEmpty()) {
@@ -68,11 +84,19 @@ internal fun AdminLogScreen(events: List<AdminLogEvent>, onBack: () -> Unit) {
         } else {
             items(selected.drop(current * pageSize).take(pageSize), key = { "${it.timestamp}_${it.type}_${it.detail}" }) { event ->
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                    Row {
-                        Text(event.type.uppercase(), color = NavyLight, fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Text("●  " + event.type.uppercase(),
+                            color = when (event.type) {
+                                "Sekolah" -> Good
+                                "Masuk" -> Navy
+                                "Soal" -> NavyLight
+                                else -> Ink
+                            }, fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            modifier = Modifier.weight(1f))
                         Text(LocalAdminLog.date(event.timestamp), color = Subtle, fontSize = 10.sp)
                     }
+                    HorizontalDivider(color = Border)
                     Text(event.detail, color = Ink, fontSize = 13.sp)
                 }
             }
@@ -96,12 +120,34 @@ internal fun AdminProfileScreen(
     onSave: (AdminPreferences) -> Boolean,
     onBack: () -> Unit,
     onLog: () -> Unit,
+    onSchool: () -> Unit,
+    roster: List<SchoolRosterEntry>,
+    onRosterExport: (Int) -> Unit,
     onLogout: () -> Unit
 ) {
     var name by remember(config) { mutableStateOf(config.displayName) }
     var school by remember(config) { mutableStateOf(config.school) }
     var result by remember { mutableStateOf<String?>(null) }
     var confirmLogout by remember { mutableStateOf(false) }
+    var exportNotice by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val excelType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    val rosterExport = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(excelType)
+    ) { uri ->
+        if (uri != null) scope.launch {
+            exportNotice = try {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use {
+                        SchoolRosterExcel.write(it, roster)
+                    } ?: throw IllegalArgumentException("Gagal membuka lokasi.")
+                }
+                onRosterExport(roster.size)
+                "Data sekolah berhasil diekspor."
+            } catch (_: Exception) { "Gagal menyimpan Excel data sekolah." }
+        }
+    }
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
@@ -129,13 +175,28 @@ internal fun AdminProfileScreen(
         }
         item {
             WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                Text("Pengaturan tampilan", color = Ink, fontSize = 17.sp,
+                Text("Administrasi Sekolah", color = Ink, fontSize = 17.sp,
                     fontWeight = FontWeight.ExtraBold)
+                Text("Kelola data resmi dan pantau siswa yang belum mendaftar.",
+                    color = Subtle, fontSize = 12.sp)
+                OutlinedButton(onClick = onSchool,
+                    shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Text("Manajemen Jurusan, Kelas & Siswa", color = Navy, fontSize = 12.sp)
+                }
+                OutlinedButton(onClick = onLog,
+                    shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Text("Riwayat Aktivitas Admin", color = Navy, fontSize = 12.sp)
+                }
                 OutlinedButton(
-                    onClick = onLog,
+                    onClick = { rosterExport.launch("VOKASI_Data_Sekolah.xlsx") },
+                    enabled = roster.isNotEmpty(),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
-                ) { Text("Lihat Log Aktivitas", color = Navy, fontSize = 12.sp) }
+                ) { Text("Unduh Data Sekolah (Excel)", color = Navy, fontSize = 12.sp) }
+                if (exportNotice.isNotBlank()) Text(exportNotice, color = Subtle, fontSize = 11.sp)
+                HorizontalDivider(color = Border)
+                Text("Profil & Tampilan Admin", color = Ink, fontSize = 17.sp,
+                    fontWeight = FontWeight.ExtraBold)
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it; result = null },

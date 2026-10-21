@@ -28,7 +28,8 @@ internal fun AdminHome(
     onMonitoring: (String, String, String) -> Unit,
     onExcelExport: (String, String, String) -> Unit,
     adminName: String,
-    schoolName: String
+    schoolName: String,
+    onSettings: () -> Unit = {}
 ) {
     val majors = students.map { it.classroom.major }.distinct().sorted()
     var major by remember { mutableStateOf(majors.firstOrNull().orEmpty()) }
@@ -71,6 +72,12 @@ internal fun AdminHome(
                     title = "Halo, ${adminName.take(20)}!",
                     subtitle = "Pantau hasil latihan siswa • $schoolName"
                 )
+                IconButton(
+                    onClick = onSettings,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 16.dp, end = 16.dp)
+                ) {
+                    Text("⚙", fontSize = 28.sp, color = Color.White)
+                }
                 Card(
                     modifier = Modifier.fillMaxWidth()
                         .padding(horizontal = 18.dp)
