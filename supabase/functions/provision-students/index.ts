@@ -183,7 +183,7 @@ function validateStudent(raw: StudentInput) {
   const classLabel = gradeMatch ? `${gradeMatch[1].toUpperCase()} ${gradeMatch[2]}`
     : `${romanForGrade(gradeLevel)} ${classLabelRaw}`;
 
-  if (fullName.length < 5 || !fullName.includes(" ")) throw new Error("Nama lengkap harus memuat minimal dua kata.");
+  if (fullName.length < 2 || fullName.length > 120) throw new Error("Nama siswa tidak valid.");
   if (!/^[A-Z0-9]{2,8}$/.test(majorCode)) throw new Error("Kode jurusan tidak valid.");
   if (!majorName || majorName.length > 100) throw new Error("Nama jurusan tidak valid.");
   if (![10, 11, 12].includes(gradeLevel)) throw new Error("Tingkat harus X, XI, atau XII.");
