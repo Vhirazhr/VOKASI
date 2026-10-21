@@ -74,8 +74,8 @@ async function findUsername(
 ) {
   const base = usernameBase(fullName);
   for (let n = 1; n <= 9999; n++) {
-    const suffix = n === 1 ? "" : \`.\${n}\`;
-    const candidate = (base.slice(0, 30 - suffix.length).replace(/\\.+$/g, "") + suffix).slice(0, 30);
+    const suffix = n === 1 ? "" : `.${n}`;
+    const candidate = (base.slice(0, 30 - suffix.length).replace(/\.+$/g, "") + suffix).slice(0, 30);
     const key = candidate.toLowerCase();
     if (reservedUsernames.has(key)) continue;
     reservedUsernames.add(key);
@@ -270,7 +270,7 @@ Deno.serve(async (req) => {
   for (let i = 0; i < students.length; i++) {
     try {
       const parsed = validateStudent(students[i]);
-      const identityKey = \`${parsed.normalizedName}${parsed.majorCode.toLowerCase()}${parsed.admissionYear}\`;
+      const identityKey = `${parsed.normalizedName}|${parsed.majorCode.toLowerCase()}|${parsed.admissionYear}`;
       if (seenIdentityKeys.has(identityKey)) {
         failures.push({ row: i + 1, fullName: parsed.fullName, error: "Identitas siswa ganda dalam file impor." });
         continue;
@@ -320,7 +320,7 @@ Deno.serve(async (req) => {
         } else classRow = data;
       }
 
-      const identityKey = \`${parsed.normalizedName}${parsed.majorCode.toLowerCase()}${parsed.admissionYear}\`;
+      const identityKey = `${parsed.normalizedName}|${parsed.majorCode.toLowerCase()}|${parsed.admissionYear}`;
       const { data: rosterMatches, error: rosterReadError } = await admin.from("student_roster")
         .select("id,full_name,username,auth_user_id,registration_status,data_status,class_id")
         .eq("identity_key", identityKey).limit(2);
@@ -357,7 +357,7 @@ Deno.serve(async (req) => {
       let authUserId = roster.auth_user_id as string | null;
       if (!authUserId) {
         const username = String(roster.username ?? "");
-        const loginEmail = \`${username}@students.vokasi.invalid\`;
+        const loginEmail = `${username}@students.vokasi.invalid`;
         const { data: createdUser, error: createError } = await admin.auth.admin.createUser({
           email: loginEmail,
           password: INITIAL_PASSWORD,
