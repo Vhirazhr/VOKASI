@@ -618,6 +618,14 @@ internal fun AdminSchoolScreen(
                     Text("Akun, username, dan password yang sudah ada tetap aman. " +
                         "Tidak ada data yang berubah sebelum menekan Simpan.",
                         color = Subtle, fontSize = 11.sp)
+                    if (schoolImportNotice.isNotBlank()) {
+                        Text(
+                            schoolImportNotice,
+                            color = if (schoolImportNotice.startsWith("Berhasil")) Good else
+                                if (schoolImportNotice.startsWith("Menyinkronkan")) Navy else Bad,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             },
             confirmButton = {
