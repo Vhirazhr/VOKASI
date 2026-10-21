@@ -12,7 +12,8 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const INITIAL_PASSWORD = Deno.env.get("VOKASI_INITIAL_STUDENT_PASSWORD");
 const DEFAULT_SCHOOL_YEAR = "2026/2027";
-const MAX_BATCH = 25;
+const MAX_BATCH = 2500;
+const STUDENT_CONCURRENCY = 8;
 const MAJOR_NAMES: Record<string, string> = {
   DPIB: "Desain Pemodelan dan Informasi Bangunan",
   GEO: "Teknik Geomatika",
@@ -66,19 +67,29 @@ function usernameBase(fullName: string) {
   return (value || "siswa").slice(0, 26).replace(/\.+$/g, "") || "siswa";
 }
 
-async function findUsername(admin: ReturnType<typeof createClient>, fullName: string) {
+async function findUsername(
+  admin: ReturnType<typeof createClient>,
+  fullName: string,
+  reservedUsernames: Set<string>,
+) {
   const base = usernameBase(fullName);
   for (let n = 1; n <= 9999; n++) {
-    const suffix = n === 1 ? "" : `.${n}`;
-    const candidate = (base.slice(0, 30 - suffix.length).replace(/\.+$/g, "") + suffix).slice(0, 30);
+    const suffix = n === 1 ? "" : \`.\${n}\`;
+    const candidate = (base.slice(0, 30 - suffix.length).replace(/\\.+$/g, "") + suffix).slice(0, 30);
+    const key = candidate.toLowerCase();
+    if (reservedUsernames.has(key)) continue;
+    reservedUsernames.add(key);
     const { data, error } = await admin.from("student_roster")
       .select("id").ilike("username", candidate).limit(1);
-    if (error) throw new Error("Gagal memeriksa ketersediaan username.");
+    if (error) {
+      reservedUsernames.delete(key);
+      throw new Error("Gagal memeriksa ketersediaan username.");
+    }
     if (!data?.length) return candidate;
+    reservedUsernames.delete(key);
   }
   throw new Error("Tidak dapat membuat username unik untuk nama ini.");
 }
-
 async function findAuthUserByEmail(admin: ReturnType<typeof createClient>, email: string): Promise<User | null> {
   for (let page = 1; page <= 20; page++) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
@@ -230,7 +241,7 @@ Deno.serve(async (req) => {
   const majors = Array.isArray(body.majors) ? body.majors : [];
   if (students.length > MAX_BATCH || classes.length > 500 || majors.length > 50 ||
       (students.length === 0 && classes.length === 0 && majors.length === 0)) {
-    return json(400, { error: `Kirim maksimal ${MAX_BATCH} siswa, 500 kelas, dan 50 jurusan per batch.` });
+    return json(400, { error: `Kirim maksimal ${MAX_BATCH} siswa, 500 kelas, dan 50 jurusan per impor.` });
   }
 
   const created: Array<{ fullName: string; username: string; status: string }> = [];
@@ -252,15 +263,32 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Validate rows before concurrent work and reject duplicate identities in the same file.
+  const reservedUsernames = new Set<string>();
+  const studentWork: Array<{ row: number; parsed: ReturnType<typeof validateStudent> }> = [];
+  const seenIdentityKeys = new Set<string>();
   for (let i = 0; i < students.length; i++) {
-    const raw = students[i];
-    let parsed: ReturnType<typeof validateStudent>;
-    try { parsed = validateStudent(raw); }
-    catch (e) {
-      failures.push({ row: i + 1, fullName: String(raw?.fullName ?? ""), error: e instanceof Error ? e.message : "Data tidak valid." });
-      continue;
+    try {
+      const parsed = validateStudent(students[i]);
+      const identityKey = \`${parsed.normalizedName}${parsed.majorCode.toLowerCase()}${parsed.admissionYear}\`;
+      if (seenIdentityKeys.has(identityKey)) {
+        failures.push({ row: i + 1, fullName: parsed.fullName, error: "Identitas siswa ganda dalam file impor." });
+        continue;
+      }
+      seenIdentityKeys.add(identityKey);
+      studentWork.push({ row: i + 1, parsed });
+    } catch (e) {
+      failures.push({
+        row: i + 1,
+        fullName: String(students[i]?.fullName ?? ""),
+        error: e instanceof Error ? e.message : "Data tidak valid.",
+      });
     }
+  }
 
+  let nextWorkIndex = 0;
+  async function processStudent(item: { row: number; parsed: ReturnType<typeof validateStudent> }) {
+    const { row: rowNumber, parsed } = item;
     try {
       const { data: majorRow, error: majorReadError } = await admin.from("majors")
         .select("id,code,name").eq("code", parsed.majorCode).maybeSingle();
@@ -279,10 +307,10 @@ Deno.serve(async (req) => {
         .eq("class_name", parsed.classLabel).eq("school_year", parsed.schoolYear).maybeSingle();
       if (classReadError) throw new Error("Gagal membaca daftar kelas.");
       if (!classRow) {
-        const { data, error } = await admin.from("classes")
-          .insert({ major_id: major.id, grade_level: parsed.gradeLevel, class_name: parsed.classLabel,
-            school_year: parsed.schoolYear, is_active: true })
-          .select("id").single();
+        const { data, error } = await admin.from("classes").insert({
+          major_id: major.id, grade_level: parsed.gradeLevel, class_name: parsed.classLabel,
+          school_year: parsed.schoolYear, is_active: true,
+        }).select("id").single();
         if (error || !data) {
           const retry = await admin.from("classes").select("id")
             .eq("major_id", major.id).eq("grade_level", parsed.gradeLevel)
@@ -292,7 +320,7 @@ Deno.serve(async (req) => {
         } else classRow = data;
       }
 
-      const identityKey = `${parsed.normalizedName}|${parsed.majorCode.toLowerCase()}|${parsed.admissionYear}`;
+      const identityKey = \`${parsed.normalizedName}${parsed.majorCode.toLowerCase()}${parsed.admissionYear}\`;
       const { data: rosterMatches, error: rosterReadError } = await admin.from("student_roster")
         .select("id,full_name,username,auth_user_id,registration_status,data_status,class_id")
         .eq("identity_key", identityKey).limit(2);
@@ -301,7 +329,7 @@ Deno.serve(async (req) => {
       let roster = rosterMatches?.[0] ?? null;
 
       if (!roster) {
-        const username = await findUsername(admin, parsed.fullName);
+        const username = await findUsername(admin, parsed.fullName, reservedUsernames);
         const { data, error } = await admin.from("student_roster").insert({
           full_name: parsed.fullName, normalized_name: parsed.normalizedName, identity_key: identityKey,
           major_id: major.id, class_id: classRow.id, admission_year: parsed.admissionYear,
@@ -315,7 +343,7 @@ Deno.serve(async (req) => {
           class_id: classRow.id, major_id: major.id, current_school_year: parsed.schoolYear,
           full_name: parsed.fullName, normalized_name: parsed.normalizedName,
         };
-        if (!roster.username) changes.username = await findUsername(admin, parsed.fullName);
+        if (!roster.username) changes.username = await findUsername(admin, parsed.fullName, reservedUsernames);
         const { error } = await admin.from("student_roster").update(changes).eq("id", roster.id);
         if (error) throw new Error("Gagal memperbarui data kelas siswa.");
         roster = { ...roster, ...changes };
@@ -323,13 +351,13 @@ Deno.serve(async (req) => {
 
       if (roster.registration_status === "inactive") {
         existing.push({ fullName: roster.full_name, username: roster.username ?? "", status: "inactive" });
-        continue;
+        return;
       }
 
       let authUserId = roster.auth_user_id as string | null;
       if (!authUserId) {
         const username = String(roster.username ?? "");
-        const loginEmail = `${username}@students.vokasi.invalid`;
+        const loginEmail = \`${username}@students.vokasi.invalid\`;
         const { data: createdUser, error: createError } = await admin.auth.admin.createUser({
           email: loginEmail,
           password: INITIAL_PASSWORD,
@@ -343,7 +371,7 @@ Deno.serve(async (req) => {
         const { error: linkError } = await admin.from("student_roster").update({
           auth_user_id: authUserId, registration_status: "registered", registered_at: new Date().toISOString(),
         }).eq("id", roster.id);
-        if (linkError) throw new Error("Akun dibuat tetapi gagal menghubungkannya ke daftar siswa; impor ulang batch yang sama untuk melanjutkan.");
+        if (linkError) throw new Error("Akun dibuat tetapi gagal menghubungkannya ke daftar siswa; impor ulang aman untuk melanjutkan.");
         created.push({ fullName: roster.full_name, username: roster.username, status: "created" });
       } else {
         existing.push({ fullName: roster.full_name, username: roster.username, status: "existing" });
@@ -352,11 +380,24 @@ Deno.serve(async (req) => {
       const { error: profileError } = await admin.from("student_profiles").upsert({
         user_id: authUserId, roster_id: roster.id,
       }, { onConflict: "user_id" });
-      if (profileError) throw new Error("Akun ada tetapi profil belum tersiapkan; impor ulang batch yang sama untuk melanjutkan.");
+      if (profileError) throw new Error("Akun ada tetapi profil belum tersiapkan; impor ulang aman untuk melanjutkan.");
     } catch (e) {
-      failures.push({ row: i + 1, fullName: parsed.fullName, error: e instanceof Error ? e.message : "Gagal memproses siswa." });
+      failures.push({
+        row: rowNumber,
+        fullName: parsed.fullName,
+        error: e instanceof Error ? e.message : "Gagal memproses siswa.",
+      });
     }
   }
+
+  const workers = Array.from({ length: Math.min(STUDENT_CONCURRENCY, studentWork.length) }, async () => {
+    while (true) {
+      const index = nextWorkIndex++;
+      if (index >= studentWork.length) return;
+      await processStudent(studentWork[index]);
+    }
+  });
+  await Promise.all(workers);
 
   const { error: auditError } = await admin.from("school_import_batches").insert({
     created_by: userData.user.id,
