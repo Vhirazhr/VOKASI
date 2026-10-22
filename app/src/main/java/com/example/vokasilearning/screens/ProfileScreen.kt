@@ -117,7 +117,7 @@ internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () ->
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item {
-            StudentScreenHeader("Profil Siswa", "Semua perkembangan belajarmu ada di sini.")
+            StudentScreenHeader("Profil Siswa", "Progres dan riwayat latihan tersimpan di perangkat ini.")
         }
         item {
             WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
