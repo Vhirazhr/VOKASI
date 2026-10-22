@@ -110,7 +110,7 @@ internal fun AdminSchoolScreen(
     val schoolImportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
-        if (uri != null && !schoolImportBusy) exportScope.launch {
+        if (uri != null && !schoolImportBusy && !manualSyncBusy && !importBusy) exportScope.launch {
             schoolImportBusy = true
             schoolImportNotice = ""
             try {
@@ -145,7 +145,7 @@ internal fun AdminSchoolScreen(
     val classImportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
-        if (uri != null && !importBusy) exportScope.launch {
+        if (uri != null && !importBusy && !schoolImportBusy && !manualSyncBusy) exportScope.launch {
             importBusy = true
             importNotice = try {
                 val added = withContext(Dispatchers.IO) {
@@ -187,7 +187,7 @@ internal fun AdminSchoolScreen(
             notice = "Penghapusan tersinkron belum diaktifkan. Tidak ada perubahan yang disimpan."
             return
         }
-        if (manualSyncBusy) return
+        if (manualSyncBusy || schoolImportBusy || importBusy) return
         exportScope.launch {
             manualSyncBusy = true
             notice = "Menyinkronkan perubahan ke server..."
@@ -284,10 +284,6 @@ internal fun AdminSchoolScreen(
                                     if (e.registered) "● Terdaftar" else "● Belum terdaftar",
                                     color = if (e.registered) Good else Bad, fontSize = 12.sp
                                 )
-                                if (e.registered) {
-                                    Text("Username: " + e.username,
-                                        color = Navy, fontSize = 11.sp)
-                                }
                                 Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                                     TextButton(
                                         onClick = { promotion = e; promotionTarget = "" },
@@ -295,18 +291,7 @@ internal fun AdminSchoolScreen(
                                     ) {
                                         Text("Pindah / Naik Kelas", color = Navy, fontSize = 12.sp)
                                     }
-                                    if (!e.registered) {
-                                        TextButton(
-                                            onClick = {
-                                                commit(directory.copy(
-                                                    roster = directory.roster - e
-                                                ), "Data siswa belum terdaftar dihapus.")
-                                            },
-                                            contentPadding = PaddingValues(horizontal = 2.dp)
-                                        ) {
-                                            Text("Hapus", color = Bad, fontSize = 12.sp)
-                                        }
-                                    }
+
                                 }
                             }
                             HorizontalDivider(color = Border)
@@ -365,10 +350,7 @@ internal fun AdminSchoolScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     ) { Text("Unduh Data Siswa (Excel)", color = Navy, fontSize = 12.sp) }
-                    Text("Impor menambah data; pembaruan kelas siswa lama juga dikenali " +
-                        "otomatis saat menggunakan Excel terbaru. Semua perubahan " +
-                        "ditinjau sebelum disimpan.",
-                        color = Subtle, fontSize = 11.sp)
+                    
                     if (schoolImportNotice.isNotBlank()) {
                         Text(schoolImportNotice,
                             color = if (schoolImportNotice.startsWith("Berhasil") ||
@@ -433,12 +415,7 @@ internal fun AdminSchoolScreen(
                     Text(value, color = Ink, fontWeight = FontWeight.Bold)
                     Text(directory.classes.count { it.major == value }.toString() + " kelas",
                         color = Subtle, fontSize = 11.sp)
-                    if (directory.classes.none { it.major == value }) {
-                        TextButton(onClick = {
-                            commit(directory.copy(majors = directory.majors - value),
-                                "Jurusan kosong dihapus.")
-                        }) { Text("Hapus jurusan kosong", color = Bad) }
-                    }
+
                 }
             }
 
@@ -508,12 +485,7 @@ internal fun AdminSchoolScreen(
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                     Text(c.label, color = Ink, fontWeight = FontWeight.Bold)
                     Text(c.major, color = Subtle, fontSize = 12.sp)
-                    if (directory.roster.none { it.classLabel == c.label && it.major == c.major }) {
-                        TextButton(onClick = {
-                            commit(directory.copy(classes = directory.classes - c),
-                                "Kelas kosong dihapus.")
-                        }) { Text("Hapus kelas kosong", color = Bad) }
-                    }
+
                 }
             }
             item {
@@ -562,13 +534,7 @@ internal fun AdminSchoolScreen(
                 }
             }
         }
-        if (notice.isNotBlank()) {
-            item {
-                Text(notice, Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                    color = if (notice.contains("ditambahkan") || notice.contains("dihapus")) Good else Bad,
-                    fontSize = 12.sp)
-            }
-        }
+
     }
     if (showFilterDialog) {
         val dialogClasses = directory.classes
@@ -630,7 +596,7 @@ internal fun AdminSchoolScreen(
                     Text("Ringkasan perubahan pada data sekolah:", color = Ink, fontSize = 13.sp)
                     Text(preview.newMajors.toString() + " jurusan", color = Navy)
                     Text(preview.newClasses.toString() + " kelas", color = Navy)
-                    Text(preview.newStudents.toString() + " siswa baru (Belum Terdaftar)", color = Navy)
+                    Text(preview.newStudents.toString() + " siswa baru (akun otomatis)", color = Navy)
                     Text(preview.movedStudents.toString() +
                         " siswa lama pindah/naik kelas (akun tetap)", color = Navy)
                     Text(preview.skipped.toString() + " data siswa duplikat dilewati",
