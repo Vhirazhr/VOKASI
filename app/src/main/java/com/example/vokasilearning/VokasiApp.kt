@@ -90,6 +90,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
     var schoolScoresReady by remember { mutableStateOf(false) }
     var schoolScoresError by remember { mutableStateOf("") }
     var schoolResultsCursor by remember { mutableStateOf<String?>(null) }
+    val schoolLeaders = remember { mutableStateListOf<SchoolLeaderboardEntry>() }
+    var schoolRankReady by remember { mutableStateOf(false) }
+    var schoolRankError by remember { mutableStateOf("") }
+    var schoolRankReload by remember { mutableIntStateOf(0) }
     var adminMajorFilter by remember { mutableStateOf("") }
     var adminStudentMajor by remember { mutableStateOf("") }
     var adminClassFilter by remember { mutableStateOf("") }
@@ -140,6 +144,9 @@ internal fun VokasiApp(activity: ComponentActivity) {
             schoolScoresReady = false
             schoolScoresError = ""
             schoolResultsCursor = null
+            schoolLeaders.clear()
+            schoolRankReady = false
+            schoolRankError = ""
             attempts.clear()
             students.clear()
             // Clear legacy local directory files that could expose an admin's
@@ -203,6 +210,30 @@ internal fun VokasiApp(activity: ComponentActivity) {
     }
 
     QuizScreenProtection(activity = activity, enabled = page == Page.QUIZ)
+
+    // A school's ranking is fetched through a read-only, privacy-minimal RPC.
+    // Never synthesize school positions from the logged-in pupil's own history.
+    LaunchedEffect(page, isRemoteStudent, currentId, schoolRankReload) {
+        if (isRemoteStudent && currentId != null &&
+            (page == Page.HOME || page == Page.LEADERBOARD)) {
+            while (isRemoteStudent && (page == Page.HOME || page == Page.LEADERBOARD)) {
+                try {
+                    val rows = SchoolLeaderboardRepository.fetch()
+                    schoolLeaders.clear()
+                    schoolLeaders.addAll(rows)
+                    schoolRankReady = true
+                    schoolRankError = ""
+                } catch (_: Exception) {
+                    if (!schoolRankReady) {
+                        schoolLeaders.clear()
+                        schoolRankError = "Peringkat sekolah belum bisa dimuat. " +
+                            "Pastikan fungsi ranking di Supabase sudah diaktifkan."
+                    }
+                }
+                delay(60_000L)
+            }
+        }
+    }
 
     // 20-second incremental refresh, only within a school-admin session.
     LaunchedEffect(isAdmin) {
@@ -540,6 +571,9 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                     currentId = remoteStudent.username
                                     isAdmin = false
                                     isRemoteStudent = true
+                                    schoolLeaders.clear()
+                                    schoolRankReady = false
+                                    schoolRankError = ""
                                     schoolScoresReady = false
                                     schoolResultsCursor = null
                                     appScope.launch {
@@ -604,6 +638,8 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     )
                     Page.HOME -> if (me != null) StudentHome(
                         me, students.toList(), attempts.toList(), questions.size,
+                        schoolLeaders = schoolLeaders.toList(),
+                        schoolRankReady = schoolRankReady,
                         onStart = { startQuiz() }, onRanking = { page = Page.LEADERBOARD },
                         onPractice = { category -> startQuiz(category) }
                     )
@@ -625,7 +661,13 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         onPractice = { category -> reviewingHistory = false; startQuiz(category) },
                         openReviewOnEntry = reviewingHistory
                     )
-                    Page.LEADERBOARD -> if (me != null) LeaderboardScreen(me, students.toList(), attempts.toList())
+                    Page.LEADERBOARD -> if (me != null) LeaderboardScreen(
+                        me = me,
+                        leaderboard = schoolLeaders.toList(),
+                        dataReady = schoolRankReady,
+                        dataError = schoolRankError,
+                        onRetry = { schoolRankReload++ }
+                    )
                     Page.PROFILE -> if (me != null) ProfileScreen(
                         me, attempts.toList(), onLogout = { logout() },
                         onReview = { attempt -> currentAttempt = attempt; reviewingHistory = true; page = Page.RESULT }
