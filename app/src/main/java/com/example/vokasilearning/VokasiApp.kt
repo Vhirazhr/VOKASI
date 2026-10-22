@@ -118,7 +118,11 @@ internal fun VokasiApp(activity: ComponentActivity) {
 
     fun logout() {
         if (isAdmin) recordAdmin("Masuk", "Admin keluar dari aplikasi")
+        val departingStudent = if (isRemoteStudent) currentId else null
         appScope.launch {
+            departingStudent?.let { username ->
+                try { StreakReminderScheduler.cancel(activity, username) } catch (_: Exception) { }
+            }
             // Complete sign-out before presenting another login, so a pending
             // sign-out cannot accidentally invalidate the next person's session.
             if (isAdmin || isRemoteStudent) {
@@ -467,6 +471,12 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                     currentId = remoteStudent.username
                                     isAdmin = false
                                     isRemoteStudent = true
+                                    // Restore only explicitly enabled OS reminders for this account.
+                                    try {
+                                        if (StudentNoticeStore.pushReminder(activity, remoteStudent.username)) {
+                                            StreakReminderScheduler.schedule(activity, remoteStudent.username)
+                                        }
+                                    } catch (_: Exception) { }
                                     page = if (restoreQuiz(remoteStudent.username)) Page.QUIZ else Page.HOME
                                     true
                                 }
