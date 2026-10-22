@@ -38,7 +38,7 @@ class BulkStudentExcelReportTest {
         assertEquals(setOf("Pemesinan","Akuntansi"),records.map { it.major }.toSet())
         assertEquals(86,records.first { it.name == "Andi Pratama" }.score)
         assertEquals("Selesai",records.first { it.name == "Citra Putri" }.status)
-        assertEquals("Belum Mengerjakan",records.first { it.name == "Budi Saputra" }.status)
+        assertEquals("Belum Tercatat",records.first { it.name == "Budi Saputra" }.status)
         assertEquals("Belum Terdaftar",records.first { it.name == "Dina Rahma" }.status)
     }
 
