@@ -330,6 +330,7 @@ internal fun ResultPage(
 internal fun CompletionDialog(
     attempt: Attempt,
     streak: Int,
+    highlightStreak: Boolean = false,
     onViewResults: () -> Unit
 ) {
     val gradeColor = when {
@@ -461,6 +462,14 @@ internal fun CompletionDialog(
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
+                }
+                if (highlightStreak && streak in setOf(3, 7, 14, 30, 60, 100)) {
+                    Text(
+                        "Streak $streak hari! Pertahankan kebiasaan belajarmu.",
+                        color = Good, fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
                 }
                 VokasiButton(
                     text = "Lihat Hasil",
