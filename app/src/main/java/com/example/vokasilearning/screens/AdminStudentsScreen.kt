@@ -45,11 +45,9 @@ internal fun AdminStudentsScreen(
     var pagingActivated by remember { mutableStateOf(false) }
     var reviewing by remember { mutableStateOf<Attempt?>(null) }
     val lazyState = rememberLazyListState()
-    val latestCompulsory = remember(attempts) {
-        attempts.asSequence().filter { it.practiceCategory == null }
-            .groupBy { it.studentId }
-            .mapValues { (_, list) -> list.maxByOrNull { it.timeMillis }!! }
-    }
+    // Grades have not been synced to a central server. Local attempts on this
+    // administrator's phone MUST NOT be treated as individual school results.
+    val latestCompulsory = emptyMap<String, Attempt>()
     val majors = students.groupBy { it.classroom.major }.toSortedMap()
     val classes = students.filter { it.classroom.major == major && (grade == null || schoolGrade(it.classroom.label) == grade) }
         .groupBy { it.classroom.label }.toSortedMap()
@@ -96,10 +94,7 @@ internal fun AdminStudentsScreen(
         if (pagingActivated) lazyState.scrollToItem(2)
     }
 
-    val history = selectedStudent?.let { student ->
-        attempts.filter { it.studentId == student.username && it.practiceCategory == null }
-            .sortedWith(compareByDescending<Attempt> { it.timeMillis }.thenByDescending { it.sessionKey })
-    }.orEmpty()
+    val history = emptyList<Attempt>()
     val listingSize = when {
         selectedStudent != null && query.isBlank() -> history.size
         query.isNotBlank() -> matches.size
@@ -221,7 +216,7 @@ internal fun AdminStudentsScreen(
                             Text(student.name, color = Ink, fontSize = 17.sp,
                                 fontWeight = FontWeight.ExtraBold, maxLines = 2)
                             Text(student.classroom.major, color = Subtle, fontSize = 11.sp)
-                            Text(student.classroom.label + " • @" + student.username,
+                            Text(student.classroom.label,
                                 color = Subtle, fontSize = 11.sp)
                             if (student.admissionYear > 0) {
                                 Text("Angkatan ${student.admissionYear}",
@@ -231,20 +226,20 @@ internal fun AdminStudentsScreen(
                     }
                     val latest = latestCompulsory[student.username]
                     HorizontalDivider(color = Border)
-                    Text("Nilai wajib terakhir", color = Subtle, fontSize = 11.sp)
-                    Text(latest?.let { "${it.score}/100" } ?: "Belum ada hasil",
+                    Text("Status nilai sekolah", color = Subtle, fontSize = 11.sp)
+                    Text(latest?.let { "${it.score}/100" } ?: "Belum tersinkron",
                         color = when {
                             latest == null -> Subtle
                             latest.score < 60 -> Bad
                             else -> Navy
                         }, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("${history.size} sesi wajib tersimpan", color = Subtle, fontSize = 11.sp)
+                    Text("Hasil kuis belum terkirim ke database sekolah.", color = Subtle, fontSize = 11.sp)
                 }
             }
             if (history.isEmpty()) {
                 item {
                     WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                        Text("Belum ada riwayat latihan wajib.", color = Subtle)
+                        Text("Riwayat latihan belum tersinkron.", color = Subtle)
                     }
                 }
             } else {
@@ -387,7 +382,7 @@ private fun AdminDirectoryStudentRow(
                     fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("${student.classroom.major} • ${student.classroom.label}",
                     color = Subtle, fontSize = 10.sp, maxLines = 2)
-                Text(grade?.let { "Nilai wajib: ${it.score}/100" } ?: "Belum ada nilai wajib",
+                Text(grade?.let { "Nilai wajib: ${it.score}/100" } ?: "Nilai belum tersinkron",
                     color = grade?.let { if (it.score < 60) Bad else Navy } ?: Subtle,
                     fontSize = 11.sp)
             }
