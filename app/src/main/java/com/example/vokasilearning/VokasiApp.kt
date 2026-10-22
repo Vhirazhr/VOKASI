@@ -413,35 +413,40 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         onLogin = { u, p ->
                             val login = u.trim()
                             if (login.contains("@")) {
-                                if (authenticateSchoolAdmin(login, p)) {
-                                    // Load shared school data after server-side admin verification.
+                                if (!authenticateSchoolAdmin(login, p)) {
+                                    false
+                                } else {
+                                    // Supabase is the source of truth. A failed directory
+                                    // refresh must never present stale, local-only students
+                                    // as if they were synchronized school records.
                                     try {
                                         val remote = SupabaseSchoolRepository.loadDirectory()
-                                        val merged = SupabaseSchoolRepository.mergeRemoteWithLocal(
-                                            remote, schoolDirectory
-                                        )
-                                        SchoolDirectoryStore.save(activity, merged)
-                                        schoolDirectory = merged
+                                        SchoolDirectoryStore.save(activity, remote)
+                                        schoolDirectory = remote
                                         students.clear()
-                                        students.addAll(merged.roster.mapNotNull { entry ->
+                                        students.addAll(remote.roster.mapNotNull { entry ->
                                             entry.asStudent()?.copy(
                                                 photo = StudentAccountStore.photo(activity, entry.id)
                                             )
                                         })
+                                        currentId = null
+                                        isAdmin = true
+                                        isRemoteStudent = false
+                                        page = Page.ADMIN_HOME
+                                        recordAdmin("Masuk", "Admin masuk ke panel VOKASI")
+                                        true
                                     } catch (_: Exception) {
-                                        // Authentication still succeeds if a temporary data read fails.
+                                        try { vokasiSupabase.auth.signOut() } catch (_: Exception) { }
+                                        false
                                     }
-                                    currentId = null
-                                    isAdmin = true
-                                    isRemoteStudent = false
-                                    page = Page.ADMIN_HOME
-                                    recordAdmin("Masuk", "Admin masuk ke panel VOKASI")
-                                    true
-                                } else false
+                                }
                             } else {
-                                // Prefer the shared Supabase account; fall back only to local prototype accounts.
+                                // Production student accounts are provisioned and verified
+                                // by Supabase. Do not fall back to stale local passwords.
                                 val remoteStudent = SupabaseSchoolRepository.authenticateStudent(login, p)
-                                if (remoteStudent != null) {
+                                if (remoteStudent == null) {
+                                    false
+                                } else {
                                     val existingIndex = students.indexOfFirst {
                                         it.username.equals(remoteStudent.username, true)
                                     }
@@ -452,34 +457,9 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                     isRemoteStudent = true
                                     page = if (restoreQuiz(remoteStudent.username)) Page.QUIZ else Page.HOME
                                     true
-                                } else {
-                                    val loginIdentity = StudentLoginName.parse(login)
-                                    val found = students.firstOrNull { student ->
-                                        loginIdentity != null &&
-                                            loginIdentity.aliases.any {
-                                                it.equals(student.username, true)
-                                            } &&
-                                            (loginIdentity.normalizedFullName == null ||
-                                                StudentLoginName.normalizeFullName(student.name) ==
-                                                    loginIdentity.normalizedFullName) &&
-                                            (loginIdentity.classHint == null ||
-                                                student.classroom.label.trim()
-                                                    .replace(Regex("\\s+"), " ")
-                                                    .uppercase(Locale.ROOT) == loginIdentity.classHint) &&
-                                            student.password.isNotBlank() &&
-                                            SchoolCredentials.verify(p, student.password)
-                                    }
-                                    if (found != null) {
-                                        currentId = found.username
-                                        isAdmin = false
-                                        isRemoteStudent = false
-                                        page = if (restoreQuiz(found.username)) Page.QUIZ else Page.HOME
-                                        true
-                                    } else false
                                 }
                             }
-                        },
-                        onRegister = { page = Page.REGISTER }
+                        }
                     )
                     Page.REGISTER -> RegisterScreen(
                         onBack = { page = Page.LOGIN },
