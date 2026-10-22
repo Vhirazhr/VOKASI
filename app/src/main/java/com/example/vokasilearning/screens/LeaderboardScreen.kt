@@ -18,7 +18,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.vokasilearning.data.demoClasses
 import com.example.vokasilearning.logic.*
 import com.example.vokasilearning.model.*
 import com.example.vokasilearning.ui.*
@@ -32,9 +31,9 @@ internal fun LeaderboardScreen(me: Student, users: List<Student>, attempts: List
     var filterOpen by remember { mutableStateOf(false) }
 
     val groups = if (scope == RankingScope.CLASS) {
-        users.map { it.classroom.label }.plus(demoClasses.map { it.label }).distinct()
+        users.map { it.classroom.label }.distinct()
     } else {
-        users.map { it.classroom.major }.plus(demoClasses.map { it.major }).distinct()
+        users.map { it.classroom.major }.distinct()
     }
     val groupValue = if (scope == RankingScope.CLASS) chosenClass else chosenMajor
     val ordered = rankList(users, attempts, me, scope, metric, chosenMajor, chosenClass)
@@ -48,7 +47,7 @@ internal fun LeaderboardScreen(me: Student, users: List<Student>, attempts: List
         item {
             StudentScreenHeader(
                 title = "Papan Peringkat",
-                subtitle = "Lihat pencapaian terbaik di sekolahmu."
+                subtitle = "Nilai latihan berasal dari perangkat ini; belum tersinkron antarsiswa."
             )
         }
         item {
