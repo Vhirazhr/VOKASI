@@ -160,7 +160,37 @@ internal object SupabaseSchoolRepository {
             "Belum ada data sekolah untuk disinkronkan."
         }
 
-        val payloadMajors = directory.majors.map { name ->
+        // Re-read server data before every change. A school admin editing one
+        // student must not resend all 2,378 already provisioned accounts.
+        val serverDirectory = loadDirectory()
+        val serverById = serverDirectory.roster.mapNotNull { row ->
+            row.remoteId?.let { it to row }
+        }.toMap()
+        val serverByIdentity = serverDirectory.roster.groupBy { identity(it) }
+        val changedEntries = directory.roster.filter { incoming ->
+            val saved = incoming.remoteId?.let { serverById[it] }
+                ?: serverByIdentity[identity(incoming)]?.singleOrNull()
+            saved == null ||
+                normalized(saved.fullName) != normalized(incoming.fullName) ||
+                normalized(saved.classLabel) != normalized(incoming.classLabel) ||
+                resolveMajor(saved.major)?.first != resolveMajor(incoming.major)?.first ||
+                saved.admissionYear != incoming.admissionYear
+        }
+        val serverClassKeys = serverDirectory.classes.map {
+            (resolveMajor(it.major)?.first ?: normalized(it.major)) + "|" + normalized(it.label)
+        }.toSet()
+        val changedClasses = directory.classes.filter {
+            (resolveMajor(it.major)?.first ?: normalized(it.major)) + "|" +
+                normalized(it.label) !in serverClassKeys
+        }
+        val serverMajors = serverDirectory.majors.mapNotNull { resolveMajor(it)?.first }.toSet()
+        val changedMajors = directory.majors.filter { major ->
+            resolveMajor(major)?.first !in serverMajors
+        }
+        if (changedEntries.isEmpty() && changedClasses.isEmpty() &&
+            changedMajors.isEmpty()) return serverDirectory
+
+        val payloadMajors = changedMajors.map { name ->
             val major = resolveMajor(name)
                 ?: throw IllegalArgumentException(
                     "Jurusan ‘$name’ belum dikenali. Gunakan salah satu dari 11 kode jurusan resmi."
@@ -171,7 +201,7 @@ internal object SupabaseSchoolRepository {
             }
         }.distinctBy { it["code"]?.toString() }
 
-        val payloadClasses = directory.classes.map { classroom ->
+        val payloadClasses = changedClasses.map { classroom ->
             val major = resolveMajor(classroom.major)
                 ?: throw IllegalArgumentException(
                     "Jurusan ‘${classroom.major}’ belum dikenali. Gunakan salah satu dari 11 kode jurusan resmi."
@@ -189,7 +219,7 @@ internal object SupabaseSchoolRepository {
             }
         }.distinctBy { "${it["majorCode"]}|${it["classLabel"]}" }
 
-        val payloadRows = directory.roster.map { entry ->
+        val payloadRows = changedEntries.map { entry ->
             val major = resolveMajor(entry.major)
                 ?: throw IllegalArgumentException(
                     "Jurusan ‘${entry.major}’ belum dikenali. Gunakan salah satu dari 11 kode jurusan resmi."
@@ -209,31 +239,40 @@ internal object SupabaseSchoolRepository {
             }
         }
 
-        // Send the whole roster in one authenticated request. The Edge Function
-        // handles account creation concurrently, so admins don't wait for ~100 small requests.
-        val response = vokasiSupabase.functions.invoke(
-            function = "provision-students",
-            body = buildJsonObject {
-                put("students", buildJsonArray { payloadRows.forEach { add(it) } })
-                put("majors", buildJsonArray { payloadMajors.forEach { add(it) } })
-                put("classes", buildJsonArray { payloadClasses.forEach { add(it) } })
-            }
-        )
-        val result = JSONObject(response.bodyAsText())
-        val failed = result.optInt("failed", 0)
-        val created = result.optInt("created", 0)
-        val existing = result.optInt("existing", 0)
-        if (failed > 0 || !result.optBoolean("success", false)) {
-            val failures = result.optJSONArray("failures")
-            val first = failures?.optJSONObject(0)
-            val row = first?.optInt("row", -1) ?: -1
-            val reason = first?.optString("error").orEmpty()
-            val summary = "Proses server selesai: $created akun baru, $existing akun sudah ada, $failed gagal."
-            throw IllegalStateException(
-                if (reason.isNotBlank()) "$summary Contoh kendala pada baris $row: $reason. " +
-                    "Data yang sudah tersimpan tidak dihapus; impor ulang aman dilakukan setelah kendala diperbaiki."
-                else "$summary Data yang sudah tersimpan tidak dihapus; periksa riwayat impor di server."
+        // A single huge Edge Function call may time out. Keep each batch small.
+        // Retry can safely be initiated by the admin because provisioning is
+        // idempotent; the next run skips unchanged rows automatically.
+        val batches = payloadRows.chunked(25).ifEmpty { listOf(emptyList()) }
+        batches.forEachIndexed { batchIndex, batch ->
+            val response = vokasiSupabase.functions.invoke(
+                function = "provision-students",
+                body = buildJsonObject {
+                    put("students", buildJsonArray { batch.forEach { add(it) } })
+                    put("majors", buildJsonArray {
+                        if (batchIndex == 0) payloadMajors.forEach { add(it) }
+                    })
+                    put("classes", buildJsonArray {
+                        if (batchIndex == 0) payloadClasses.forEach { add(it) }
+                    })
+                }
             )
+            val result = JSONObject(response.bodyAsText())
+            val failed = result.optInt("failed", 0)
+            val created = result.optInt("created", 0)
+            val existing = result.optInt("existing", 0)
+            if (failed > 0 || !result.optBoolean("success", false) ||
+                created + existing != batch.size) {
+                val failures = result.optJSONArray("failures")
+                val first = failures?.optJSONObject(0)
+                val row = first?.optInt("row", -1) ?: -1
+                val reason = first?.optString("error").orEmpty()
+                throw IllegalStateException(
+                    "Sinkronisasi batch ${batchIndex + 1}/${batches.size} belum berhasil. " +
+                        "Gagal=$failed, baris=$row. " +
+                        if (reason.isBlank()) "Periksa koneksi lalu ulangi sinkronisasi."
+                        else reason
+                )
+            }
         }
 
         return loadDirectory()
