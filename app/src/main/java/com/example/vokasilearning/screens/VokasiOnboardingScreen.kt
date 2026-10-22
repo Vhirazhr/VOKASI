@@ -52,17 +52,17 @@ private val splashCopy = listOf(
     SplashCopy(
         "BELAJAR LEBIH TERARAH",
         "Latihan singkat,\nprogres yang nyata.",
-        "Bangun kebiasaan belajar lewat soal pilihan otomatis yang sesuai untuk latihan harianmu."
+        "Latih kemampuan lewat soal pilihan ganda."
     ),
     SplashCopy(
         "PANTAU PERKEMBANGAN",
         "Setiap jawaban\nmembawamu maju.",
-        "Lihat nilai, XP, level, dan streak dalam rangkuman progres yang jelas dan mudah dipahami."
+        "Lihat nilai, XP, level, dan streak di HP ini."
     ),
     SplashCopy(
         "TUMBUH BERSAMA",
-        "Berprestasi bersama\nteman sekelas.",
-        "Jaga konsistensi dan temukan posisimu di papan peringkat dalam lingkungan sekolah."
+        "Pantau progresmu\nsetiap hari.",
+        "Ranking saat ini berasal dari riwayat di perangkat, belum lintas HP."
     )
 )
 
