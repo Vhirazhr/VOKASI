@@ -25,7 +25,7 @@ import java.util.Locale
  * All values and corresponding categories remain readable without relying on color alone.
  */
 @Composable
-internal fun SchoolScoreDonut(stats: SchoolStatistics) {
+internal fun SchoolScoreDonut(stats: SchoolStatistics, dataAvailable: Boolean = true) {
     val pieces = listOf(
         Triple("75–100", stats.high, Good),
         Triple("60–74", stats.middle, Warning),
@@ -35,6 +35,10 @@ internal fun SchoolScoreDonut(stats: SchoolStatistics) {
     WhiteCard(Modifier.fillMaxWidth()) {
         Text("Distribusi nilai", color = Ink, fontSize = 16.sp,
             fontWeight = FontWeight.ExtraBold)
+        if (!dataAvailable) {
+            Text("Menunggu hasil latihan tersinkron dari Supabase.",
+                color = Subtle, fontSize = 12.sp)
+        }
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -51,7 +55,7 @@ internal fun SchoolScoreDonut(stats: SchoolStatistics) {
                         useCenter = false, topLeft = origin, size = square,
                         style = Stroke(width = width)
                     )
-                    if (stats.students > 0) {
+                    if (dataAvailable && stats.students > 0) {
                         var angle = -90f
                         pieces.forEach { (_, count, color) ->
                             if (count > 0) {
@@ -67,9 +71,9 @@ internal fun SchoolScoreDonut(stats: SchoolStatistics) {
                     }
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("${stats.participationPercent}%", color = Navy,
+                    Text(if (dataAvailable) "${stats.participationPercent}%" else "—", color = Navy,
                         fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Selesai", color = Subtle, fontSize = 11.sp)
+                    Text(if (dataAvailable) "Selesai" else "Menunggu", color = Subtle, fontSize = 11.sp)
                 }
             }
             Column(
@@ -82,19 +86,21 @@ internal fun SchoolScoreDonut(stats: SchoolStatistics) {
                         Box(Modifier.size(10.dp).clip(CircleShape).background(color))
                         Text(label, color = Subtle, fontSize = 11.sp,
                             modifier = Modifier.weight(1f), maxLines = 1)
-                        Text("$count", color = Ink, fontSize = 12.sp,
+                        Text(if (dataAvailable) "$count" else "—", color = Ink, fontSize = 12.sp,
                             fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
-        Text("Setiap siswa dihitung sekali berdasarkan nilai wajib terakhir pada bulan terpilih.",
+        Text(if (dataAvailable)
+            "Setiap siswa dihitung sekali berdasarkan nilai wajib terakhir pada bulan terpilih."
+            else "Grafik akan terisi setelah data berhasil dimuat.",
             color = Subtle, fontSize = 11.sp)
     }
 }
 
 @Composable
-internal fun SchoolMonthlyTrend(stats: SchoolStatistics) {
+internal fun SchoolMonthlyTrend(stats: SchoolStatistics, dataAvailable: Boolean = true) {
     val monthNames = listOf("Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
         "Jul", "Agu", "Sep", "Okt", "Nov", "Des")
     WhiteCard(Modifier.fillMaxWidth()) {
@@ -102,10 +108,11 @@ internal fun SchoolMonthlyTrend(stats: SchoolStatistics) {
             fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
         Text("6 bulan hingga periode terpilih • Skala nilai 0–100",
             color = Subtle, fontSize = 11.sp)
-        val hasData = stats.trend.any { it.second != null }
+        val hasData = dataAvailable && stats.trend.any { it.second != null }
         if (!hasData) {
             Box(Modifier.fillMaxWidth().height(140.dp), contentAlignment = Alignment.Center) {
-                Text("Belum ada nilai wajib untuk grafik ini.",
+                Text(if (dataAvailable) "Belum ada nilai wajib untuk grafik ini."
+                    else "Menunggu hasil latihan tersinkron.",
                     color = Subtle, fontSize = 12.sp)
             }
         } else {
