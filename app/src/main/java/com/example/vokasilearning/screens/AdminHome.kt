@@ -91,11 +91,11 @@ internal fun AdminHome(
                             Text("HASIL LATIHAN WAJIB",
                                 modifier = Modifier.weight(1f), color = NavyLight,
                                 fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                            Pill("Data lokal", PaleGold, Warning)
+                            Pill("Nilai HP ini", PaleGold, Warning)
                         }
                         Text("Unduh Hasil Siswa", color = Ink, fontSize = 25.sp,
                             fontWeight = FontWeight.ExtraBold)
-                        Text("Semua jurusan dan kelas aktif secara default. Pilih tanggal laporan.",
+                        Text("Pilih tanggal atau filter yang diperlukan.",
                             color = Subtle, fontSize = 12.sp)
                         AdminSelect("Jurusan", major, listOf("") + majors, { major = it },
                             Modifier.fillMaxWidth())
@@ -115,7 +115,7 @@ internal fun AdminHome(
                             major = major, classroom = classroom, date = date,
                             modifier = Modifier.fillMaxWidth(), onExport = onExcelExport
                         )
-                        Text("Satu file Excel berisi seluruh siswa sesuai filter, termasuk yang belum mendaftar atau belum mengerjakan.",
+                        Text("Excel memuat siswa sesuai filter. Nilai hanya dari perangkat ini.",
                             color = Subtle, fontSize = 11.sp)
                     }
                 }
@@ -204,7 +204,7 @@ internal fun AdminHome(
                                 fontWeight = FontWeight.ExtraBold)
                         }
                     }
-                    Text("${stats.majors} jurusan • ${stats.classes} kelas • ${stats.missing} belum mengerjakan",
+                    Text("${stats.majors} jurusan • ${stats.classes} kelas • ${stats.missing} belum tercatat di HP ini",
                         color = Subtle, fontSize = 11.sp)
                 }
 
@@ -214,7 +214,7 @@ internal fun AdminHome(
                 WhiteCard(Modifier.fillMaxWidth()) {
                     Text("Perubahan nilai siswa", color = Ink, fontSize = 16.sp,
                         fontWeight = FontWeight.ExtraBold)
-                    Text("Dibandingkan dengan bulan sebelumnya, untuk siswa yang mengikuti kedua periode.",
+                    Text("Perbandingan bulan ini dan sebelumnya pada HP ini.",
                         color = Subtle, fontSize = 11.sp)
                     Row(
                         Modifier.fillMaxWidth(),
