@@ -31,6 +31,7 @@ internal fun StudentAccountScreen(
     val context = LocalContext.current
     val accountScope = rememberCoroutineScope()
     var passwordBusy by remember { mutableStateOf(false) }
+    var passwordUpdated by remember { mutableStateOf(false) }
     var oldPass by remember { mutableStateOf("") }
     var newPass by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
@@ -128,9 +129,10 @@ internal fun StudentAccountScreen(
                             } catch (_: Exception) {
                                 "Password tidak berhasil diperbarui."
                             }
-                            notice = error ?: "Password berhasil diperbarui."
+                            notice = error.orEmpty()
                             if (error == null) {
                                 oldPass = ""; newPass = ""; confirm = ""
+                                passwordUpdated = true
                             }
                             passwordBusy = false
                         }
@@ -138,9 +140,15 @@ internal fun StudentAccountScreen(
                 )
                 if (notice.isNotBlank()) Text(notice, color = if (notice.contains("berhasil")) Good else Bad,
                     fontSize = 12.sp)
-                Text("Password baru minimal 8 karakter. Password tidak dapat dilihat oleh admin.",
-                    color = Subtle, fontSize = 11.sp)
+
             }
         }
+    }
+    if (passwordUpdated) {
+        ActionFeedbackDialog(
+            title = "Password diperbarui",
+            message = "Password baru sudah aktif. Gunakan saat masuk berikutnya.",
+            onDismiss = { passwordUpdated = false }
+        )
     }
 }
