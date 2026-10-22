@@ -83,13 +83,21 @@ internal object SupabaseSchoolRepository {
         val majorsById = remoteMajors.associateBy { it.id }
         val classesById = remoteClasses.associateBy { it.id }
 
-        // Query roster per major so a school with more than 1,000 students is not
-        // silently truncated by PostgREST's default maximum response size.
+        // PostgREST limits each response to 1,000 rows. Always page the
+        // authoritative Supabase roster so no student disappears when a
+        // major grows beyond the server's row limit.
         val remoteRoster = mutableListOf<RemoteRoster>()
+        val batchSize = 500
         remoteMajors.forEach { major ->
-            remoteRoster += vokasiSupabase.from("student_roster").select {
-                filter { eq("major_id", major.id) }
-            }.decodeList<RemoteRoster>()
+            var from = 0L
+            do {
+                val page = vokasiSupabase.from("student_roster").select {
+                    filter { eq("major_id", major.id) }
+                    range(from, from + batchSize - 1L)
+                }.decodeList<RemoteRoster>()
+                remoteRoster.addAll(page)
+                from += page.size
+            } while (page.size == batchSize)
         }
 
         val classrooms = remoteClasses.mapNotNull { remoteClass ->
@@ -133,27 +141,14 @@ internal object SupabaseSchoolRepository {
     }
 
     /**
-     * Keep local-only rows while remote setup is empty or has not yet received
-     * those rows. Remote entries win for matching school identity.
+     * Supabase is authoritative after a successful server refresh. Returning
+     * locally cached/imported rows here would resurrect deleted students and
+     * cause duplicates in the admin directory.
      */
-    fun mergeRemoteWithLocal(remote: SchoolDirectory, local: SchoolDirectory): SchoolDirectory {
-        val remoteKeys = remote.roster.map { identity(it) }.toSet()
-        val localOnly = local.roster.filter { identity(it) !in remoteKeys }
-        val roster = if (remote.roster.isEmpty()) local.roster
-            else remote.roster + localOnly
-        return SchoolDirectory(
-            majors = (remote.majors + local.majors).distinctBy { normalized(it) },
-            classes = (remote.classes + local.classes).distinctBy {
-                (resolveMajor(it.major)?.second?.let { name -> normalized(name) } ?: normalized(it.major)) +
-                    "|" + normalized(it.label)
-            },
-            roster = roster.sortedWith(
-                compareBy<SchoolRosterEntry> { it.major }
-                    .thenBy { it.classLabel }
-                    .thenBy { it.fullName }
-            )
-        )
-    }
+    fun mergeRemoteWithLocal(
+        remote: SchoolDirectory,
+        @Suppress("UNUSED_PARAMETER") local: SchoolDirectory
+    ): SchoolDirectory = remote
 
     /**
      * Provision every roster row in idempotent batches. The Edge Function owns
