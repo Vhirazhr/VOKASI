@@ -333,10 +333,25 @@ internal fun WhiteCard(modifier: Modifier = Modifier, content: @Composable Colum
 }
 
 @Composable
-internal fun Avatar(student: Student?, size: Dp = 48.dp) {
+internal fun Avatar(
+    student: Student?,
+    size: Dp = 48.dp,
+    syncFromCloud: Boolean = false
+) {
+    var remoteImage by remember(student?.username, syncFromCloud) {
+        mutableStateOf<ImageBitmap?>(null)
+    }
+    LaunchedEffect(student?.username, syncFromCloud) {
+        val username = student?.username
+        if (syncFromCloud && !username.isNullOrBlank()) {
+            remoteImage = com.example.vokasilearning.data.SupabaseAvatarRepository.download(username)
+        }
+    }
+    val visibleImage = student?.photo ?: remoteImage
     val mod = Modifier.size(size).clip(CircleShape).border(2.dp, Color.White, CircleShape)
-    if (student?.photo != null) {
-        Image(student.photo, contentDescription = "Foto profil", modifier = mod, contentScale = ContentScale.Crop)
+    if (visibleImage != null) {
+        Image(visibleImage, contentDescription = "Foto profil", modifier = mod,
+            contentScale = ContentScale.Crop)
     } else {
         Box(mod.background(Brush.linearGradient(listOf(NavyLight, Navy))), contentAlignment = Alignment.Center) {
             Text(student?.name?.split(" ")?.take(2)?.mapNotNull { it.firstOrNull()?.uppercase() }?.joinToString("") ?: "?",
