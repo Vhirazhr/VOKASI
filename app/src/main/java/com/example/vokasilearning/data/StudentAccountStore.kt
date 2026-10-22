@@ -17,6 +17,10 @@ internal object StudentAccountStore {
     private fun photoFile(context: Context, rosterId: Long): File =
         File(context.filesDir, "vokasi_avatar_" + rosterId + ".jpg")
 
+    fun photoJpegBytes(context: Context, rosterId: Long): ByteArray? = try {
+        photoFile(context, rosterId).takeIf { it.isFile }?.readBytes()
+    } catch (_: Exception) { null }
+
     fun photo(context: Context, rosterId: Long): ImageBitmap? = try {
         val f = photoFile(context, rosterId)
         if (!f.exists()) null else BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap()
