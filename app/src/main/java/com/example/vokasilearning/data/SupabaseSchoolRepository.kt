@@ -337,21 +337,33 @@ internal object SupabaseSchoolRepository {
         return null
     }
 
-    /** Verify the current password and change it in Supabase Auth. */
+    /** Reauthenticate the same Supabase user before changing password. */
     suspend fun updateStudentPassword(username: String, currentPassword: String, newPassword: String) {
         require(newPassword.length >= 8) { "Password baru minimal 8 karakter." }
-        val cleanUsername = username.trim()
+        val currentUser = vokasiSupabase.auth.currentUserOrNull()
+            ?: throw IllegalArgumentException("Sesi login berakhir. Masuk kembali.")
+        val loginEmail = username.trim() + STUDENT_LOGIN_DOMAIN
+        require(currentUser.email?.equals(loginEmail, ignoreCase = true) == true) {
+            "Akun aktif tidak sesuai. Masuk kembali."
+        }
         try {
-            vokasiSupabase.auth.signOut()
+            // Do not sign out first: a mistyped old password must not silently
+            // discard the student's current authenticated session.
             vokasiSupabase.auth.signInWith(Email) {
-                email = cleanUsername + STUDENT_LOGIN_DOMAIN
+                email = loginEmail
                 password = currentPassword
+            }
+            val verifiedUser = vokasiSupabase.auth.currentUserOrNull()
+            if (verifiedUser?.id != currentUser.id) {
+                try { vokasiSupabase.auth.signOut() } catch (_: Exception) { }
+                throw IllegalArgumentException("Identitas akun berubah. Masuk kembali.")
             }
             vokasiSupabase.auth.updateUser {
                 password = newPassword
             }
+        } catch (error: IllegalArgumentException) {
+            throw error
         } catch (_: Exception) {
-            try { vokasiSupabase.auth.signOut() } catch (_: Exception) { }
             throw IllegalArgumentException("Password saat ini salah atau koneksi ke server gagal.")
         }
     }
