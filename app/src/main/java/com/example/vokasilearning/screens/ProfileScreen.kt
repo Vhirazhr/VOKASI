@@ -135,7 +135,7 @@ internal fun ProfileScreen(me: Student, attempts: List<Attempt>, onLogout: () ->
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Text("@${me.username}", color = Subtle, fontSize = 12.sp)
+                        Text("Masuk dengan nama lengkap", color = Subtle, fontSize = 12.sp)
                         Text(me.classroom.label, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(me.classroom.major, color = Subtle, fontSize = 11.sp, maxLines = 2)
                     }
