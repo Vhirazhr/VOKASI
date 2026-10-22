@@ -161,7 +161,7 @@ internal fun AdminStudentsScreen(
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Text("${students.size} siswa • ${majors.size} jurusan • Data lokal",
+                        Text("${students.size} siswa • ${majors.size} jurusan • Data Supabase",
                             color = Subtle, fontSize = 11.sp)
                     }
                 }
