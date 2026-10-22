@@ -181,6 +181,7 @@ internal object SupabaseAttemptRepository {
                     filter { gte("created_at", sinceCreatedAt) }
                 }
                 order("created_at", Order.ASCENDING)
+                order("id", Order.ASCENDING)
                 range(offset, offset + PAGE_SIZE - 1)
             }.decodeList<StoredAttempt>()
             rows.addAll(page)
