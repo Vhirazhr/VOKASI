@@ -32,7 +32,8 @@ class AdminUiInteractionTest {
         composeRule.onNodeWithText("Lihat Kelas").performClick()
         composeRule.onNodeWithText("Pilih Kelas").performClick()
         composeRule.onNodeWithText("Detail").performClick()
-        composeRule.onNodeWithText("Nilai wajib terakhir").assertExists()
+        composeRule.onNodeWithText("Status nilai sekolah").assertExists()
+        composeRule.onNodeWithText("Belum tersinkron").assertExists()
         composeRule.onNodeWithText("‹ Kembali").performClick()
         composeRule.onNodeWithText("Pilih Siswa").assertExists()
     }
