@@ -23,6 +23,10 @@ import com.example.vokasilearning.logic.*
 import com.example.vokasilearning.model.*
 import com.example.vokasilearning.ui.*
 
+private fun SchoolLeaderboardEntry.asDisplayStudent(me: Student): Student =
+    if (username.equals(me.username, ignoreCase = true)) me
+    else Student(username, "", displayName, Classroom(classroom, major))
+
 @Composable
 internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardEntry>, dataReady: Boolean, dataError: String, onRetry: () -> Unit) {
     var metric by remember { mutableStateOf(RankingMetric.XP) }
@@ -139,11 +143,12 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
                         }
                         DropdownMenu(
                             expanded = filterOpen,
-                            onDismissRequest = { filterOpen = false }
+                            onDismissRequest = { filterOpen = false },
+                            modifier = Modifier.heightIn(max = 300.dp)
                         ) {
                             groups.forEach { option ->
                                 DropdownMenuItem(
-                                    text = { Text(option) },
+                                    text = { Text(option, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                                     onClick = {
                                         if (scope == RankingScope.CLASS) chosenClass = option
                                         else chosenMajor = option
@@ -269,7 +274,19 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
         } else {
             item {
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                    Text("Belum ada siswa pada kelompok ini.", color = Subtle)
+                    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Text(
+                            when {
+                                !dataReady && dataError.isNotBlank() -> dataError
+                                !dataReady -> "Memuat hasil peringkat dari Supabase..."
+                                else -> "Belum ada peserta dengan hasil tercatat di kategori ini."
+                            },
+                            color = Subtle
+                        )
+                        if (!dataReady && dataError.isNotBlank()) {
+                            TextButton(onClick = onRetry) { Text("Coba lagi", color = Navy) }
+                        }
+                    }
                 }
             }
         }
@@ -278,21 +295,22 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
 
 @Composable
 internal fun PodiumItem(
-    student: Student,
+    entry: SchoolLeaderboardEntry,
+    me: Student,
     rank: Int,
     metric: RankingMetric,
-    attempts: List<Attempt>,
     modifier: Modifier = Modifier
 ) {
+    val student = entry.asDisplayStudent(me)
     val accent = when (rank) {
         1 -> Color(0xFFFFE1A5)
         2 -> Color(0xFFE5EBF2)
         else -> Color(0xFFF6D9C3)
     }
     val label = if (metric == RankingMetric.XP) {
-        "${studentSeasonXp(student, attempts)} XP"
+        "${entry.seasonXp} XP"
     } else {
-        "${calculateStreak(student, attempts)}"
+        "${entry.streak} hari"
     }
     Column(
         modifier.fillMaxWidth()
@@ -306,7 +324,7 @@ internal fun PodiumItem(
         Text("★", color = NavyLight, fontSize = 17.sp)
         Avatar(student, if (rank == 1) 52.dp else 43.dp)
         Text(
-            student.name.substringBefore(' '),
+            entry.displayName,
             color = Ink,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
