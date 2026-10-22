@@ -342,7 +342,6 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     Page.STUDENT_NOTIFICATIONS -> if (me != null) StudentNotificationsScreen(
                         me = me, attempts = attempts.toList(),
                         onOpenPractice = { page = Page.HOME },
-                        onOpenSettings = { page = Page.STUDENT_SETTINGS },
                         onBack = { page = studentHeaderReturn }
                     )
                     Page.STUDENT_SETTINGS -> if (me != null) StudentAccountScreen(
