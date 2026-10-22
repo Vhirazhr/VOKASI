@@ -330,6 +330,7 @@ internal fun ResultPage(
 internal fun CompletionDialog(
     attempt: Attempt,
     streak: Int,
+    syncStatus: String = "",
     highlightStreak: Boolean = false,
     onViewResults: () -> Unit
 ) {
@@ -468,6 +469,14 @@ internal fun CompletionDialog(
                         "Streak $streak hari! Pertahankan kebiasaan belajarmu.",
                         color = Good, fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                if (syncStatus.isNotBlank()) {
+                    Text(
+                        syncStatus,
+                        color = if (syncStatus.startsWith("Tersimpan di Supabase")) Good else Subtle,
+                        fontSize = 11.sp,
                         textAlign = TextAlign.Center
                     )
                 }
