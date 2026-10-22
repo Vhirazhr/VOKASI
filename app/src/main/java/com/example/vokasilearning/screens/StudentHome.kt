@@ -400,7 +400,7 @@ internal fun StudentHome(
                                     Text("${index + 1}", modifier = Modifier.width(17.dp),
                                         color = if (index == 0) Warning else Subtle,
                                         fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
-                                    Avatar(student, 38.dp)
+                                    Avatar(student, 38.dp, syncFromCloud = true)
                                     Column(Modifier.weight(1f)) {
                                         Text(student.name, color = Ink, fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
