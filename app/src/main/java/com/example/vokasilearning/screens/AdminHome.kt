@@ -214,7 +214,7 @@ internal fun AdminHome(
                         }
                     }
                     Text(if (scoresReady)
-                        "${stats.majors} jurusan • ${stats.classes} kelas • ${stats.missing} belum latihan"
+                        "${stats.majors} jurusan • ${stats.classes} kelas • ${stats.missing} belum tercatat di server"
                         else "${stats.majors} jurusan • ${stats.classes} kelas • Status latihan menunggu sinkronisasi",
                         color = Subtle, fontSize = 11.sp)
                 }
