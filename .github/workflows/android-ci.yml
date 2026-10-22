@@ -26,7 +26,7 @@ jobs:
       - name: Unit tests, debug APK, and UI-test APK compilation
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest --no-configuration-cache
+          ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest --no-configuration-cache
       - name: Upload debug APK for Android testing
         uses: actions/upload-artifact@v4
         with:
