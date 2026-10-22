@@ -26,8 +26,8 @@ android {
         applicationId = "com.example.vokasilearning"
         minSdk = 24
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SUPABASE_URL", "\"${supabaseUrl}\"")
@@ -36,9 +36,11 @@ android {
 
     buildTypes {
         release {
+            // Release-only crashes must be investigated on a physical device.
+            // Temporarily turn off R8 optimization so APK uses the same runtime
+            // classes as Debug; keep the signed release build variant.
             optimization {
-                enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
+                enable = false
             }
         }
     }
