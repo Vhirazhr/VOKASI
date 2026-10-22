@@ -127,10 +127,10 @@ internal fun AdminMonitorScreen(
                                 onExport = onExcelExport
                             )
                         } else {
-                            Text("Untuk ekspor gabungan semua jurusan/kelas, gunakan tombol Unduh Hasil Siswa di Ringkasan.",
+                            Text("Ekspor semua kelas tersedia di Ringkasan.",
                                 color = Subtle, fontSize = 11.sp)
                         }
-                        Text("Nilai wajib terakhir pada tanggal terpilih • ${summary.studentCount} siswa",
+                        Text("Nilai yang tercatat di HP ini • ${summary.studentCount} siswa",
                             color = Subtle, fontSize = 11.sp)
                     }
                 }
@@ -157,7 +157,7 @@ internal fun AdminMonitorScreen(
                     FilterChip(
                         selected = onlyMissing,
                         onClick = { onlyMissing = true; pagingActivated = false },
-                        label = { Text("Belum mengerjakan", fontSize = 12.sp) }
+                        label = { Text("Belum tercatat", fontSize = 12.sp) }
                     )
                     Spacer(Modifier.weight(1f))
                     Text("${members.size} siswa", color = Subtle, fontSize = 11.sp)
