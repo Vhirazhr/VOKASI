@@ -76,7 +76,11 @@ internal fun StudentHome(
     val seasonXp = studentSeasonXp(me, attempts)
     val streak = calculateStreak(me, attempts)
     val numberOfQuestions = if (countQuestions >= 500) QUESTIONS_PER_SESSION else 0
-    val topStudents = rankList(students, attempts, me, RankingScope.SCHOOL, RankingMetric.XP).take(3)
+    val scoredUsers = attempts.asSequence().map { it.studentId }.toSet()
+    val topStudents = rankList(
+        students.filter { it.username == me.username || it.username in scoredUsers },
+        attempts, me, RankingScope.SCHOOL, RankingMetric.XP
+    ).take(3)
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
@@ -358,7 +362,7 @@ internal fun StudentHome(
                         Column(Modifier.weight(1f)) {
                             Text("PAPAN PERINGKAT", color = NavyLight,
                                 fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-                            Text("Teratas musim ini", color = Ink,
+                            Text("Peringkat perangkat ini", color = Ink,
                                 fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
                         }
                         TextButton(onClick = onRanking) {
