@@ -17,7 +17,9 @@ internal data class SchoolLeaderboardEntry(
     val classroom: String,
     @SerialName("season_xp") val seasonXp: Long,
     @SerialName("lifetime_xp") val lifetimeXp: Long,
-    val streak: Long
+    val streak: Long,
+    @SerialName("mandatory_average") val mandatoryAverage: Int? = null,
+    @SerialName("mandatory_days") val mandatoryDays: Long = 0
 )
 
 internal object SchoolLeaderboardRepository {
