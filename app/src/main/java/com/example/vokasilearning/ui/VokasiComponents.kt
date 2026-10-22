@@ -248,13 +248,14 @@ internal fun VokasiButton(
             interactionSource = interactionSource,
             modifier = modifier.height(52.dp).scale(scale)
                 .clip(RoundedCornerShape(15.dp))
-                .background(Brush.linearGradient(listOf(Navy, Color(0xFF345F93)))),
+                .background(Brush.linearGradient(if (enabled) listOf(Navy, Color(0xFF345F93))
+                    else listOf(Color(0xFFE3E8EF), Color(0xFFE3E8EF)))),
             shape = RoundedCornerShape(15.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color.Transparent,
                 contentColor = Color.White,
                 disabledContainerColor = Color.White.copy(alpha = 0.18f),
-                disabledContentColor = Color.White.copy(alpha = 0.5f)
+                disabledContentColor = Subtle
             )
         ) {
             Text(text, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
