@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.supabase.postgrest)
     implementation(libs.supabase.auth)
     implementation(libs.supabase.functions)
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
     implementation(libs.ktor.client.android)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.androidx.activity.compose)
