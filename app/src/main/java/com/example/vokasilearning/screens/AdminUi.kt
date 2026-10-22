@@ -48,7 +48,7 @@ internal val LocalAdminHeaderActions = staticCompositionLocalOf<AdminHeaderActio
 
 @Composable
 internal fun AdminTopIcon(kind: Int, description: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick, modifier = Modifier.size(39.dp).semantics { contentDescription = description }) {
+    IconButton(onClick = onClick, modifier = Modifier.size(48.dp).semantics { contentDescription = description }) {
         Canvas(Modifier.size(21.dp)) {
             val unit = size.minDimension / 24f
             val path = Path()
@@ -180,7 +180,7 @@ internal fun AdminSelect(
                 contentPadding = PaddingValues(horizontal = 10.dp),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text(value.ifBlank { "Semua" }, modifier = Modifier.weight(1f),
+                Text(value.ifBlank { if (options.any { it.isBlank() }) "Semua" else "Pilih ${label.lowercase(Locale("id", "ID"))}" }, modifier = Modifier.weight(1f),
                     fontSize = 12.sp, color = Ink, maxLines = 1,
                     overflow = TextOverflow.Ellipsis)
                 Text("⌄", color = Navy)
@@ -234,7 +234,7 @@ internal fun AdminPaginationFooter(
     val start = if (total == 0) 0 else current * pageSize + 1
     val end = minOf(total, (current + 1) * pageSize)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("$label $start–$end dari $total • Maksimal $pageSize per halaman",
+        Text("$label $start–$end dari $total",
             fontSize = 11.sp, color = Subtle)
         Row(
             Modifier.fillMaxWidth(),
