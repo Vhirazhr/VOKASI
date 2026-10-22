@@ -53,5 +53,5 @@ internal data class AnswerReview(
 )
 
 internal data class LevelData(val level: Int, val startXp: Int, val nextXp: Int)
-internal enum class RankingMetric { XP, STREAK }
+internal enum class RankingMetric { XP, SCORE, STREAK }
 internal enum class RankingScope { SCHOOL, MAJOR, CLASS }
