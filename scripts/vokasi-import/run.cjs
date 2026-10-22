@@ -72,9 +72,11 @@ async function main() {
   async function login() {
     const {data,error} = await sb.auth.signInWithPassword({email:EMAIL,password:PASSWORD});
     if (error || !data?.user) fail('Login admin Supabase gagal; periksa email/password secret.');
-    const {data:admin,error:adminError} = await sb.from('school_admins')
-      .select('user_id').eq('user_id',data.user.id).eq('is_active',true).maybeSingle();
-    if (adminError || !admin) fail('Akun masuk bukan admin sekolah aktif; impor dibatalkan.');
+    // The authenticated role intentionally cannot SELECT school_admins.
+    // Use the security-definer RPC already granted to authenticated users.
+    const {data:isAdmin,error:adminError} = await sb.rpc('is_school_admin');
+    if (adminError) fail('Pemeriksaan izin admin gagal: '+adminError.message);
+    if (isAdmin !== true) fail('Akun masuk bukan admin sekolah aktif; periksa akun admin yang disimpan di GitHub Secrets.');
     return data.user.id;
   }
   await login();
