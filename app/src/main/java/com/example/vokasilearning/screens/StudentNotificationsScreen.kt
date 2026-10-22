@@ -8,7 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -16,73 +16,87 @@ import com.example.vokasilearning.data.StudentNoticeStore
 import com.example.vokasilearning.model.Attempt
 import com.example.vokasilearning.model.Student
 import com.example.vokasilearning.ui.*
-import androidx.compose.ui.platform.LocalContext
 
 @Composable
 internal fun StudentNotificationsScreen(
-    me: Student, attempts: List<Attempt>, onOpenPractice: () -> Unit,
-    onOpenSettings: () -> Unit, onBack: () -> Unit
+    me: Student,
+    attempts: List<Attempt>,
+    onOpenPractice: () -> Unit,
+    onBack: () -> Unit
 ) {
     val context = LocalContext.current
     var remindStreak by remember(me.username) {
         mutableStateOf(StudentNoticeStore.streakReminder(context, me.username))
     }
-    val notices = StudentNoticeStore.forStudent(me, attempts, remindStreak)
+    var readRevision by remember(me.username) { mutableIntStateOf(0) }
+    val notices = remember(me.username, attempts, remindStreak, readRevision) {
+        StudentNoticeStore.forStudent(me, attempts, remindStreak)
+            .filterNot { StudentNoticeStore.isRead(context, me.username, it.key) }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(Canvas),
         contentPadding = PaddingValues(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item { StudentScreenHeader("Notifikasi", "Informasi dan pengingat belajar yang penting.") }
+        item { StudentScreenHeader("Notifikasi", "Pengingat belajar dan informasi akun.") }
         item {
             WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                TextButton(onClick = onBack) { Text("‹ Kembali", color = Navy) }
-                Text("Pusat Pemberitahuan", color = Ink, fontWeight = FontWeight.ExtraBold,
-                    fontSize = 18.sp)
-                Text("Informasi terbaru, bukan riwayat aktivitas.",
-                    color = Subtle, fontSize = 11.sp)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(onClick = onBack) { Text("‹ Kembali", color = Navy) }
+                    if (notices.size > 1) {
+                        TextButton(onClick = {
+                            StudentNoticeStore.markAllRead(context, me.username, notices)
+                            readRevision++
+                        }) { Text("Tandai semua dibaca", color = Navy, fontSize = 12.sp) }
+                    }
+                }
+                Text(
+                    if (notices.isEmpty()) "Tidak ada pemberitahuan baru"
+                    else notices.size.toString() + " pemberitahuan baru",
+                    color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp
+                )
             }
         }
         items(notices, key = { it.key }) { notification ->
             WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                Row {
-                    Text("●", color = Good, modifier = Modifier.padding(end = 8.dp))
-                    Column {
-                        Text(notification.title, fontSize = 14.sp, color = Ink,
-                            fontWeight = FontWeight.ExtraBold)
-                        Text(notification.description, fontSize = 12.sp, color = Subtle)
-                    }
+                Text(notification.title, color = Ink, fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold)
+                Text(notification.description, color = Subtle, fontSize = 12.sp)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = {
+                        StudentNoticeStore.markRead(context, me.username, notification.key)
+                        readRevision++
+                    }) { Text("Tandai dibaca", color = Navy, fontSize = 12.sp) }
                 }
             }
-        }
-        if (notices.isEmpty()) {
-            item { WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                Text("Semua beres! Tidak ada pemberitahuan penting saat ini.",
-                    color = Good, fontSize = 12.sp)
-            } }
         }
         item {
             WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                Text("Preferensi Pengingat", color = Ink,
-                    fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
-                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Pengingat streak", color = Ink, fontWeight = FontWeight.Bold)
-                        Text("Tampilkan pengingat konsistensi jika belum belajar hari ini.",
-                            color = Subtle, fontSize = 11.sp)
-                    }
+                Text("Pengingat Streak", color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Text("Aktifkan pengingat saat streak masih dapat dilanjutkan.",
+                        modifier = Modifier.weight(1f), color = Subtle, fontSize = 12.sp)
                     Switch(checked = remindStreak, onCheckedChange = {
                         remindStreak = it
                         StudentNoticeStore.setStreakReminder(context, me.username, it)
+                        readRevision++
                     })
                 }
-                Text("Pengingat saat ini tampil ketika aplikasi dibuka. Notifikasi push terjadwal memerlukan komponen tambahan.",
-                    color = Subtle, fontSize = 11.sp)
-                OutlinedButton(onClick = onOpenPractice, modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)) {
-                    Text("Buka Latihan", color = Navy)
-                }
+                OutlinedButton(
+                    onClick = onOpenPractice,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("Buka Latihan", color = Navy) }
             }
+        }
+        item {
+            Text("Pengingat tampil di aplikasi, bukan push terjadwal.",
+                color = Subtle, fontSize = 11.sp,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp))
         }
     }
 }
