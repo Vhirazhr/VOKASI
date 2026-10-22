@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 internal fun AuthHero(title: String, subtitle: String) {
     Box(
-        Modifier.fillMaxWidth().height(255.dp)
+        Modifier.fillMaxWidth().heightIn(min = 205.dp)
             .clip(RoundedCornerShape(bottomStart = 35.dp, bottomEnd = 35.dp))
             .background(Brush.linearGradient(listOf(DeepNavy, Navy, Color(0xFF294F7F))))
             .padding(23.dp)
@@ -55,7 +55,8 @@ internal fun AuthHero(title: String, subtitle: String) {
         ) {
             Text(title, color = Color.White, fontSize = 27.sp,
                 fontWeight = FontWeight.ExtraBold)
-            Text(subtitle, color = Color(0xFFCBD7E5), fontSize = 12.sp)
+            Text(subtitle, color = Color(0xFFCBD7E5), fontSize = 12.sp,
+                maxLines = 2, lineHeight = 17.sp)
         }
     }
 }
