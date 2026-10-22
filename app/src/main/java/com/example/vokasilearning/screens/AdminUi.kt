@@ -196,7 +196,7 @@ internal fun AdminSelect(
                         onValueChange = { search = it },
                         placeholder = { Text("Cari jurusan", fontSize = 12.sp) },
                         singleLine = true,
-                        modifier = Modifier.width(260.dp).padding(horizontal = 8.dp),
+                        modifier = Modifier.widthIn(min = 180.dp, max = 260.dp).padding(horizontal = 8.dp),
                         shape = RoundedCornerShape(12.dp)
                     )
                 }
