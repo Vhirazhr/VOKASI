@@ -30,6 +30,15 @@ internal object StudentNoticeStore {
             .putBoolean("streak_" + accountKey(username), enabled).apply()
     }
 
+    /** OS notification scheduling is opt-in and OFF for every account by default. */
+    fun pushReminder(context: Context, username: String): Boolean =
+        preferences(context).getBoolean("push_" + accountKey(username), false)
+
+    fun setPushReminder(context: Context, username: String, enabled: Boolean) {
+        preferences(context).edit()
+            .putBoolean("push_" + accountKey(username), enabled).apply()
+    }
+
     fun isRead(context: Context, username: String, noticeKey: String): Boolean =
         preferences(context).getStringSet("read_" + accountKey(username), emptySet())
             ?.contains(noticeKey) == true
@@ -59,8 +68,10 @@ internal object StudentNoticeStore {
         val existing = prefs.getStringSet("read_" + newKey, emptySet()).orEmpty()
         prefs.edit()
             .putBoolean("streak_" + newKey, streakReminder(context, old))
+            .putBoolean("push_" + newKey, pushReminder(context, old))
             .putStringSet("read_" + newKey, (read + existing).toSet())
             .remove("streak_" + oldKey)
+            .remove("push_" + oldKey)
             .remove("read_" + oldKey).apply()
     }
 
