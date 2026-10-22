@@ -453,10 +453,21 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                     page = if (restoreQuiz(remoteStudent.username)) Page.QUIZ else Page.HOME
                                     true
                                 } else {
-                                    val found = students.firstOrNull {
-                                        it.username.equals(login, true) &&
-                                            it.password.isNotBlank() &&
-                                            SchoolCredentials.verify(p, it.password)
+                                    val loginIdentity = StudentLoginName.parse(login)
+                                    val found = students.firstOrNull { student ->
+                                        loginIdentity != null &&
+                                            loginIdentity.aliases.any {
+                                                it.equals(student.username, true)
+                                            } &&
+                                            (loginIdentity.normalizedFullName == null ||
+                                                StudentLoginName.normalizeFullName(student.name) ==
+                                                    loginIdentity.normalizedFullName) &&
+                                            (loginIdentity.classHint == null ||
+                                                student.classroom.label.trim()
+                                                    .replace(Regex("\\s+"), " ")
+                                                    .uppercase(Locale.ROOT) == loginIdentity.classHint) &&
+                                            student.password.isNotBlank() &&
+                                            SchoolCredentials.verify(p, student.password)
                                     }
                                     if (found != null) {
                                         currentId = found.username
