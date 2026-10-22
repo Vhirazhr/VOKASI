@@ -244,53 +244,63 @@ internal object SupabaseSchoolRepository {
         return loadDirectory()
     }
 
-    /** Authenticate a student with the username alias created by the Edge Function. */
-    suspend fun authenticateStudent(username: String, password: String): Student? {
-        val cleanUsername = username.trim()
-        if (cleanUsername.isBlank() || password.isBlank()) return null
-        return try {
-            // A login attempt must never inherit another person's previous session.
-            vokasiSupabase.auth.signOut()
-            vokasiSupabase.auth.signInWith(Email) {
-                email = cleanUsername + STUDENT_LOGIN_DOMAIN
-                this.password = password
-            }
-            val userId = vokasiSupabase.auth.currentUserOrNull()?.id ?: run {
+    /**
+     * Sign in using a human-readable full name. The existing internal Auth
+     * username/email is derived invisibly, so no migration of 2,378 accounts
+     * is needed. A class hint disambiguates identical full names.
+     */
+    suspend fun authenticateStudent(fullNameOrUsername: String, password: String): Student? {
+        val identity = com.example.vokasilearning.logic.StudentLoginName.parse(fullNameOrUsername)
+            ?: return null
+        if (password.isBlank()) return null
+        for (loginAlias in identity.aliases) {
+            try {
+                // A login attempt must never inherit a previous user's session.
                 vokasiSupabase.auth.signOut()
-                return null
-            }
-            val roster = vokasiSupabase.from("student_roster")
-                .select().decodeList<RemoteRoster>()
-                .singleOrNull {
-                    it.authUserId == userId && it.registrationStatus == "registered"
-                } ?: run {
-                    vokasiSupabase.auth.signOut()
-                    return null
+                vokasiSupabase.auth.signInWith(Email) {
+                    email = loginAlias + STUDENT_LOGIN_DOMAIN
+                    this.password = password
                 }
-            val remoteClass = vokasiSupabase.from("classes").select {
-                filter { eq("id", roster.classId) }
-            }.decodeList<RemoteClass>().singleOrNull() ?: run {
-                vokasiSupabase.auth.signOut()
-                return null
+                val userId = vokasiSupabase.auth.currentUserOrNull()?.id ?: continue
+                // PostgREST caps unfiltered selects; always look up the logged-in
+                // account by ID rather than downloading the first 1,000 students.
+                val roster = vokasiSupabase.from("student_roster").select {
+                    filter { eq("auth_user_id", userId) }
+                }.decodeList<RemoteRoster>()
+                    .singleOrNull { it.registrationStatus == "registered" }
+                    ?: continue
+                if (identity.normalizedFullName != null &&
+                    com.example.vokasilearning.logic.StudentLoginName.normalizeFullName(
+                        roster.fullName
+                    ) != identity.normalizedFullName) continue
+
+                val remoteClass = vokasiSupabase.from("classes").select {
+                    filter { eq("id", roster.classId) }
+                }.decodeList<RemoteClass>().singleOrNull() ?: continue
+                if (identity.classHint != null &&
+                    remoteClass.className.trim().replace(Regex("\\s+"), " ")
+                        .uppercase(java.util.Locale.ROOT) != identity.classHint) continue
+                val majorId = roster.majorId ?: remoteClass.majorId
+                val major = vokasiSupabase.from("majors").select {
+                    filter { eq("id", majorId) }
+                }.decodeList<RemoteMajor>().singleOrNull() ?: continue
+                return Student(
+                    username = roster.username ?: loginAlias,
+                    password = "",
+                    name = roster.fullName,
+                    classroom = Classroom(remoteClass.className, major.name),
+                    admissionYear = roster.admissionYear
+                )
+            } catch (_: Exception) {
+                // A username collision can have a different alias. Try the next
+                // candidate only when the user supplied an explicit class.
+            } finally {
+                // Retain the Supabase session only when authentication succeeded.
+                // Kotlin finally runs even after return, so don't sign out here.
             }
-            val majorId = roster.majorId ?: remoteClass.majorId
-            val major = vokasiSupabase.from("majors").select {
-                filter { eq("id", majorId) }
-            }.decodeList<RemoteMajor>().singleOrNull() ?: run {
-                vokasiSupabase.auth.signOut()
-                return null
-            }
-            Student(
-                username = roster.username ?: cleanUsername,
-                password = "",
-                name = roster.fullName,
-                classroom = Classroom(remoteClass.className, major.name),
-                admissionYear = roster.admissionYear
-            )
-        } catch (_: Exception) {
-            try { vokasiSupabase.auth.signOut() } catch (_: Exception) { }
-            null
         }
+        try { vokasiSupabase.auth.signOut() } catch (_: Exception) { }
+        return null
     }
 
     /** Verify the current password and change it in Supabase Auth. */
