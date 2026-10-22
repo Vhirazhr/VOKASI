@@ -36,7 +36,9 @@ internal fun LeaderboardScreen(me: Student, users: List<Student>, attempts: List
         users.map { it.classroom.major }.distinct()
     }
     val groupValue = if (scope == RankingScope.CLASS) chosenClass else chosenMajor
-    val ordered = rankList(users, attempts, me, scope, metric, chosenMajor, chosenClass)
+    val scoredUsers = attempts.asSequence().map { it.studentId }.toSet()
+    val eligible = users.filter { it.username == me.username || it.username in scoredUsers }
+    val ordered = rankList(eligible, attempts, me, scope, metric, chosenMajor, chosenClass)
     val meRank = ordered.indexOfFirst { it.username == me.username }
 
     LazyColumn(
