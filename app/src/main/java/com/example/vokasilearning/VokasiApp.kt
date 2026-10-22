@@ -450,7 +450,13 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                 val photo = StudentAccountStore.savePhoto(activity, roster.id, bitmap)
                                 val i = students.indexOfFirst { it.username == me.username }
                                 if (i >= 0) students[i] = students[i].copy(photo = photo)
-                                null
+                                try {
+                                    SupabaseAvatarRepository.uploadBitmap(me.username, bitmap)
+                                    null
+                                } catch (_: Exception) {
+                                    "Foto tersimpan di HP, tetapi belum tersinkron. " +
+                                        "Pastikan SQL foto sudah aktif lalu unggah lagi."
+                                }
                             } catch (e: Exception) {
                                 e.message ?: "Gagal menyimpan foto."
                             }
@@ -563,6 +569,26 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                             StudentAccountStore.photo(activity, it.id)
                                         }
                                     ))
+                                    // Upgrade previous single-device profile photos to
+                                    // private cloud storage on the same device the pupil used.
+                                    appScope.launch {
+                                        if (isRemoteStudent && currentId == remoteStudent.username) {
+                                            val syncedPhoto = ownRoster?.let {
+                                                SupabaseAvatarRepository.restoreExisting(
+                                                    activity, remoteStudent.username, it.id
+                                                )
+                                            } ?: SupabaseAvatarRepository.download(remoteStudent.username)
+                                            if (syncedPhoto != null &&
+                                                isRemoteStudent && currentId == remoteStudent.username) {
+                                                val index = students.indexOfFirst {
+                                                    it.username == remoteStudent.username
+                                                }
+                                                if (index >= 0) {
+                                                    students[index] = students[index].copy(photo = syncedPhoto)
+                                                }
+                                            }
+                                        }
+                                    }
                                     val ownLocal = LocalAttemptStore.load(activity).filter {
                                         it.studentId.equals(remoteStudent.username, true)
                                     }
