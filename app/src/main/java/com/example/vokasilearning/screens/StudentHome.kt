@@ -59,12 +59,14 @@ import com.example.vokasilearning.*
 import com.example.vokasilearning.data.*
 import com.example.vokasilearning.logic.*
 import com.example.vokasilearning.model.*
+import com.example.vokasilearning.data.SchoolLeaderboardEntry
 import com.example.vokasilearning.screens.*
 import com.example.vokasilearning.ui.*
 
 @Composable
 internal fun StudentHome(
     me: Student, students: List<Student>, attempts: List<Attempt>, countQuestions: Int,
+    schoolLeaders: List<SchoolLeaderboardEntry> = emptyList(), schoolRankReady: Boolean = false,
     onStart: () -> Unit, onRanking: () -> Unit,
     onPractice: (String) -> Unit
 ) {
@@ -76,11 +78,12 @@ internal fun StudentHome(
     val seasonXp = studentSeasonXp(me, attempts)
     val streak = calculateStreak(me, attempts)
     val numberOfQuestions = if (countQuestions >= 500) QUESTIONS_PER_SESSION else 0
-    val scoredUsers = attempts.asSequence().map { it.studentId }.toSet()
-    val topStudents = rankList(
-        students.filter { it.username == me.username || it.username in scoredUsers },
-        attempts, me, RankingScope.SCHOOL, RankingMetric.XP
-    ).take(3)
+    val topStudents = if (schoolRankReady)
+        schoolLeaders.sortedWith(
+            compareByDescending<SchoolLeaderboardEntry> { it.seasonXp }
+                .thenBy { it.username }
+        ).take(3)
+    else emptyList()
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
@@ -362,7 +365,7 @@ internal fun StudentHome(
                         Column(Modifier.weight(1f)) {
                             Text("PAPAN PERINGKAT", color = NavyLight,
                                 fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-                            Text("Peringkat perangkat ini", color = Ink,
+                            Text(if (schoolRankReady) "Peringkat sekolah" else "Peringkat belum dimuat", color = Ink,
                                 fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
                         }
                         TextButton(onClick = onRanking) {
@@ -376,7 +379,16 @@ internal fun StudentHome(
                         colors = CardDefaults.cardColors(containerColor = Color.White)
                     ) {
                         Column(Modifier.padding(11.dp)) {
-                            topStudents.forEachIndexed { index, student ->
+                            if (topStudents.isEmpty()) {
+                                Text(if (schoolRankReady) "Belum ada peserta dengan nilai tercatat."
+                                    else "Peringkat sekolah sedang dimuat dari Supabase.",
+                                    color = Subtle, fontSize = 12.sp,
+                                    modifier = Modifier.padding(10.dp))
+                            }
+                            topStudents.forEachIndexed { index, entry ->
+                                val student = if (entry.username.equals(me.username, true)) me
+                                    else Student(entry.username, "", entry.displayName,
+                                        Classroom(entry.classroom, entry.major))
                                 Row(
                                     Modifier.fillMaxWidth()
                                         .clip(RoundedCornerShape(15.dp))
@@ -395,7 +407,7 @@ internal fun StudentHome(
                                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(student.classroom.label, color = Subtle, fontSize = 10.sp)
                                     }
-                                    Text("${studentSeasonXp(student, attempts)} XP",
+                                    Text("${entry.seasonXp} XP",
                                         color = Navy, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                                 if (index < topStudents.lastIndex) HorizontalDivider(color = Border)
