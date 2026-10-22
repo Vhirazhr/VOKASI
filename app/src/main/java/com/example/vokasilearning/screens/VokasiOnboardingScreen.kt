@@ -71,13 +71,19 @@ internal fun VokasiOnboardingScreen(onFinish: () -> Unit) {
     var slide by remember { mutableIntStateOf(0) }
     val copy = splashCopy[slide]
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-            .background(SplashBackground)
-            .padding(start = 24.dp, end = 24.dp, top = 18.dp, bottom = 22.dp)
-    ) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val compact = maxHeight < 520.dp
+        Column(
+            modifier = Modifier.fillMaxSize()
+                .background(SplashBackground)
+                .padding(
+                    start = 24.dp, end = 24.dp,
+                    top = if (compact) 8.dp else 18.dp,
+                    bottom = if (compact) 8.dp else 22.dp
+                )
+        ) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(55.dp),
+            modifier = Modifier.fillMaxWidth().height(if (compact) 42.dp else 55.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Only the official lion/gear icon is shown here. No book icon/LEARNING text.
@@ -96,6 +102,8 @@ internal fun VokasiOnboardingScreen(onFinish: () -> Unit) {
             }
         }
 
+        // In short landscape viewports, prioritize readable controls over art.
+        if (!compact) {
         // Center illustrations resize to the real screen height without clipping small devices.
         BoxWithConstraints(
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -105,6 +113,8 @@ internal fun VokasiOnboardingScreen(onFinish: () -> Unit) {
             if (artworkSize > 0.dp) {
                 OnboardingArtwork(slide = slide, dimension = artworkSize)
             }
+        }
+
         }
 
         Column(
@@ -121,8 +131,8 @@ internal fun VokasiOnboardingScreen(onFinish: () -> Unit) {
             Text(
                 text = copy.heading,
                 color = DeepNavy,
-                fontSize = 29.sp,
-                lineHeight = 35.sp,
+                fontSize = if (compact) 24.sp else 29.sp,
+                lineHeight = if (compact) 29.sp else 35.sp,
                 fontWeight = FontWeight.Normal,
                 letterSpacing = (-0.8).sp
             )
@@ -134,7 +144,7 @@ internal fun VokasiOnboardingScreen(onFinish: () -> Unit) {
             )
         }
 
-        Spacer(Modifier.height(37.dp))
+        Spacer(Modifier.height(if (compact) 8.dp else 24.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -157,7 +167,7 @@ internal fun VokasiOnboardingScreen(onFinish: () -> Unit) {
                 onClick = {
                     if (slide < splashCopy.lastIndex) slide++ else onFinish()
                 },
-                modifier = Modifier.widthIn(min = 165.dp).height(54.dp),
+                modifier = Modifier.widthIn(min = 150.dp).height(if (compact) 44.dp else 54.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Navy),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 7.dp)
@@ -171,6 +181,7 @@ internal fun VokasiOnboardingScreen(onFinish: () -> Unit) {
                 Spacer(Modifier.width(9.dp))
                 Text("›", fontSize = 26.sp, color = Color.White)
             }
+        }
         }
     }
 }
