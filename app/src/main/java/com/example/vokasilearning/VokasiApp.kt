@@ -716,6 +716,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
         CompletionDialog(
             attempt = currentAttempt!!,
             streak = calculateStreak(me, attempts.toList()),
+            highlightStreak = attempts.count {
+                it.studentId == me.username && it.answered > 0 &&
+                    dayKey(it.timeMillis) == dayKey(currentAttempt!!.timeMillis)
+            } == 1,
             onViewResults = { showResultPopup = false }
         )
     }
