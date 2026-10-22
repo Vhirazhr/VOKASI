@@ -126,6 +126,7 @@ internal fun AdminProfileScreen(
     var school by remember(config) { mutableStateOf(config.school) }
     var result by remember { mutableStateOf<String?>(null) }
     var confirmLogout by remember { mutableStateOf(false) }
+    var profileSaved by remember { mutableStateOf(false) }
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
@@ -172,15 +173,17 @@ internal fun AdminProfileScreen(
                 Text("Ini hanya nama tampilan lokal. Tidak mengganti username, sandi, atau hak akses.",
                     color = Subtle, fontSize = 11.sp)
                 if (result != null) {
-                    Text(result.orEmpty(), color = if (result == "Profil tersimpan.") Good else Bad,
+                    Text(result.orEmpty(), color = Bad,
                         fontSize = 12.sp)
                 }
                 VokasiButton(
                     text = "Simpan Profil",
                     enabled = name.isNotBlank() && school.isNotBlank(),
                     onClick = {
-                        result = if (onSave(AdminPreferences(name.trim(), school.trim())))
-                            "Profil tersimpan." else "Gagal menyimpan profil."
+                        if (onSave(AdminPreferences(name.trim(), school.trim()))) {
+                            result = null
+                            profileSaved = true
+                        } else result = "Gagal menyimpan profil."
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -197,6 +200,13 @@ internal fun AdminProfileScreen(
             TextButton(onClick = { confirmLogout = true },
                 modifier = Modifier.fillMaxWidth()) { Text("Keluar Akun", color = Bad) }
         }
+    }
+    if (profileSaved) {
+        ActionFeedbackDialog(
+            title = "Profil admin tersimpan",
+            message = "Nama tampilan perangkat sudah diperbarui.",
+            onDismiss = { profileSaved = false }
+        )
     }
     if (confirmLogout) {
         AlertDialog(
