@@ -6,6 +6,7 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.functions.functions
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Order
 import io.ktor.client.statement.bodyAsText
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -93,6 +94,7 @@ internal object SupabaseSchoolRepository {
             do {
                 val page = vokasiSupabase.from("student_roster").select {
                     filter { eq("major_id", major.id) }
+                    order("id", Order.ASCENDING)
                     range(from, from + batchSize - 1L)
                 }.decodeList<RemoteRoster>()
                 remoteRoster.addAll(page)
