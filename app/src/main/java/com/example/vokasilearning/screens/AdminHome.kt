@@ -115,7 +115,7 @@ internal fun AdminHome(
                             major = major, classroom = classroom, date = date,
                             modifier = Modifier.fillMaxWidth(), onExport = onExcelExport
                         )
-                        Text("Excel memuat siswa sesuai filter. Nilai hanya dari perangkat ini.",
+                        Text("Nilai tersimpan di perangkat ini.",
                             color = Subtle, fontSize = 11.sp)
                     }
                 }
