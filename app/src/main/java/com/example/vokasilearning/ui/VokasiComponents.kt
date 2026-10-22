@@ -82,8 +82,8 @@ internal fun VokasiBottomNav(
         tonalElevation = 2.dp
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(77.dp)
-                .padding(horizontal = 21.dp, vertical = 7.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 76.dp)
+                .padding(horizontal = if (items.size >= 5) 8.dp else 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -106,9 +106,12 @@ internal fun VokasiBottomNav(
                         MonochromeNavIcon(target = target, active = active)
                     }
                     Text(
-                        label, fontSize = 10.sp,
+                        label, fontSize = if (items.size >= 5) 9.sp else 11.sp,
                         fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                        color = if (active) Navy else Subtle
+                        color = if (active) Navy else Subtle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
