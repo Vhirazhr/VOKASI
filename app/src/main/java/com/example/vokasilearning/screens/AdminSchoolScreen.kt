@@ -208,7 +208,7 @@ internal fun AdminSchoolScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            AdminHero("Data Sekolah", "Data siswa dan manajemen sekolah", compact = true)
+            AdminHero("Data Sekolah", "Siswa, kelas, dan jurusan", compact = true)
         }
         item {
             Row(
@@ -236,13 +236,12 @@ internal fun AdminSchoolScreen(
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                     Text("Data Siswa", color = Ink, fontWeight = FontWeight.ExtraBold,
                         fontSize = 19.sp)
-                    Text(results.size.toString() + " dari " + directory.roster.size +
-                        " siswa • Maksimal " + AdminPagination.PAGE_SIZE + " per halaman",
+                    Text(results.size.toString() + " dari " + directory.roster.size + " siswa",
                         color = Subtle, fontSize = 11.sp)
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it; page = 0 },
-                        placeholder = { Text("Cari nama atau username siswa") },
+                        placeholder = { Text("Cari nama siswa") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
@@ -310,9 +309,7 @@ internal fun AdminSchoolScreen(
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                     Text("Kelola Data Sekolah", color = Ink,
                         fontWeight = FontWeight.ExtraBold, fontSize = 19.sp)
-                    Text("Kelola jurusan, kelas, angkatan, dan siswa melalui Excel.",
-                        color = Subtle, fontSize = 12.sp)
-                    OutlinedButton(
+                                        OutlinedButton(
                         onClick = {
                             schoolTemplateLauncher.launch("Template_Data_Sekolah_VOKASI.xlsx")
                         },
@@ -368,9 +365,7 @@ internal fun AdminSchoolScreen(
                         Column(Modifier.weight(1f)) {
                             Text("Pengelolaan Manual", color = Ink,
                                 fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Text("Tambah jurusan, kelas atau siswa secara langsung.",
-                                color = Subtle, fontSize = 11.sp)
-                        }
+                                                    }
                         TextButton(onClick = { manualOpen = !manualOpen }) {
                             Text(if (manualOpen) "Tutup" else "Buka", color = Navy)
                         }
