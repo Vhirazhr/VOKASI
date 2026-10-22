@@ -47,14 +47,20 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
     }
     val groupValue = if (scope == RankingScope.CLASS) chosenClass else chosenMajor
     val ordered = if (dataReady) leaderboard.filter { entry ->
-        when (scope) {
+        val matchesScope = when (scope) {
             RankingScope.SCHOOL -> true
             RankingScope.MAJOR -> entry.major == chosenMajor
             RankingScope.CLASS -> entry.major == chosenMajor && entry.classroom == chosenClass
         }
+        matchesScope && (metric != RankingMetric.SCORE || entry.mandatoryDays > 0)
     }.sortedWith(compareByDescending<SchoolLeaderboardEntry> {
-        if (metric == RankingMetric.XP) it.seasonXp else it.streak
-    }.thenBy { it.displayName }.thenBy { it.username }) else emptyList()
+        when (metric) {
+            RankingMetric.XP -> it.seasonXp
+            RankingMetric.SCORE -> (it.mandatoryAverage ?: -1).toLong()
+            RankingMetric.STREAK -> it.streak
+        }
+    }.thenByDescending { if (metric == RankingMetric.SCORE) it.mandatoryDays else 0L }
+        .thenBy { it.displayName }.thenBy { it.username }) else emptyList()
     val meRank = ordered.indexOfFirst { it.username.equals(me.username, true) }
 
     LazyColumn(
@@ -83,6 +89,7 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
                 ) {
                     listOf(
                         RankingMetric.XP to "XP Season",
+                        RankingMetric.SCORE to "Nilai Wajib",
                         RankingMetric.STREAK to "Daily Streak"
                     ).forEach { (option, label) ->
                         val active = metric == option
@@ -97,7 +104,7 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
                             Text(
                                 label,
                                 color = if (active) Color.White else Subtle,
-                                fontSize = 12.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
                             )
@@ -176,8 +183,11 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
                             Text("#${meRank + 1} dari ${ordered.size} peserta aktif", color = Ink, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
                         }
                         Pill(
-                            if (metric == RankingMetric.XP) "${ordered[meRank].seasonXp} XP"
-                            else "${ordered[meRank].streak} hari",
+                            when (metric) {
+                                RankingMetric.XP -> "${ordered[meRank].seasonXp} XP"
+                                RankingMetric.SCORE -> "${ordered[meRank].mandatoryAverage ?: 0}/100"
+                                RankingMetric.STREAK -> "${ordered[meRank].streak} hari"
+                            },
                             PaleBlue, Navy
                         )
                     }
@@ -241,7 +251,7 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
                                 fontWeight = FontWeight.ExtraBold,
                                 fontSize = 13.sp
                             )
-                            Avatar(student, 42.dp)
+                            Avatar(student, 42.dp, syncFromCloud = true)
                             Column(Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
@@ -265,8 +275,11 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
                                 }
                             }
                             Text(
-                                if (metric == RankingMetric.XP) "${entry.seasonXp} XP"
-                                else "${entry.streak} hari",
+                                when (metric) {
+                                    RankingMetric.XP -> "${entry.seasonXp} XP"
+                                    RankingMetric.SCORE -> "${entry.mandatoryAverage ?: 0}/100"
+                                    RankingMetric.STREAK -> "${entry.streak} hari"
+                                },
                                 color = Navy,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.ExtraBold,
@@ -284,7 +297,9 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
                             when {
                                 !dataReady && dataError.isNotBlank() -> dataError
                                 !dataReady -> "Memuat hasil peringkat dari Supabase..."
-                                else -> "Belum ada peserta dengan hasil tercatat di kategori ini."
+                                else -> if (metric == RankingMetric.SCORE)
+                                    "Belum ada nilai Latihan Wajib pada musim ini."
+                                    else "Belum ada peserta dengan hasil tercatat di kategori ini."
                             },
                             color = Subtle
                         )
@@ -312,10 +327,10 @@ internal fun PodiumItem(
         2 -> Color(0xFFE5EBF2)
         else -> Color(0xFFF6D9C3)
     }
-    val label = if (metric == RankingMetric.XP) {
-        "${entry.seasonXp} XP"
-    } else {
-        "${entry.streak} hari"
+    val label = when (metric) {
+        RankingMetric.XP -> "${entry.seasonXp} XP"
+        RankingMetric.SCORE -> "${entry.mandatoryAverage ?: 0}/100"
+        RankingMetric.STREAK -> "${entry.streak} hari"
     }
     Column(
         modifier.fillMaxWidth()
@@ -327,7 +342,7 @@ internal fun PodiumItem(
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         Text("★", color = NavyLight, fontSize = 17.sp)
-        Avatar(student, if (rank == 1) 52.dp else 43.dp)
+        Avatar(student, if (rank == 1) 52.dp else 43.dp, syncFromCloud = true)
         Text(
             entry.displayName,
             color = Ink,
