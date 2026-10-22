@@ -49,6 +49,7 @@ internal fun AdminSchoolScreen(
     var promotion by remember { mutableStateOf<SchoolRosterEntry?>(null) }
     var promotionTarget by remember { mutableStateOf("") }
     var notice by remember { mutableStateOf("") }
+    var completedAction by remember { mutableStateOf<String?>(null) }
     var newMajor by remember { mutableStateOf("") }
     var major by remember { mutableStateOf("") }
     var grade by remember { mutableStateOf("X") }
@@ -156,7 +157,8 @@ internal fun AdminSchoolScreen(
                 val syncError = onImport(directory.copy(classes = directory.classes + added))
                 if (syncError == null) {
                     classPage = 0
-                    "Berhasil menambahkan dan menyinkronkan " + added.size + " kelas ke server."
+                    completedAction = added.size.toString() + " kelas berhasil tersimpan di Supabase."
+                    ""
                 } else syncError
             } catch (e: IllegalArgumentException) {
                 e.message ?: "Excel tidak valid."
@@ -196,7 +198,12 @@ internal fun AdminSchoolScreen(
             } catch (e: Exception) {
                 e.message ?: "Gagal menyinkronkan data sekolah."
             }
-            notice = error ?: "$label Data berhasil disimpan di server."
+            if (error == null) {
+                notice = ""
+                completedAction = "$label Data tersimpan di Supabase."
+            } else {
+                notice = error
+            }
             manualSyncBusy = false
         }
     }
@@ -642,6 +649,8 @@ internal fun AdminSchoolScreen(
                                                 preview.newStudents + " siswa baru, " +
                                                 preview.movedStudents + " siswa pindah/naik kelas."
                                         }
+                                        completedAction = schoolImportNotice
+                                        schoolImportNotice = ""
                                         schoolPreview = null
                                     } else {
                                         schoolImportNotice = error
@@ -668,6 +677,14 @@ internal fun AdminSchoolScreen(
                     Text("Batal", color = Subtle)
                 }
             }
+        )
+    }
+
+    completedAction?.let { message ->
+        ActionFeedbackDialog(
+            title = "Berhasil disimpan",
+            message = message,
+            onDismiss = { completedAction = null }
         )
     }
 
