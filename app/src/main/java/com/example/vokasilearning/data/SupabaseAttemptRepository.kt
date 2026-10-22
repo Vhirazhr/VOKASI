@@ -1,0 +1,171 @@
+package com.example.vokasilearning.data
+
+import com.example.vokasilearning.model.AnswerReview
+import com.example.vokasilearning.model.AnswerStatus
+import com.example.vokasilearning.model.Attempt
+import com.example.vokasilearning.model.Question
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.from
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import java.util.UUID
+
+/**
+ * School results are shared through Supabase, not through the administrator's
+ * Android device. Only a student's own Auth user can insert their own results;
+ * admins are read-only. The SQL migration must be applied before use.
+ */
+internal object SupabaseAttemptRepository {
+    private const val PAGE_SIZE = 500
+
+    @Serializable
+    private data class CompactReview(
+        @SerialName("question_id") val questionId: Int,
+        @SerialName("selected_index") val selectedIndex: Int? = null,
+        val status: String,
+        @SerialName("response_seconds") val responseSeconds: Int = 0
+    )
+
+    @Serializable
+    private data class StoredAttempt(
+        @SerialName("auth_user_id") val authUserId: String,
+        val username: String,
+        @SerialName("session_key") val sessionKey: String,
+        @SerialName("completed_at_ms") val completedAtMs: Long,
+        val signature: String,
+        val correct: Int,
+        val answered: Int,
+        @SerialName("question_count") val questionCount: Int,
+        val score: Int,
+        @SerialName("earned_xp") val earnedXp: Int,
+        @SerialName("seconds_spent") val secondsSpent: Int,
+        @SerialName("practice_category") val practiceCategory: String? = null,
+        @SerialName("name_snapshot") val nameSnapshot: String = "",
+        @SerialName("class_snapshot") val classSnapshot: String = "",
+        @SerialName("major_snapshot") val majorSnapshot: String = "",
+        @SerialName("review_summary") val reviewSummary: List<CompactReview> = emptyList()
+    )
+
+    @Serializable
+    private data class UploadAttempt(
+        @SerialName("auth_user_id") val authUserId: String,
+        val username: String,
+        @SerialName("session_key") val sessionKey: String,
+        @SerialName("completed_at_ms") val completedAtMs: Long,
+        val signature: String,
+        val correct: Int,
+        val answered: Int,
+        @SerialName("question_count") val questionCount: Int,
+        val score: Int,
+        @SerialName("earned_xp") val earnedXp: Int,
+        @SerialName("seconds_spent") val secondsSpent: Int,
+        @SerialName("practice_category") val practiceCategory: String? = null,
+        @SerialName("name_snapshot") val nameSnapshot: String = "",
+        @SerialName("class_snapshot") val classSnapshot: String = "",
+        @SerialName("major_snapshot") val majorSnapshot: String = "",
+        @SerialName("review_summary") val reviewSummary: List<CompactReview> = emptyList()
+    )
+
+    private suspend fun fetchOwnRows(userId: String): List<StoredAttempt> {
+        val rows = mutableListOf<StoredAttempt>()
+        var offset = 0L
+        do {
+            val page = vokasiSupabase.from("student_attempts").select {
+                filter { eq("auth_user_id", userId) }
+                range(offset, offset + PAGE_SIZE - 1)
+            }.decodeList<StoredAttempt>()
+            rows.addAll(page)
+            offset += page.size
+        } while (page.size == PAGE_SIZE)
+        return rows
+    }
+
+    /** Send only unsynced local sessions, never all accounts on this device. */
+    suspend fun syncOwn(username: String, local: List<Attempt>): Int {
+        val authUserId = vokasiSupabase.auth.currentUserOrNull()?.id?.toString()
+            ?: throw IllegalStateException("Sesi siswa sudah berakhir.")
+        val alreadyStored = fetchOwnRows(authUserId)
+            .mapTo(HashSet()) { it.sessionKey }
+        var added = 0
+        local.filter {
+            it.studentId.equals(username, ignoreCase = true) &&
+                it.sessionKey.isNotBlank() &&
+                it.questionCount in listOf(10, 100) &&
+                it.answered in 0..it.questionCount &&
+                it.correct in 0..it.answered
+        }.distinctBy { it.sessionKey }.forEach { run ->
+            if (run.sessionKey in alreadyStored) return@forEach
+            // QuizSession emits UUID session keys. Skip invalid old demo rows.
+            if (runCatching { UUID.fromString(run.sessionKey) }.isFailure) return@forEach
+            vokasiSupabase.from("student_attempts").insert(
+                UploadAttempt(
+                    authUserId = authUserId,
+                    username = username,
+                    sessionKey = run.sessionKey,
+                    completedAtMs = run.timeMillis,
+                    signature = run.signature,
+                    correct = run.correct,
+                    answered = run.answered,
+                    questionCount = run.questionCount,
+                    score = run.score,
+                    earnedXp = run.earnedXp,
+                    secondsSpent = run.secondsSpent,
+                    practiceCategory = run.practiceCategory,
+                    nameSnapshot = run.studentNameSnapshot,
+                    classSnapshot = run.classSnapshot,
+                    majorSnapshot = run.majorSnapshot,
+                    reviewSummary = run.review.map {
+                        CompactReview(it.question.id, it.selectedIndex,
+                            it.status.name, it.responseSeconds)
+                    }
+                )
+            )
+            alreadyStored.add(run.sessionKey)
+            added++
+        }
+        return added
+    }
+
+    /**
+     * Called ONLY after successful school-admin authentication.
+     * Paginate across all sessions; PostgREST caps individual responses.
+     */
+    suspend fun loadForAdmin(questions: List<Question>): List<Attempt> {
+        val permitted = vokasiSupabase.postgrest.rpc("is_school_admin").decodeAs<Boolean>()
+        check(permitted) { "Akun ini bukan admin sekolah aktif." }
+        val questionById = questions.associateBy { it.id }
+        val rows = mutableListOf<StoredAttempt>()
+        var offset = 0L
+        do {
+            val page = vokasiSupabase.from("student_attempts").select {
+                range(offset, offset + PAGE_SIZE - 1)
+            }.decodeList<StoredAttempt>()
+            rows.addAll(page)
+            offset += page.size
+        } while (page.size == PAGE_SIZE)
+        return rows.map { row ->
+            Attempt(
+                studentId = row.username,
+                timeMillis = row.completedAtMs,
+                signature = row.signature,
+                correct = row.correct,
+                answered = row.answered,
+                questionCount = row.questionCount,
+                score = row.score,
+                earnedXp = row.earnedXp,
+                secondsSpent = row.secondsSpent,
+                sessionKey = row.sessionKey,
+                practiceCategory = row.practiceCategory,
+                studentNameSnapshot = row.nameSnapshot,
+                classSnapshot = row.classSnapshot,
+                majorSnapshot = row.majorSnapshot,
+                review = row.reviewSummary.mapNotNull { saved ->
+                    val question = questionById[saved.questionId] ?: return@mapNotNull null
+                    val status = runCatching { AnswerStatus.valueOf(saved.status) }.getOrNull()
+                        ?: return@mapNotNull null
+                    AnswerReview(question, saved.selectedIndex, status, saved.responseSeconds)
+                }
+            )
+        }
+    }
+}
