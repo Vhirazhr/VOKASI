@@ -23,6 +23,7 @@ import com.example.vokasilearning.ui.*
 internal fun AdminMonitorScreen(
     students: List<Student>,
     attempts: List<Attempt>,
+    scoresReady: Boolean = true,
     initialMajor: String = "",
     initialClass: String = "",
     initialDate: String = "",
@@ -104,7 +105,9 @@ internal fun AdminMonitorScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("HASIL LATIHAN WAJIB", color = NavyLight, fontSize = 11.sp,
                                 fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
-                            Pill("Lokal / demo", PaleGold, Warning)
+                            Pill(if (scoresReady) "Supabase" else "Menunggu",
+                                if (scoresReady) PaleGreen else PaleGold,
+                                if (scoresReady) Good else Warning)
                         }
                         AdminSelect("Jurusan", major, listOf("") + majors, { major = it },
                             Modifier.fillMaxWidth())
@@ -115,12 +118,12 @@ internal fun AdminMonitorScreen(
                         }
                         HorizontalDivider(color = Border)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AdminSummaryMetric("Selesai", "${summary.completedCount}", Good, Modifier.weight(1f))
-                            AdminSummaryMetric("Belum", "${summary.missingCount}", Warning, Modifier.weight(1f))
-                            AdminSummaryMetric("Rata-rata", summary.averageScore?.toString() ?: "—",
+                            AdminSummaryMetric("Selesai", if (scoresReady) "${summary.completedCount}" else "—", Good, Modifier.weight(1f))
+                            AdminSummaryMetric("Belum", if (scoresReady) "${summary.missingCount}" else "—", Warning, Modifier.weight(1f))
+                            AdminSummaryMetric("Rata-rata", if (scoresReady) summary.averageScore?.toString() ?: "—" else "—",
                                 Navy, Modifier.weight(1f))
                         }
-                        if (major.isNotBlank() && classroom.isNotBlank()) {
+                        if (scoresReady && major.isNotBlank() && classroom.isNotBlank()) {
                             AdminExcelAction(
                                 students, attempts, major, classroom, date,
                                 modifier = Modifier.fillMaxWidth(), text = "Unduh Excel Kelas",
@@ -130,7 +133,8 @@ internal fun AdminMonitorScreen(
                             Text("Ekspor semua kelas tersedia di Ringkasan.",
                                 color = Subtle, fontSize = 11.sp)
                         }
-                        Text("Nilai yang tercatat di HP ini • ${summary.studentCount} siswa",
+                        Text(if (scoresReady) "Data nilai tersinkron • ${summary.studentCount} siswa"
+                            else "Menunggu sinkronisasi nilai • ${summary.studentCount} siswa",
                             color = Subtle, fontSize = 11.sp)
                     }
                 }
@@ -157,7 +161,7 @@ internal fun AdminMonitorScreen(
                     FilterChip(
                         selected = onlyMissing,
                         onClick = { onlyMissing = true; pagingActivated = false },
-                        label = { Text("Belum tercatat", fontSize = 12.sp) }
+                        label = { Text(if (scoresReady) "Belum latihan" else "Belum tersinkron", fontSize = 12.sp) }
                     )
                     Spacer(Modifier.weight(1f))
                     Text("${members.size} siswa", color = Subtle, fontSize = 11.sp)
@@ -183,7 +187,7 @@ internal fun AdminMonitorScreen(
                             Text(student.classroom.label, color = Subtle, fontSize = 11.sp)
                         }
                         Pill(
-                            result?.let { "${it.score}/100" } ?: "Belum",
+                            if (!scoresReady) "—" else result?.let { "${it.score}/100" } ?: "Belum",
                             when {
                                 result == null -> PaleGold
                                 result.score < 60 -> Color(0xFFFFE7EA)
