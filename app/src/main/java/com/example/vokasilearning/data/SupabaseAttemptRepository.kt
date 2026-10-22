@@ -6,6 +6,8 @@ import com.example.vokasilearning.model.Attempt
 import com.example.vokasilearning.model.Question
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.util.UUID
@@ -43,7 +45,8 @@ internal object SupabaseAttemptRepository {
         @SerialName("name_snapshot") val nameSnapshot: String = "",
         @SerialName("class_snapshot") val classSnapshot: String = "",
         @SerialName("major_snapshot") val majorSnapshot: String = "",
-        @SerialName("review_summary") val reviewSummary: List<CompactReview> = emptyList()
+        @SerialName("review_summary") val reviewSummary: List<CompactReview> = emptyList(),
+        @SerialName("created_at") val createdAt: String = ""
     )
 
     @Serializable
@@ -126,11 +129,14 @@ internal object SupabaseAttemptRepository {
         return added
     }
 
-    /**
-     * Called ONLY after successful school-admin authentication.
-     * Paginate across all sessions; PostgREST caps individual responses.
-     */
-    suspend fun loadForAdmin(questions: List<Question>): List<Attempt> {
+    /** The cursor lets the open dashboard request only newer submissions. */
+    data class AdminBatch(val attempts: List<Attempt>, val lastCreatedAt: String?)
+
+    /** Use >= for the cursor boundary so sessions with the same timestamp are not lost. */
+    suspend fun loadForAdmin(
+        questions: List<Question>,
+        sinceCreatedAt: String? = null
+    ): AdminBatch {
         val permitted = vokasiSupabase.postgrest.rpc("is_school_admin").decodeAs<Boolean>()
         check(permitted) { "Akun ini bukan admin sekolah aktif." }
         val questionById = questions.associateBy { it.id }
@@ -138,12 +144,16 @@ internal object SupabaseAttemptRepository {
         var offset = 0L
         do {
             val page = vokasiSupabase.from("student_attempts").select {
+                if (!sinceCreatedAt.isNullOrBlank()) {
+                    filter { gte("created_at", sinceCreatedAt) }
+                }
+                order("created_at", Order.ASCENDING)
                 range(offset, offset + PAGE_SIZE - 1)
             }.decodeList<StoredAttempt>()
             rows.addAll(page)
             offset += page.size
         } while (page.size == PAGE_SIZE)
-        return rows.map { row ->
+        val decoded = rows.map { row ->
             Attempt(
                 studentId = row.username,
                 timeMillis = row.completedAtMs,
@@ -167,5 +177,6 @@ internal object SupabaseAttemptRepository {
                 }
             )
         }
+        return AdminBatch(decoded, rows.lastOrNull()?.createdAt ?: sinceCreatedAt)
     }
 }
