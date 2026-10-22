@@ -66,7 +66,7 @@ internal fun LoginScreen(
                     shape = RoundedCornerShape(13.dp),
                     colors = authFieldColors()
                 )
-                if (error) Text("Login gagal. Periksa nama dan password.\nJika nama kembar, tambahkan | Kelas.",
+                if (error) Text("Login gagal. Periksa identitas dan password.",
                     color = Bad, fontSize = 12.sp)
                 Spacer(Modifier.height(4.dp))
                 VokasiButton(
