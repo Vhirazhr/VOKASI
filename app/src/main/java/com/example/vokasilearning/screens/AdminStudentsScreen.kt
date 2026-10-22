@@ -32,6 +32,7 @@ import java.util.TimeZone
 internal fun AdminStudentsScreen(
     students: List<Student>,
     attempts: List<Attempt>,
+    scoresReady: Boolean = true,
     initialMajor: String = ""
 ) {
     var major by remember(initialMajor) { mutableStateOf(initialMajor.takeIf { requested ->
@@ -205,7 +206,7 @@ internal fun AdminStudentsScreen(
             } else {
                 items(visible, key = { "search_${it.username}" }) { student ->
                     AdminDirectoryStudentRow(
-                        student = student, grade = latestCompulsory[student.username],
+                        student = student, grade = if (scoresReady) latestCompulsory[student.username] else null,
                         onClick = { selectStudent(student) }
                     )
                 }
@@ -232,19 +233,22 @@ internal fun AdminStudentsScreen(
                     val latest = latestCompulsory[student.username]
                     HorizontalDivider(color = Border)
                     Text("Nilai wajib terakhir", color = Subtle, fontSize = 11.sp)
-                    Text(latest?.let { "${it.score}/100" } ?: "Belum ada hasil",
+                    Text(if (!scoresReady) "Menunggu sinkronisasi"
+                        else latest?.let { "${it.score}/100" } ?: "Belum ada hasil",
                         color = when {
                             latest == null -> Subtle
                             latest.score < 60 -> Bad
                             else -> Navy
                         }, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("${history.size} sesi wajib tersimpan", color = Subtle, fontSize = 11.sp)
+                    Text(if (scoresReady) "${history.size} sesi wajib tersimpan"
+                        else "Riwayat sedang dimuat dari Supabase", color = Subtle, fontSize = 11.sp)
                 }
             }
             if (history.isEmpty()) {
                 item {
                     WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                        Text("Belum ada riwayat latihan wajib.", color = Subtle)
+                        Text(if (scoresReady) "Belum ada riwayat latihan wajib."
+                            else "Menunggu data nilai Supabase.", color = Subtle)
                     }
                 }
             } else {
@@ -387,7 +391,7 @@ private fun AdminDirectoryStudentRow(
                     fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("${student.classroom.major} • ${student.classroom.label}",
                     color = Subtle, fontSize = 10.sp, maxLines = 2)
-                Text(grade?.let { "Nilai wajib: ${it.score}/100" } ?: "Belum ada nilai wajib",
+                Text(grade?.let { "Nilai wajib: ${it.score}/100" } ?: "Nilai belum tersedia",
                     color = grade?.let { if (it.score < 60) Bad else Navy } ?: Subtle,
                     fontSize = 11.sp)
             }
