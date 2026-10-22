@@ -26,6 +26,8 @@ import com.example.vokasilearning.ui.*
 internal fun AdminHome(
     students: List<Student>, questions: List<Question>, attempts: List<Attempt>,
     roster: List<SchoolRosterEntry>,
+    scoresReady: Boolean = true,
+    scoresNotice: String = "",
     onStudents: (String) -> Unit,
     onMonitoring: (String, String, String) -> Unit,
     onExcelExport: (String, String, String) -> Unit,
@@ -91,7 +93,9 @@ internal fun AdminHome(
                             Text("HASIL LATIHAN WAJIB",
                                 modifier = Modifier.weight(1f), color = NavyLight,
                                 fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                            Pill("Nilai HP ini", PaleGold, Warning)
+                            Pill(if (scoresReady) "Supabase" else "Menunggu data",
+                                if (scoresReady) PaleGreen else PaleGold,
+                                if (scoresReady) Good else Warning)
                         }
                         Text("Unduh Hasil Siswa", color = Ink, fontSize = 25.sp,
                             fontWeight = FontWeight.ExtraBold)
@@ -113,9 +117,11 @@ internal fun AdminHome(
                         AdminBulkExcelAction(
                             roster = roster, students = students, attempts = attempts,
                             major = major, classroom = classroom, date = date,
-                            modifier = Modifier.fillMaxWidth(), onExport = onExcelExport
+                            modifier = Modifier.fillMaxWidth(), onExport = onExcelExport,
+                            scoresReady = scoresReady
                         )
-                        Text("Nilai tersimpan di perangkat ini.",
+                        Text(if (scoresReady) "Data hasil latihan tersinkron dari Supabase."
+                            else "Menyiapkan koneksi nilai sekolah.",
                             color = Subtle, fontSize = 11.sp)
                     }
                 }
@@ -182,6 +188,8 @@ internal fun AdminHome(
                             Text("Tampilkan semua", color = Navy, fontSize = 12.sp)
                         }
                     }
+                    if (scoresNotice.isNotBlank()) Text(scoresNotice,
+                        color = Warning, fontSize = 11.sp)
                     HorizontalDivider(color = Border)
                     Row(
                         Modifier.fillMaxWidth(),
@@ -194,50 +202,55 @@ internal fun AdminHome(
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("Sudah latihan", color = Subtle, fontSize = 11.sp)
-                            Text("${stats.completed}", color = Good, fontSize = 24.sp,
+                            Text(if (scoresReady) "${stats.completed}" else "—",
+                                color = Good, fontSize = 24.sp,
                                 fontWeight = FontWeight.ExtraBold)
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Text("Rata-rata", color = Subtle, fontSize = 11.sp)
-                            Text(stats.average?.toString() ?: "—",
+                            Text(if (scoresReady) stats.average?.toString() ?: "—" else "—",
                                 color = Navy, fontSize = 24.sp,
                                 fontWeight = FontWeight.ExtraBold)
                         }
                     }
-                    Text("${stats.majors} jurusan • ${stats.classes} kelas • ${stats.missing} belum tercatat di HP ini",
+                    Text(if (scoresReady)
+                        "${stats.majors} jurusan • ${stats.classes} kelas • ${stats.missing} belum latihan"
+                        else "${stats.majors} jurusan • ${stats.classes} kelas • Status latihan menunggu sinkronisasi",
                         color = Subtle, fontSize = 11.sp)
                 }
 
-                SchoolScoreDonut(stats)
-                SchoolMonthlyTrend(stats)
+                SchoolScoreDonut(stats, dataAvailable = scoresReady)
+                SchoolMonthlyTrend(stats, dataAvailable = scoresReady)
 
                 WhiteCard(Modifier.fillMaxWidth()) {
                     Text("Perubahan nilai siswa", color = Ink, fontSize = 16.sp,
                         fontWeight = FontWeight.ExtraBold)
-                    Text("Perbandingan bulan ini dan sebelumnya pada HP ini.",
+                    Text(if (scoresReady) "Perbandingan bulan ini dan sebelumnya."
+                        else "Menunggu data nilai sekolah.",
                         color = Subtle, fontSize = 11.sp)
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("${stats.improved}", color = Good,
+                            Text(if (scoresReady) "${stats.improved}" else "—", color = Good,
                                 fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
                             Text("Naik", color = Subtle, fontSize = 12.sp)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("${stats.stable}", color = Navy,
+                            Text(if (scoresReady) "${stats.stable}" else "—", color = Navy,
                                 fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
                             Text("Tetap", color = Subtle, fontSize = 12.sp)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("${stats.declined}", color = Bad,
+                            Text(if (scoresReady) "${stats.declined}" else "—", color = Bad,
                                 fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
                             Text("Turun", color = Subtle, fontSize = 12.sp)
                         }
                     }
                     Text(
-                        "Rata-rata bulan sebelumnya: ${stats.previousAverage?.toString() ?: "Belum ada data"}",
+                        if (scoresReady) "Rata-rata bulan sebelumnya: ${stats.previousAverage?.toString() ?: "Belum ada data"}"
+                        else "Rata-rata menunggu sinkronisasi",
                         color = Subtle, fontSize = 11.sp
                     )
                 }
