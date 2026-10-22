@@ -18,12 +18,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.vokasilearning.data.SchoolLeaderboardEntry
 import com.example.vokasilearning.logic.*
 import com.example.vokasilearning.model.*
 import com.example.vokasilearning.ui.*
 
 @Composable
-internal fun LeaderboardScreen(me: Student, users: List<Student>, attempts: List<Attempt>) {
+internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardEntry>, dataReady: Boolean, dataError: String, onRetry: () -> Unit) {
     var metric by remember { mutableStateOf(RankingMetric.XP) }
     var scope by remember { mutableStateOf(RankingScope.SCHOOL) }
     var chosenMajor by remember { mutableStateOf(me.classroom.major) }
@@ -31,15 +32,21 @@ internal fun LeaderboardScreen(me: Student, users: List<Student>, attempts: List
     var filterOpen by remember { mutableStateOf(false) }
 
     val groups = if (scope == RankingScope.CLASS) {
-        users.map { it.classroom.label }.distinct()
+        leaderboard.map { it.classroom }.distinct().sorted()
     } else {
-        users.map { it.classroom.major }.distinct()
+        leaderboard.map { it.major }.distinct().sorted()
     }
     val groupValue = if (scope == RankingScope.CLASS) chosenClass else chosenMajor
-    val scoredUsers = attempts.asSequence().map { it.studentId }.toSet()
-    val eligible = users.filter { it.username == me.username || it.username in scoredUsers }
-    val ordered = rankList(eligible, attempts, me, scope, metric, chosenMajor, chosenClass)
-    val meRank = ordered.indexOfFirst { it.username == me.username }
+    val ordered = if (dataReady) leaderboard.filter { entry ->
+        when (scope) {
+            RankingScope.SCHOOL -> true
+            RankingScope.MAJOR -> entry.major == chosenMajor
+            RankingScope.CLASS -> entry.major == me.classroom.major && entry.classroom == chosenClass
+        }
+    }.sortedWith(compareByDescending<SchoolLeaderboardEntry> {
+        if (metric == RankingMetric.XP) it.seasonXp else it.streak
+    }.thenBy { it.displayName }.thenBy { it.username }) else emptyList()
+    val meRank = ordered.indexOfFirst { it.username.equals(me.username, true) }
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
@@ -49,7 +56,7 @@ internal fun LeaderboardScreen(me: Student, users: List<Student>, attempts: List
         item {
             StudentScreenHeader(
                 title = "Papan Peringkat",
-                subtitle = "Nilai latihan berasal dari perangkat ini; belum tersinkron antarsiswa."
+                subtitle = if (dataReady) "Peringkat peserta dari hasil di Supabase." else "Menghubungkan papan peringkat sekolah..."
             )
         }
         item {
