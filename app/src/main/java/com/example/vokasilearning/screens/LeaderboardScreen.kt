@@ -163,11 +163,11 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
                         Column(Modifier.weight(1f)) {
                             Text("POSISIMU", color = NavyLight, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
                             Spacer(Modifier.height(4.dp))
-                            Text("#${meRank + 1} dari ${ordered.size} siswa", color = Ink, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("#${meRank + 1} dari ${ordered.size} peserta aktif", color = Ink, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
                         }
                         Pill(
-                            if (metric == RankingMetric.XP) "${studentSeasonXp(me, attempts)} XP"
-                            else "${calculateStreak(me, attempts)} hari",
+                            if (metric == RankingMetric.XP) "${ordered[meRank].seasonXp} XP"
+                            else "${ordered[meRank].streak} hari",
                             PaleBlue, Navy
                         )
                     }
@@ -187,9 +187,9 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
                             horizontalArrangement = Arrangement.spacedBy(9.dp),
                             verticalAlignment = Alignment.Bottom
                         ) {
-                            PodiumItem(ordered[1], 2, metric, attempts, Modifier.weight(1f).height(163.dp))
-                            PodiumItem(ordered[0], 1, metric, attempts, Modifier.weight(1f).height(194.dp))
-                            PodiumItem(ordered[2], 3, metric, attempts, Modifier.weight(1f).height(163.dp))
+                            PodiumItem(ordered[1], me, 2, metric, Modifier.weight(1f).height(163.dp))
+                            PodiumItem(ordered[0], me, 1, metric, Modifier.weight(1f).height(194.dp))
+                            PodiumItem(ordered[2], me, 3, metric, Modifier.weight(1f).height(163.dp))
                         }
                     } else {
                         Row(
@@ -199,7 +199,7 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
                         ) {
                             ordered.forEachIndexed { i, student ->
                                 PodiumItem(
-                                    student, i + 1, metric, attempts,
+                                    student, me, i + 1, metric,
                                     Modifier.weight(1f).height(if (i == 0) 190.dp else 163.dp)
                                 )
                             }
@@ -214,8 +214,9 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
                     Modifier.padding(horizontal = 18.dp)
                 )
             }
-            itemsIndexed(ordered, key = { _, student -> student.username }) { index, student ->
-                val isMe = student.username == me.username
+            itemsIndexed(ordered, key = { _, entry -> entry.username }) { index, entry ->
+                val isMe = entry.username.equals(me.username, true)
+                val student = entry.asDisplayStudent(me)
                 Column(Modifier.padding(horizontal = 18.dp)) {
                     WhiteCard(Modifier.fillMaxWidth()) {
                         Row(
@@ -244,7 +245,7 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
                                     )
                                 }
                                 Text(
-                                    "${student.classroom.label} • LV ${levelFor(lifetimeXp(student, attempts)).level}",
+                                    "${entry.classroom} • LV ${levelFor(entry.lifetimeXp.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()).level}",
                                     color = Subtle,
                                     fontSize = 10.sp,
                                     maxLines = 1
@@ -254,8 +255,8 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
                                 }
                             }
                             Text(
-                                if (metric == RankingMetric.XP) "${studentSeasonXp(student, attempts)} XP"
-                                else "${calculateStreak(student, attempts)}",
+                                if (metric == RankingMetric.XP) "${entry.seasonXp} XP"
+                                else "${entry.streak} hari",
                                 color = Navy,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.ExtraBold,
