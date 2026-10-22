@@ -1,0 +1,53 @@
+name: VOKASI - Impor 2378 Siswa
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Pratinjau dulu; pilih import hanya setelah validasi"
+        required: true
+        type: choice
+        options:
+          - preview
+          - import
+        default: preview
+      resume:
+        description: "Lanjutkan jika proses impor sebelumnya terhenti"
+        required: true
+        type: boolean
+        default: false
+      confirmation:
+        description: "Untuk import ketik: IMPORT_2378_VOKASI"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vokasi-student-import-production
+  cancel-in-progress: false
+
+jobs:
+  import-students:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Supabase client
+        run: npm install --no-save --no-package-lock --prefix scripts/vokasi-import @supabase/supabase-js@2
+      - name: Validate and optionally import students
+        env:
+          VOKASI_SUPABASE_URL: https://vztvdpcbtrarrcmpzzqe.supabase.co
+          VOKASI_SUPABASE_ANON_KEY: sb_publishable_VxqBB5cioMmLDbIDit9w_w_hcCY7R7t
+          VOKASI_ADMIN_EMAIL: ${{ secrets.VOKASI_ADMIN_EMAIL }}
+          VOKASI_ADMIN_PASSWORD: ${{ secrets.VOKASI_ADMIN_PASSWORD }}
+          VOKASI_IMPORT_AES_KEY: ${{ secrets.VOKASI_IMPORT_AES_KEY }}
+          VOKASI_IMPORT_MODE: ${{ inputs.mode }}
+          VOKASI_IMPORT_RESUME: ${{ inputs.resume }}
+          VOKASI_IMPORT_CONFIRM: ${{ inputs.confirmation }}
+        run: node scripts/vokasi-import/run.cjs
