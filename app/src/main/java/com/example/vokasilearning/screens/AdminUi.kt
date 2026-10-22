@@ -6,6 +6,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -185,35 +187,77 @@ internal fun AdminSelect(
                     overflow = TextOverflow.Ellipsis)
                 Text("⌄", color = Navy)
             }
-            DropdownMenu(
-                expanded = open,
-                onDismissRequest = { open = false },
-                modifier = Modifier.heightIn(max = 360.dp)
-            ) {
-                if (searchable) {
-                    OutlinedTextField(
-                        value = search,
-                        onValueChange = { search = it },
-                        placeholder = { Text("Cari jurusan", fontSize = 12.sp) },
-                        singleLine = true,
-                        modifier = Modifier.widthIn(min = 180.dp, max = 260.dp).padding(horizontal = 8.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
-                if (visibleOptions.isEmpty()) {
-                    DropdownMenuItem(
-                        text = { Text("Jurusan tidak ditemukan", fontSize = 12.sp) },
-                        onClick = {}, enabled = false
-                    )
-                }
-                visibleOptions.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option.ifBlank { "Semua" }, fontSize = 13.sp) },
-                        onClick = { onChange(option); open = false }
-                    )
+            if (!searchable) {
+                DropdownMenu(
+                    expanded = open,
+                    onDismissRequest = { open = false },
+                    modifier = Modifier.heightIn(max = 300.dp)
+                ) {
+                    options.forEach { option ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(option.ifBlank { "Semua" }, fontSize = 13.sp,
+                                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            },
+                            onClick = { onChange(option); open = false }
+                        )
+                    }
                 }
             }
         }
+    }
+    if (open && searchable) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("Pilih jurusan", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(
+                    Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    OutlinedTextField(
+                        value = search,
+                        onValueChange = { search = it },
+                        placeholder = { Text("Cari jurusan") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        if (visibleOptions.isEmpty()) {
+                            item {
+                                Text("Jurusan tidak ditemukan", color = Subtle,
+                                    fontSize = 13.sp, modifier = Modifier.padding(12.dp))
+                            }
+                        }
+                        items(visibleOptions.distinct()) { option ->
+                            TextButton(
+                                onClick = { onChange(option); open = false },
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(
+                                    horizontal = 10.dp, vertical = 11.dp
+                                )
+                            ) {
+                                Text(
+                                    option.ifBlank { "Semua jurusan" },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = Ink, fontSize = 13.sp,
+                                    maxLines = 3
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { open = false }) {
+                    Text("Tutup", color = Navy)
+                }
+            }
+        )
     }
 }
 
