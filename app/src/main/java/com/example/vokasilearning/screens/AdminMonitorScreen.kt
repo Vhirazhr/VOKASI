@@ -161,7 +161,7 @@ internal fun AdminMonitorScreen(
                     FilterChip(
                         selected = onlyMissing,
                         onClick = { onlyMissing = true; pagingActivated = false },
-                        label = { Text(if (scoresReady) "Belum latihan" else "Belum tersinkron", fontSize = 12.sp) }
+                        label = { Text(if (scoresReady) "Belum tercatat" else "Belum tersinkron", fontSize = 12.sp) }
                     )
                     Spacer(Modifier.weight(1f))
                     Text("${members.size} siswa", color = Subtle, fontSize = 11.sp)
