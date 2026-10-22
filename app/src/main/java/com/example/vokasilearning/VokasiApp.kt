@@ -77,7 +77,8 @@ internal fun VokasiApp(activity: ComponentActivity) {
             addAll(LocalAdminQuestionStore.load(activity).filter { it.id !in bundledIds })
         }
     }
-    val attempts = remember { mutableStateListOf<Attempt>().apply { addAll(LocalAttemptStore.load(activity)) } }
+    // Load attempt history only after authentication; no cross-account leakage.
+    val attempts = remember { mutableStateListOf<Attempt>() }
 
     val onboardingPrefs = remember { activity.getSharedPreferences("vokasi_onboarding", android.content.Context.MODE_PRIVATE) }
     var page by remember { mutableStateOf(
@@ -86,6 +87,9 @@ internal fun VokasiApp(activity: ComponentActivity) {
     var currentId by remember { mutableStateOf<String?>(null) }
     var isAdmin by remember { mutableStateOf(false) }
     var isRemoteStudent by remember { mutableStateOf(false) }
+    var schoolScoresReady by remember { mutableStateOf(false) }
+    var schoolScoresError by remember { mutableStateOf("") }
+    var schoolResultsCursor by remember { mutableStateOf<String?>(null) }
     var adminMajorFilter by remember { mutableStateOf("") }
     var adminStudentMajor by remember { mutableStateOf("") }
     var adminClassFilter by remember { mutableStateOf("") }
@@ -132,6 +136,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
             isAdmin = false
             isRemoteStudent = false
             schoolDirectory = SchoolDirectory()
+            schoolScoresReady = false
+            schoolScoresError = ""
+            schoolResultsCursor = null
+            attempts.clear()
             students.clear()
             // Clear legacy local directory files that could expose an admin's
             // cached roster to the next user of this shared Android device.
@@ -162,7 +170,19 @@ internal fun VokasiApp(activity: ComponentActivity) {
         if (page != Page.QUIZ || !quizSession.isComplete) return
         val attempt = quizSession.finish(student, attempts.toList())
         attempts.add(attempt)
-        LocalAttemptStore.save(activity, attempts.toList())
+        val deviceHistory = LocalAttemptStore.load(activity)
+        LocalAttemptStore.save(activity, deviceHistory.filterNot {
+            it.studentId == attempt.studentId && it.sessionKey == attempt.sessionKey
+        } + attempt)
+        if (isRemoteStudent) appScope.launch {
+            try {
+                SupabaseAttemptRepository.syncOwn(
+                    student.username, LocalAttemptStore.load(activity)
+                )
+            } catch (_: Exception) {
+                // Durable local history will be uploaded at next login.
+            }
+        }
         recordAdmin(
             "Nilai",
             "${student.username} • ${attempt.practiceCategory?.let { "Latihan $it" } ?: "Wajib"} • Nilai ${attempt.score}/100"
@@ -436,6 +456,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                         currentId = null
                                         isAdmin = true
                                         isRemoteStudent = false
+                                        attempts.clear()
+                                        schoolResultsCursor = null
+                                        schoolScoresReady = false
+                                        schoolScoresError = ""
                                         page = Page.ADMIN_HOME
                                         recordAdmin("Masuk", "Admin masuk ke panel VOKASI")
                                         true
