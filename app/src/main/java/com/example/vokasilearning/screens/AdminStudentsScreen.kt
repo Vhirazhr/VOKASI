@@ -142,7 +142,7 @@ internal fun AdminStudentsScreen(
                         OutlinedTextField(
                             value = query,
                             onValueChange = { query = it; page = 0 },
-                            placeholder = { Text("Nama, username, kelas, jurusan") },
+                            placeholder = { Text("Cari nama atau kelas") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             shape = RoundedCornerShape(13.dp)
@@ -161,7 +161,7 @@ internal fun AdminStudentsScreen(
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Text("${students.size} siswa • ${majors.size} jurusan • Data Supabase",
+                        Text("${students.size} siswa • ${majors.size} jurusan",
                             color = Subtle, fontSize = 11.sp)
                     }
                 }
