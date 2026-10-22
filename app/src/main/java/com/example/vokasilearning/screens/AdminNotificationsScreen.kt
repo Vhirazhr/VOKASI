@@ -27,7 +27,6 @@ internal fun AdminNotificationsScreen(
     onSchool: () -> Unit,
     onBack: () -> Unit
 ) {
-    val unregistered = directory.pendingCount
     val messages = StudentNoticeStore.forAdmin(directory)
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
@@ -36,7 +35,7 @@ internal fun AdminNotificationsScreen(
     ) {
         item {
             Box(Modifier.fillMaxWidth()) {
-                AdminHero("Notifikasi", "Informasi terbaru panel VOKASI", compact = true)
+                AdminHero("Notifikasi", "Hal yang perlu diperiksa", compact = true)
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
                         .padding(top = 198.dp),
@@ -45,29 +44,10 @@ internal fun AdminNotificationsScreen(
                 ) {
                     Column(Modifier.padding(17.dp)) {
                         TextButton(onClick = onBack) { Text("‹ Kembali", color = Navy) }
-                        Text("Notifikasi lokal perangkat",
+                        Text(messages.size.toString() + " informasi aktif",
                             color = Subtle, fontSize = 12.sp)
                     }
                 }
-            }
-        }
-        item {
-            WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                Text("Status Pendaftaran", color = Ink, fontSize = 17.sp,
-                    fontWeight = FontWeight.ExtraBold)
-                Text(
-                    if (unregistered > 0) "$unregistered siswa belum mendaftarkan akun"
-                    else "Tidak ada siswa tertunda dalam daftar sekolah.",
-                    color = if (unregistered > 0) Bad else Good,
-                    fontWeight = FontWeight.Bold, fontSize = 13.sp
-                )
-                Text("Notifikasi berisi kondisi yang perlu ditindaklanjuti, bukan riwayat aktivitas.",
-                    color = Subtle, fontSize = 12.sp)
-                OutlinedButton(
-                    onClick = onSchool,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                ) { Text("Buka Manajemen Sekolah", color = Navy, fontSize = 12.sp) }
             }
         }
         items(messages.size) { index ->
@@ -76,18 +56,20 @@ internal fun AdminNotificationsScreen(
                 Text(message.title, color = Ink, fontSize = 15.sp,
                     fontWeight = FontWeight.ExtraBold)
                 Text(message.description, color = Subtle, fontSize = 12.sp)
+                if (message.key == "admin_pending" || message.key == "admin_setup") {
+                    OutlinedButton(
+                        onClick = onSchool,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) { Text("Buka Data Sekolah", color = Navy, fontSize = 12.sp) }
+                }
             }
         }
         if (messages.isEmpty()) item {
             WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                Text("Tidak ada pemberitahuan yang memerlukan tindakan saat ini.",
+                Text("Tidak ada informasi yang perlu ditindaklanjuti.",
                     color = Good, fontSize = 12.sp)
             }
-        }
-        item {
-            Text("Notifikasi ini belum disinkronkan antarperangkat.",
-                color = Subtle, fontSize = 11.sp,
-                modifier = Modifier.padding(horizontal = 18.dp))
         }
     }
 }
