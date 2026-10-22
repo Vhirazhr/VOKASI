@@ -30,7 +30,7 @@ internal fun SchoolScoreDonut(stats: SchoolStatistics, dataAvailable: Boolean = 
         Triple("75–100", stats.high, Good),
         Triple("60–74", stats.middle, Warning),
         Triple("0–59", stats.low, Bad),
-        Triple("Belum", stats.missing, Subtle)
+        Triple("Belum tercatat", stats.missing, Subtle)
     )
     WhiteCard(Modifier.fillMaxWidth()) {
         Text("Distribusi nilai", color = Ink, fontSize = 16.sp,
