@@ -19,17 +19,17 @@ internal object VokasiHelp {
     data class Answer(val text: String, val recognized: Boolean)
     private val topics: List<Pair<List<String>, String>> = listOf(
         listOf("daftar", "registrasi", "akun baru") to
-            "Akun hanya bisa dibuat jika nama lengkap, jurusan, kelas, dan angkatan sudah dimasukkan admin. Buka Daftar, pilih kelas dari daftar, lalu isi username dan password. Jika ditolak, hubungi admin sekolah.",
+            "Akun siswa dibuat admin sekolah melalui Supabase. Siswa tidak perlu mendaftar sendiri. Jika belum bisa login, hubungi admin.",
         listOf("masuk", "login", "password", "sandi") to
-            "Di halaman Masuk, isi username dan password yang didaftarkan. Jika gagal, cek penulisan dan minta bantuan admin. Jangan bagikan sandi kepada siapa pun.",
+            "Siswa masuk dengan nama lengkap dan password. Huruf kapital bebas. Jika nama sama, gunakan format Nama | Kelas. Admin masuk dengan email.",
         listOf("angkatan", "tingkat", "kelas", "jurusan") to
             "Tingkat X, XI, XII menunjukkan kelas 1, 2, 3 SMK. Angkatan adalah tahun masuk siswa. Jurusan dan kelas ditetapkan admin agar tidak ada kelas fiktif.",
         listOf("waktu", "durasi", "timer", "30 menit") to
             "Latihan wajib VOKASI memiliki target 100 soal dan total waktu 30 menit. Waktu tiap soal mengikuti kode tingkat kesulitan yang ditentukan sistem.",
         listOf("nilai", "skor", "benar", "salah") to
-            "Setelah latihan selesai, aplikasi menampilkan skor dan pembahasan jawaban. Admin dapat memeriksa rekap Nilai per kelas dan tanggal.",
+            "Nilai dan pembahasan tersimpan di perangkat. Rekap admin belum tersinkron antarpengguna.",
         listOf("xp", "streak", "peringkat", "leaderboard") to
-            "XP dan streak memberi apresiasi atas latihan konsisten. Peringkat dapat ditinjau sesuai lingkup yang tersedia di halaman Peringkat.",
+            "XP, streak, dan peringkat saat ini berasal dari riwayat latihan pada perangkat ini, bukan klasemen sekolah terpusat.",
         listOf("perkalian", "kali") to
             "Perkalian adalah penjumlahan berulang. Misalnya 12 × 3 = 12 + 12 + 12 = 36. Untuk hitungan tertentu, ketik: 12 x 3.",
         listOf("pembagian", "bagi") to
@@ -43,9 +43,9 @@ internal object VokasiHelp {
         listOf("ekspor", "export", "excel", "impor", "import") to
             "Pada Admin → Soal, pilih satu atau beberapa materi, lalu tekan Ekspor Excel. Ekspor mengambil seluruh hasil filter, bukan hanya 10 soal yang terlihat. Impor menggunakan Template Excel.",
         listOf("admin", "pengaturan", "sekolah", "kelola") to
-            "Admin mengelola jurusan, kelas, angkatan, dan daftar siswa pada tab Sekolah. Status hijau berarti Terdaftar, merah berarti Belum Terdaftar. Kelas siswa diperbarui hanya oleh admin.",
+            "Data siswa dan kelas dikelola admin melalui Supabase. Perubahan penting perlu disinkronkan dan diperiksa pada tab Sekolah.",
         listOf("privasi", "offline", "internet", "api") to
-            "Asisten ini berjalan offline, tidak mengakses API atau internet, dan hanya menyediakan bantuan tentang VOKASI. Data sekolah pada versi ini tersimpan lokal, bukan tersinkron antarperangkat."
+            "Asisten berjalan offline. Data siswa dan akun tersimpan di Supabase; nilai, soal tambahan, dan progres kuis masih lokal pada perangkat."
     )
 
     fun answer(input: String): Answer {
@@ -77,7 +77,7 @@ internal object VokasiHelp {
         } }
         return if (matched != null) Answer(matched.second, true)
         else Answer(
-            "Aku hanya membantu seputar sistem VOKASI dan aritmetika dasar. Coba tanyakan tentang pendaftaran, kelas, nilai, latihan, XP, Bank Soal, impor/ekspor, atau 12 × 3.",
+            "Aku bisa bantu penggunaan VOKASI dan hitung dasar. Coba tanya tentang login, nilai, kelas, atau 12 × 3.",
             false
         )
     }
@@ -86,7 +86,7 @@ internal object VokasiHelp {
 @Composable
 internal fun VokasiAssistantScreen(isAdmin: Boolean) {
     val messages = remember { mutableStateListOf(
-        "Asisten" to "Halo! Aku Asisten VOKASI offline. Tanyakan penggunaan aplikasi atau latihan hitung dasar. Aku tidak menjawab pertanyaan di luar VOKASI."
+        "Asisten" to "Halo! Tanya seputar VOKASI atau matematika dasar. Aku berjalan offline."
     ) }
     var prompt by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize().background(Canvas)) {
