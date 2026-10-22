@@ -41,16 +41,18 @@ internal fun LoginScreen(
                     .padding(horizontal = 22.dp, vertical = 25.dp),
                 verticalArrangement = Arrangement.spacedBy(13.dp)
             ) {
-                Text("Username / Email Admin", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Ink)
+                Text("Nama Lengkap Siswa / Email Admin", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Ink)
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it.trim(); error = false },
-                    placeholder = { Text("Username siswa atau email admin") },
+                    placeholder = { Text("Contoh: Abdi Rizal Saputra") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(13.dp),
                     colors = authFieldColors()
                 )
+                Text("Ketik nama lengkap sesuai daftar sekolah. Jika namanya kembar, tambahkan | Kelas.",
+                    fontSize = 11.sp, color = Subtle)
                 Text("Password", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Ink)
                 OutlinedTextField(
                     value = password,
