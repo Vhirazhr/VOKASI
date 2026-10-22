@@ -66,14 +66,9 @@ import com.example.vokasilearning.ui.*
 
 @Composable
 internal fun VokasiApp(activity: ComponentActivity) {
-    var schoolDirectory by remember { mutableStateOf(SchoolDirectoryStore.load(activity)) }
-    val students = remember {
-        mutableStateListOf<Student>().apply {
-            addAll(SchoolDirectoryStore.load(activity).roster.mapNotNull { entry ->
-                entry.asStudent()?.copy(photo = StudentAccountStore.photo(activity, entry.id))
-            })
-        }
-    }
+    // Avoid loading another user's cached school directory before authentication.
+    var schoolDirectory by remember { mutableStateOf(SchoolDirectory()) }
+    val students = remember { mutableStateListOf<Student>() }
     val bundledQuestions = remember { QuestionBankLoader.load(activity) }
     val bundledIds = remember { bundledQuestions.map { it.id }.toSet() }
     val questions = remember {
@@ -123,15 +118,22 @@ internal fun VokasiApp(activity: ComponentActivity) {
 
     fun logout() {
         if (isAdmin) recordAdmin("Masuk", "Admin keluar dari aplikasi")
-        if (isAdmin || isRemoteStudent) {
-            appScope.launch {
+        appScope.launch {
+            // Complete sign-out before presenting another login, so a pending
+            // sign-out cannot accidentally invalidate the next person's session.
+            if (isAdmin || isRemoteStudent) {
                 try { vokasiSupabase.auth.signOut() } catch (_: Exception) { }
             }
+            currentId = null
+            isAdmin = false
+            isRemoteStudent = false
+            schoolDirectory = SchoolDirectory()
+            students.clear()
+            // Clear legacy local directory files that could expose an admin's
+            // cached roster to the next user of this shared Android device.
+            try { SchoolDirectoryStore.save(activity, SchoolDirectory()) } catch (_: Exception) { }
+            page = Page.LOGIN
         }
-        currentId = null
-        isAdmin = false
-        isRemoteStudent = false
-        page = Page.LOGIN
     }
     fun saveQuizCheckpoint() {
         val owner = currentId ?: return
@@ -421,7 +423,6 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                     // as if they were synchronized school records.
                                     try {
                                         val remote = SupabaseSchoolRepository.loadDirectory()
-                                        SchoolDirectoryStore.save(activity, remote)
                                         schoolDirectory = remote
                                         students.clear()
                                         students.addAll(remote.roster.mapNotNull { entry ->
@@ -447,11 +448,23 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                 if (remoteStudent == null) {
                                     false
                                 } else {
-                                    val existingIndex = students.indexOfFirst {
+                                    // Students only load the directory rows their own
+                                    // Supabase session may read (RLS: their own roster).
+                                    val ownDirectory = try {
+                                        SupabaseSchoolRepository.loadDirectory()
+                                    } catch (_: Exception) {
+                                        SchoolDirectory()
+                                    }
+                                    schoolDirectory = ownDirectory
+                                    students.clear()
+                                    val ownRoster = ownDirectory.roster.firstOrNull {
                                         it.username.equals(remoteStudent.username, true)
                                     }
-                                    if (existingIndex >= 0) students[existingIndex] = remoteStudent
-                                    else students.add(remoteStudent)
+                                    students.add(remoteStudent.copy(
+                                        photo = ownRoster?.let {
+                                            StudentAccountStore.photo(activity, it.id)
+                                        }
+                                    ))
                                     currentId = remoteStudent.username
                                     isAdmin = false
                                     isRemoteStudent = true
@@ -634,7 +647,6 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             try {
                                 val remote = SupabaseSchoolRepository.syncDirectory(next)
                                 val merged = SupabaseSchoolRepository.mergeRemoteWithLocal(remote, next)
-                                SchoolDirectoryStore.save(activity, merged)
                                 schoolDirectory = merged
                                 students.clear()
                                 students.addAll(merged.roster.mapNotNull { entry ->
