@@ -2,87 +2,131 @@ package com.example.vokasilearning.data
 
 import android.content.Context
 import com.example.vokasilearning.logic.dayKey
-import com.example.vokasilearning.logic.calculateStreak
 import com.example.vokasilearning.model.Attempt
 import com.example.vokasilearning.model.Student
+import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 
 internal data class VokasiNotice(val title: String, val description: String, val key: String)
+
+/**
+ * In-app reminders only; no push/scheduled delivery is implied.
+ * Streak reminders are actionable only if there was practice yesterday.
+ * Read state is scoped to a single account on this Android device.
+ */
 internal object StudentNoticeStore {
     private const val PREFS = "vokasi_notice_settings"
-    fun streakReminder(context: Context, username: String): Boolean =
+
+    private fun accountKey(username: String) = username.trim().lowercase(Locale.ROOT)
+    private fun preferences(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean("streak_" + username.lowercase(), true)
+
+    fun streakReminder(context: Context, username: String): Boolean =
+        preferences(context).getBoolean("streak_" + accountKey(username), true)
 
     fun setStreakReminder(context: Context, username: String, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean("streak_" + username.lowercase(), enabled).apply()
+        preferences(context).edit()
+            .putBoolean("streak_" + accountKey(username), enabled).apply()
+    }
+
+    fun isRead(context: Context, username: String, noticeKey: String): Boolean =
+        preferences(context).getStringSet("read_" + accountKey(username), emptySet())
+            ?.contains(noticeKey) == true
+
+    fun markRead(context: Context, username: String, noticeKey: String) {
+        val key = "read_" + accountKey(username)
+        val stored = preferences(context).getStringSet(key, emptySet()).orEmpty().toMutableSet()
+        val today = dayKey(System.currentTimeMillis())
+        stored.removeAll {
+            (it.startsWith("daily_") && it != "daily_$today") ||
+                (it.startsWith("streak_") && it != "streak_$today")
+        }
+        stored.add(noticeKey)
+        preferences(context).edit().putStringSet(key, stored).apply()
+    }
+
+    fun markAllRead(context: Context, username: String, notices: List<VokasiNotice>) {
+        notices.forEach { markRead(context, username, it.key) }
     }
 
     fun migrate(context: Context, old: String, updated: String) {
-        if (old == updated) return
-        val pref = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val state = streakReminder(context, old)
-        pref.edit().putBoolean("streak_" + updated.lowercase(), state)
-            .remove("streak_" + old.lowercase()).apply()
+        if (old.equals(updated, true)) return
+        val prefs = preferences(context)
+        val oldKey = accountKey(old)
+        val newKey = accountKey(updated)
+        val read = prefs.getStringSet("read_" + oldKey, emptySet()).orEmpty()
+        val existing = prefs.getStringSet("read_" + newKey, emptySet()).orEmpty()
+        prefs.edit()
+            .putBoolean("streak_" + newKey, streakReminder(context, old))
+            .putStringSet("read_" + newKey, (read + existing).toSet())
+            .remove("streak_" + oldKey)
+            .remove("read_" + oldKey).apply()
     }
 
-    /** Only actionable/current information; not a copied activity history. */
-    fun forStudent(me: Student, attempts: List<Attempt>, remindersEnabled: Boolean): List<VokasiNotice> {
-        val mine = attempts.filter { it.studentId == me.username }
-        val today = dayKey(System.currentTimeMillis())
-        val todayRequired = mine.any { it.practiceCategory == null &&
-            it.answered > 0 && dayKey(it.timeMillis) == today }
+    /** Pure notification policy, with a clock argument for unit testing. */
+    fun forStudent(
+        me: Student,
+        attempts: List<Attempt>,
+        remindersEnabled: Boolean,
+        nowMillis: Long = System.currentTimeMillis()
+    ): List<VokasiNotice> {
+        val mine = attempts.filter { it.studentId == me.username && it.answered > 0 }
+        val today = dayKey(nowMillis)
+        val yesterday = dayKey(Calendar.getInstance(TimeZone.getTimeZone("Asia/Jakarta")).apply {
+            timeInMillis = nowMillis
+            add(Calendar.DAY_OF_YEAR, -1)
+        }.timeInMillis)
+        val practicedToday = mine.any { dayKey(it.timeMillis) == today }
+        val practicedYesterday = mine.any { dayKey(it.timeMillis) == yesterday }
+        val completedRequiredToday = mine.any {
+            it.practiceCategory == null && dayKey(it.timeMillis) == today
+        }
         val notices = mutableListOf<VokasiNotice>()
-        if (!todayRequired) notices.add(VokasiNotice(
-            "Latihan wajib hari ini",
-            "Latihan 100 soal belum tercatat hari ini. Kerjakan saat sudah siap.",
-            "daily_" + today
-        ))
-        if (remindersEnabled && mine.isNotEmpty() &&
-            mine.none { it.answered > 0 && dayKey(it.timeMillis) == today }) {
+        if (mine.isEmpty()) {
             notices.add(VokasiNotice(
-                "Jaga streak belajarmu",
-                "Sempatkan latihan hari ini agar kebiasaan belajarmu tetap konsisten.",
-                "streak_" + today
+                "Mulai latihan pertamamu",
+                "Kerjakan latihan untuk mencatat progres belajar.",
+                "welcome"
+            ))
+        } else if (!completedRequiredToday) {
+            notices.add(VokasiNotice(
+                "Latihan wajib belum tercatat",
+                "Latihan wajib hari ini belum selesai di perangkat ini.",
+                "daily_$today"
             ))
         }
-        if (mine.isEmpty()) notices.add(VokasiNotice(
-            "Mulai perjalanan belajarmu",
-            "Latihan pertama akan membuka progres nilai dan XP. Semangat!",
-            "welcome"
-        ))
+        if (remindersEnabled && practicedYesterday && !practicedToday) {
+            notices.add(VokasiNotice(
+                "Lanjutkan streak hari ini",
+                "Kamu sudah belajar kemarin. Ayo lanjutkan hari ini!",
+                "streak_$today"
+            ))
+        }
         val latest = mine.maxByOrNull { it.timeMillis }
         if (latest != null && latest.classSnapshot.isNotBlank() &&
             latest.classSnapshot != me.classroom.label) {
             notices.add(VokasiNotice(
-                "Kelas aktif diperbarui",
-                "Kelas sekarang: " + me.classroom.label +
-                    ". Riwayat nilai lama tetap menggunakan kelas saat latihan.",
+                "Kelasmu diperbarui",
+                "Kelas sekarang: " + me.classroom.label,
                 "class_change_" + me.classroom.label
             ))
         }
-        return notices.take(4)
+        return notices.take(3)
     }
 
     fun forAdmin(directory: SchoolDirectory): List<VokasiNotice> {
         val notifications = mutableListOf<VokasiNotice>()
         if (directory.pendingCount > 0) notifications.add(VokasiNotice(
-            "Siswa belum mengaktifkan akun",
-            directory.pendingCount.toString() + " siswa masih berstatus Belum Terdaftar.",
+            "Akun siswa perlu ditinjau",
+            directory.pendingCount.toString() + " siswa belum memiliki akun aktif.",
             "admin_pending"
         ))
         if (directory.majors.isEmpty() || directory.classes.isEmpty()) {
             notifications.add(VokasiNotice(
-                "Lengkapi data sekolah",
-                "Tambahkan jurusan dan kelas resmi sebelum membuat daftar siswa.",
+                "Data sekolah belum lengkap",
+                "Periksa jurusan dan kelas sebelum menambahkan siswa.",
                 "admin_setup"
-            ))
-        }
-        if (directory.roster.isNotEmpty() && directory.pendingCount == 0) {
-            notifications.add(VokasiNotice(
-                "Pendaftaran siswa lengkap",
-                "Seluruh siswa dalam daftar lokal telah memiliki akun.",
-                "admin_complete"
             ))
         }
         return notifications
