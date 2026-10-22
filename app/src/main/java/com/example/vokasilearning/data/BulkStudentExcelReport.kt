@@ -34,7 +34,7 @@ internal object BulkStudentExcelReport {
             GradeRow(student.fullName, student.major, student.classLabel,
                 student.admissionYear, date, grade?.score, when {
                     !student.registered -> "Belum Terdaftar"
-                    grade == null -> "Belum Mengerjakan"
+                    grade == null -> "Belum Tercatat"
                     else -> "Selesai"
                 })
         }.toList()
