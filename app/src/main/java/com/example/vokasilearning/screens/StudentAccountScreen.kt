@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
 internal fun StudentAccountScreen(
     me: Student,
     onSave: suspend (String, String, String) -> String?,
-    onPhoto: (android.graphics.Bitmap) -> String?,
+    onPhoto: suspend (android.graphics.Bitmap) -> String?,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -40,16 +40,21 @@ internal fun StudentAccountScreen(
     var photoBusy by remember { mutableStateOf(false) }
     val choosePhoto = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null && !photoBusy) {
-            photoBusy = true
-            notice = try {
-                val bitmap = context.contentResolver.openInputStream(uri)?.use {
-                    val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
-                    BitmapFactory.decodeStream(it, null, opts)
+            accountScope.launch {
+                photoBusy = true
+                notice = try {
+                    val bitmap = context.contentResolver.openInputStream(uri)?.use {
+                        val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
+                        BitmapFactory.decodeStream(it, null, opts)
+                    }
+                    if (bitmap == null) "Foto tidak dapat dibuka."
+                    else onPhoto(bitmap) ?: "Foto profil tersinkron ke sekolah."
+                } catch (e: Exception) {
+                    "Gagal memperbarui foto. " + (e.message ?: "Periksa koneksi internet.")
+                } finally {
+                    photoBusy = false
                 }
-                if (bitmap == null) "Foto tidak dapat dibuka."
-                else onPhoto(bitmap) ?: "Foto profil berhasil diperbarui."
-            } catch (_: Exception) { "Gagal menyimpan foto profil." }
-            photoBusy = false
+            }
         }
     }
     LazyColumn(Modifier.fillMaxSize().background(Canvas),
@@ -75,7 +80,7 @@ internal fun StudentAccountScreen(
                 OutlinedButton(onClick = { choosePhoto.launch("image/*") },
                     enabled = !photoBusy, shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()) {
-                    Text("Ganti Foto Profil", color = Navy)
+                    Text(if (photoBusy) "Mengunggah Foto..." else "Ganti Foto Profil", color = Navy)
                 }
             }
         }
