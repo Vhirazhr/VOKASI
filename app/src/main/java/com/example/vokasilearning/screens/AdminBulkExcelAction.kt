@@ -22,6 +22,7 @@ internal fun AdminBulkExcelAction(
     classroom: String,
     date: String,
     modifier: Modifier = Modifier,
+    scoresReady: Boolean = true,
     onExport: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
@@ -53,7 +54,7 @@ internal fun AdminBulkExcelAction(
     }
     VokasiButton(
         text = "Unduh Hasil Siswa (" + matchCount + ")",
-        enabled = matchCount > 0,
+        enabled = scoresReady && matchCount > 0,
         modifier = modifier,
         onClick = {
             selection = Triple(major, classroom, date)
