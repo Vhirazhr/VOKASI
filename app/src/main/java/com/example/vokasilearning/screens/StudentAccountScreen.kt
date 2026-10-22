@@ -82,13 +82,8 @@ internal fun StudentAccountScreen(
             WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                 Text("Keamanan Akun", color = Ink, fontSize = 17.sp,
                     fontWeight = FontWeight.ExtraBold)
-                Text("Username tidak dapat diubah. Gunakan email terverifikasi untuk pemulihan akun setelah fitur email diaktifkan.",
+                Text("Login siswa menggunakan nama lengkap yang terdaftar di sekolah. Identitas akun dikelola admin.",
                     color = Subtle, fontSize = 12.sp)
-                OutlinedTextField(
-                    value = me.username, onValueChange = {},
-                    label = { Text("Username (tetap)") }, readOnly = true, singleLine = true,
-                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)
-                )
                 OutlinedTextField(
                     value = oldPass, onValueChange = { oldPass = it; notice = "" },
                     label = { Text("Password saat ini") },
