@@ -172,7 +172,7 @@ internal object SupabaseSchoolRepository {
         val changedEntries = directory.roster.filter { incoming ->
             val saved = incoming.remoteId?.let { serverById[it] }
                 ?: serverByIdentity[identity(incoming)]?.singleOrNull()
-            saved == null ||
+            saved == null || !saved.registered ||
                 normalized(saved.fullName) != normalized(incoming.fullName) ||
                 normalized(saved.classLabel) != normalized(incoming.classLabel) ||
                 resolveMajor(saved.major)?.first != resolveMajor(incoming.major)?.first ||
