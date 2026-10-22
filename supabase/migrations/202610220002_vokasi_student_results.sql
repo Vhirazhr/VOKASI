@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS public.student_attempts (
  CONSTRAINT student_attempts_score_check CHECK (score = (correct * 100 / question_count)),
  CONSTRAINT student_attempts_session_unique UNIQUE (auth_user_id, session_key)
 );
+CREATE INDEX IF NOT EXISTS student_attempts_incremental_idx ON public.student_attempts (created_at, id);
 CREATE INDEX IF NOT EXISTS student_attempts_admin_timeline_idx ON public.student_attempts (completed_at_ms DESC);
 CREATE INDEX IF NOT EXISTS student_attempts_username_timeline_idx ON public.student_attempts (LOWER(username), completed_at_ms DESC);
 CREATE INDEX IF NOT EXISTS student_attempts_auth_timeline_idx ON public.student_attempts (auth_user_id, completed_at_ms DESC);
