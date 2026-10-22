@@ -19,8 +19,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 internal fun LoginScreen(
-    onLogin: suspend (String, String) -> Boolean,
-    onRegister: () -> Unit
+    onLogin: suspend (String, String) -> Boolean
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -33,7 +32,7 @@ internal fun LoginScreen(
         modifier = Modifier.fillMaxSize().background(Color.White),
         contentPadding = PaddingValues(bottom = 28.dp)
     ) {
-        item { AuthHero("Selamat datang", "Masuk untuk melanjutkan latihanmu.") }
+        item { AuthHero("Selamat datang", "Siswa: masukkan nama lengkap sesuai data sekolah.\nAdmin: gunakan email. Nama kembar: Nama | Kelas.") }
         item {
             Column(
                 Modifier.fillMaxWidth().offset(y = (-18).dp)
@@ -51,8 +50,6 @@ internal fun LoginScreen(
                     shape = RoundedCornerShape(13.dp),
                     colors = authFieldColors()
                 )
-                Text("Ketik nama lengkap sesuai daftar sekolah. Jika namanya kembar, tambahkan | Kelas.",
-                    fontSize = 11.sp, color = Subtle)
                 Text("Password", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Ink)
                 OutlinedTextField(
                     value = password,
@@ -89,16 +86,7 @@ internal fun LoginScreen(
                     enabled = username.isNotBlank() && password.isNotBlank() && !loading,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Belum punya akun?", color = Subtle, fontSize = 12.sp)
-                    TextButton(onClick = onRegister) {
-                        Text("Daftar", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                }
+
             }
         }
     }
