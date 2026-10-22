@@ -129,31 +129,9 @@ internal object SupabaseAttemptRepository {
         return added
     }
 
-    /** The cursor lets the open dashboard request only newer submissions. */
-    data class AdminBatch(val attempts: List<Attempt>, val lastCreatedAt: String?)
-
-    /** Use >= for the cursor boundary so sessions with the same timestamp are not lost. */
-    suspend fun loadForAdmin(
-        questions: List<Question>,
-        sinceCreatedAt: String? = null
-    ): AdminBatch {
-        val permitted = vokasiSupabase.postgrest.rpc("is_school_admin").decodeAs<Boolean>()
-        check(permitted) { "Akun ini bukan admin sekolah aktif." }
+    private fun decodeRows(rows: List<StoredAttempt>, questions: List<Question>): List<Attempt> {
         val questionById = questions.associateBy { it.id }
-        val rows = mutableListOf<StoredAttempt>()
-        var offset = 0L
-        do {
-            val page = vokasiSupabase.from("student_attempts").select {
-                if (!sinceCreatedAt.isNullOrBlank()) {
-                    filter { gte("created_at", sinceCreatedAt) }
-                }
-                order("created_at", Order.ASCENDING)
-                range(offset, offset + PAGE_SIZE - 1)
-            }.decodeList<StoredAttempt>()
-            rows.addAll(page)
-            offset += page.size
-        } while (page.size == PAGE_SIZE)
-        val decoded = rows.map { row ->
+        return rows.map { row ->
             Attempt(
                 studentId = row.username,
                 timeMillis = row.completedAtMs,
@@ -177,6 +155,38 @@ internal object SupabaseAttemptRepository {
                 }
             )
         }
+    }
+
+    suspend fun loadForStudent(questions: List<Question>): List<Attempt> {
+        val userId = vokasiSupabase.auth.currentUserOrNull()?.id?.toString()
+            ?: throw IllegalStateException("Sesi siswa berakhir.")
+        return decodeRows(fetchOwnRows(userId), questions)
+    }
+
+    /** The cursor lets the open dashboard request only newer submissions. */
+    data class AdminBatch(val attempts: List<Attempt>, val lastCreatedAt: String?)
+
+    /** Use >= for the cursor boundary so sessions with the same timestamp are not lost. */
+    suspend fun loadForAdmin(
+        questions: List<Question>,
+        sinceCreatedAt: String? = null
+    ): AdminBatch {
+        val permitted = vokasiSupabase.postgrest.rpc("is_school_admin").decodeAs<Boolean>()
+        check(permitted) { "Akun ini bukan admin sekolah aktif." }
+        val rows = mutableListOf<StoredAttempt>()
+        var offset = 0L
+        do {
+            val page = vokasiSupabase.from("student_attempts").select {
+                if (!sinceCreatedAt.isNullOrBlank()) {
+                    filter { gte("created_at", sinceCreatedAt) }
+                }
+                order("created_at", Order.ASCENDING)
+                range(offset, offset + PAGE_SIZE - 1)
+            }.decodeList<StoredAttempt>()
+            rows.addAll(page)
+            offset += page.size
+        } while (page.size == PAGE_SIZE)
+        val decoded = decodeRows(rows, questions)
         return AdminBatch(decoded, rows.lastOrNull()?.createdAt ?: sinceCreatedAt)
     }
 }
