@@ -196,6 +196,38 @@ internal fun VokasiApp(activity: ComponentActivity) {
 
     QuizScreenProtection(activity = activity, enabled = page == Page.QUIZ)
 
+    // 20-second incremental refresh, only within a school-admin session.
+    LaunchedEffect(isAdmin) {
+        if (isAdmin) {
+            while (isAdmin) {
+                try {
+                    val batch = SupabaseAttemptRepository.loadForAdmin(
+                        questions.toList(), schoolResultsCursor
+                    )
+                    val existing = attempts.toList().associateBy {
+                        it.studentId to it.sessionKey
+                    }.toMutableMap()
+                    batch.attempts.forEach { row ->
+                        existing[row.studentId to row.sessionKey] = row
+                    }
+                    attempts.clear()
+                    attempts.addAll(existing.values.sortedBy { it.timeMillis })
+                    schoolResultsCursor = batch.lastCreatedAt
+                    schoolScoresReady = true
+                    schoolScoresError = ""
+                } catch (_: Exception) {
+                    if (!schoolScoresReady) {
+                        attempts.clear()
+                        schoolScoresError = "Sinkronisasi nilai belum aktif. Periksa tabel hasil kuis di Supabase."
+                    } else {
+                        schoolScoresError = "Koneksi nilai terganggu. Menampilkan data terakhir."
+                    }
+                }
+                delay(20_000L)
+            }
+        }
+    }
+
     LaunchedEffect(page, quizSession.sessionId) {
         if (page == Page.QUIZ) {
             var savedIndex = quizSession.index
@@ -492,9 +524,38 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                             StudentAccountStore.photo(activity, it.id)
                                         }
                                     ))
+                                    val ownLocal = LocalAttemptStore.load(activity).filter {
+                                        it.studentId.equals(remoteStudent.username, true)
+                                    }
+                                    attempts.clear()
+                                    attempts.addAll(ownLocal)
                                     currentId = remoteStudent.username
                                     isAdmin = false
                                     isRemoteStudent = true
+                                    schoolScoresReady = false
+                                    schoolResultsCursor = null
+                                    appScope.launch {
+                                        try {
+                                            SupabaseAttemptRepository.syncOwn(
+                                                remoteStudent.username, LocalAttemptStore.load(activity)
+                                            )
+                                            val shared = SupabaseAttemptRepository.loadForStudent(questions.toList())
+                                            if (isRemoteStudent && currentId == remoteStudent.username) {
+                                                val localFirst = LocalAttemptStore.load(activity).filter {
+                                                    it.studentId.equals(remoteStudent.username, true)
+                                                }
+                                                val restored = (localFirst + shared).distinctBy {
+                                                    it.sessionKey.ifBlank {
+                                                        it.studentId + ":" + it.timeMillis
+                                                    }
+                                                }
+                                                attempts.clear()
+                                                attempts.addAll(restored)
+                                            }
+                                        } catch (_: Exception) {
+                                            // Progress stays on-device and retries at next login.
+                                        }
+                                    }
                                     // Restore only explicitly enabled OS reminders for this account.
                                     try {
                                         if (StudentNoticeStore.pushReminder(activity, remoteStudent.username)) {
@@ -564,6 +625,8 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     Page.ADMIN_HOME -> AdminHome(
                         students.toList(), questions.toList(), attempts.toList(),
                         roster = schoolDirectory.roster,
+                        scoresReady = schoolScoresReady,
+                        scoresNotice = schoolScoresError,
                         onStudents = { chosenMajor ->
                             adminStudentMajor = chosenMajor
                             page = Page.ADMIN_STUDENTS
@@ -582,6 +645,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     )
                     Page.ADMIN_STUDENTS -> AdminStudentsScreen(
                         students = students.toList(), attempts = attempts.toList(),
+                        scoresReady = schoolScoresReady,
                         initialMajor = adminStudentMajor
                     )
                     Page.ADMIN_QUESTIONS -> AdminQuestionsScreen(
@@ -728,6 +792,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     )
                     Page.ADMIN_MONITOR -> AdminMonitorScreen(
                         students.toList(), attempts.toList(),
+                        scoresReady = schoolScoresReady,
                         initialMajor = adminMajorFilter,
                         initialClass = adminClassFilter,
                         initialDate = adminDateFilter,
