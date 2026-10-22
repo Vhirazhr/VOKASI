@@ -44,7 +44,7 @@ internal fun LoginScreen(
                 Text("Nama Lengkap Siswa / Email Admin", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Ink)
                 OutlinedTextField(
                     value = username,
-                    onValueChange = { username = it.trim(); error = false },
+                    onValueChange = { username = it; error = false },
                     placeholder = { Text("Contoh: Abdi Rizal Saputra") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -78,7 +78,7 @@ internal fun LoginScreen(
                             loading = true
                             error = false
                             try {
-                                error = !onLogin(username, password)
+                                error = !onLogin(username.trim(), password)
                             } catch (_: Exception) {
                                 error = true
                             } finally {
