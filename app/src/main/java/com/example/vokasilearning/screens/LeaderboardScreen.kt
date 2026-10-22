@@ -36,16 +36,21 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
     var filterOpen by remember { mutableStateOf(false) }
 
     val groups = if (scope == RankingScope.CLASS) {
-        leaderboard.map { it.classroom }.distinct().sorted()
+        leaderboard.filter { it.major == chosenMajor }.map { it.classroom }.distinct().sorted()
     } else {
         leaderboard.map { it.major }.distinct().sorted()
+    }
+    LaunchedEffect(scope, chosenMajor, leaderboard.size) {
+        if (scope == RankingScope.CLASS && chosenClass !in groups) {
+            chosenClass = groups.firstOrNull().orEmpty()
+        }
     }
     val groupValue = if (scope == RankingScope.CLASS) chosenClass else chosenMajor
     val ordered = if (dataReady) leaderboard.filter { entry ->
         when (scope) {
             RankingScope.SCHOOL -> true
             RankingScope.MAJOR -> entry.major == chosenMajor
-            RankingScope.CLASS -> entry.major == me.classroom.major && entry.classroom == chosenClass
+            RankingScope.CLASS -> entry.major == chosenMajor && entry.classroom == chosenClass
         }
     }.sortedWith(compareByDescending<SchoolLeaderboardEntry> {
         if (metric == RankingMetric.XP) it.seasonXp else it.streak
