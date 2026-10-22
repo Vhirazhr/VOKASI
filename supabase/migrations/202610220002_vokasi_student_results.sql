@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS public.student_attempts (
  name_snapshot TEXT NOT NULL DEFAULT '',
  class_snapshot TEXT NOT NULL DEFAULT '',
  major_snapshot TEXT NOT NULL DEFAULT '',
+ review_summary JSONB NOT NULL DEFAULT '[]'::JSONB
+    CHECK (jsonb_typeof(review_summary) = 'array' AND jsonb_array_length(review_summary) <= 100),
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  CONSTRAINT student_attempts_counts_check CHECK (correct <= answered AND answered <= question_count),
  CONSTRAINT student_attempts_score_check CHECK (score = (correct * 100 / question_count)),
