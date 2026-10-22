@@ -230,7 +230,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                             "Pastikan fungsi ranking di Supabase sudah diaktifkan."
                     }
                 }
-                delay(60_000L)
+                delay(if (page == Page.LEADERBOARD) 60_000L else 300_000L)
             }
         }
     }
