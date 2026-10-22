@@ -117,6 +117,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
     var currentAttempt by remember { mutableStateOf<Attempt?>(null) }
     var reviewingHistory by remember { mutableStateOf(false) }
     var showResultPopup by remember { mutableStateOf(false) }
+    var resultSyncStatus by remember { mutableStateOf("") }
     var quitDialog by remember { mutableStateOf(false) }
     val me = students.firstOrNull { it.username == currentId }
 
@@ -174,13 +175,20 @@ internal fun VokasiApp(activity: ComponentActivity) {
         LocalAttemptStore.save(activity, deviceHistory.filterNot {
             it.studentId == attempt.studentId && it.sessionKey == attempt.sessionKey
         } + attempt)
+        resultSyncStatus = "Menyinkronkan ke Supabase..."
         if (isRemoteStudent) appScope.launch {
             try {
                 SupabaseAttemptRepository.syncOwn(
                     student.username, LocalAttemptStore.load(activity)
                 )
+                if (currentId == student.username && currentAttempt?.sessionKey == attempt.sessionKey) {
+                    resultSyncStatus = "Tersimpan di Supabase"
+                }
             } catch (_: Exception) {
                 // Durable local history will be uploaded at next login.
+                if (currentId == student.username && currentAttempt?.sessionKey == attempt.sessionKey) {
+                    resultSyncStatus = "Tersimpan di HP. Akan dicoba lagi saat online."
+                }
             }
         }
         recordAdmin(
@@ -815,6 +823,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
         CompletionDialog(
             attempt = currentAttempt!!,
             streak = calculateStreak(me, attempts.toList()),
+            syncStatus = resultSyncStatus,
             highlightStreak = attempts.count {
                 it.studentId == me.username && it.answered > 0 &&
                     dayKey(it.timeMillis) == dayKey(currentAttempt!!.timeMillis)
