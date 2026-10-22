@@ -39,7 +39,7 @@ internal object DailyExcelReport {
                 student.classroom.label,
                 date,
                 latest?.score?.toString() ?: "",
-                if (latest == null) "Belum Mengerjakan" else "Selesai"
+                if (latest == null) "Belum Tercatat" else "Selesai"
             )
         }
         val sheet = buildString {
