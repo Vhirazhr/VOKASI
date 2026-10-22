@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.student_attempts (
  correct SMALLINT NOT NULL CHECK (correct >= 0),
  answered SMALLINT NOT NULL CHECK (answered >= 0),
  question_count SMALLINT NOT NULL CHECK (question_count IN (10, 100)),
- score SMALLINT NOT NULL CHECK (score BETWEEN 0 AND 100),
+ score SMALLINT NOT NULL,
  earned_xp SMALLINT NOT NULL DEFAULT 0 CHECK (earned_xp BETWEEN 0 AND 100),
  seconds_spent INTEGER NOT NULL DEFAULT 0 CHECK (seconds_spent BETWEEN 0 AND 7200),
  practice_category TEXT,
