@@ -32,7 +32,7 @@ internal fun LoginScreen(
         modifier = Modifier.fillMaxSize().background(Color.White),
         contentPadding = PaddingValues(bottom = 28.dp)
     ) {
-        item { AuthHero("Selamat datang", "Siswa: masukkan nama lengkap sesuai data sekolah.\nAdmin: gunakan email. Nama kembar: Nama | Kelas.") }
+        item { AuthHero("Selamat datang", "Siswa: nama lengkap • Admin: email.") }
         item {
             Column(
                 Modifier.fillMaxWidth().offset(y = (-18).dp)
@@ -66,7 +66,8 @@ internal fun LoginScreen(
                     shape = RoundedCornerShape(13.dp),
                     colors = authFieldColors()
                 )
-                if (error) Text("Login gagal. Periksa akun, password, dan koneksi internet.", color = Bad, fontSize = 12.sp)
+                if (error) Text("Login gagal. Periksa nama dan password.\nJika nama kembar, tambahkan | Kelas.",
+                    color = Bad, fontSize = 12.sp)
                 Spacer(Modifier.height(4.dp))
                 VokasiButton(
                     text = if (loading) "Memeriksa..." else "Masuk",
