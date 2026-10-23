@@ -889,8 +889,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         onLogout = { logout() }
                     )
                     Page.ADMIN_MONITOR -> AdminMonitorScreen(
-                        students.toList(), attempts.toList(),
-                        scoresReady = schoolScoresReady,
+                        students.toList(), questions.toList(),
                         initialMajor = adminMajorFilter,
                         initialClass = adminClassFilter,
                         initialDate = adminDateFilter,
