@@ -26,7 +26,8 @@ import java.util.Locale
  */
 @Composable
 internal fun SchoolScoreDonut(
-    stats: SchoolStatistics, dataAvailable: Boolean = true, weekly: Boolean = false
+    stats: SchoolStatistics, dataAvailable: Boolean = true, weekly: Boolean = false,
+    dateScoped: Boolean = false
 ) {
     val pieces = listOf(
         Triple("75–100", stats.high, Good),
@@ -94,10 +95,10 @@ internal fun SchoolScoreDonut(
                 }
             }
         }
-        Text(if (dataAvailable)
-            if (weekly) "Setiap siswa dihitung sekali dari nilai wajib terakhir pada pekan terpilih."
-            else "Setiap siswa dihitung sekali berdasarkan nilai wajib terakhir pada bulan terpilih."
-            else "Grafik akan terisi setelah data berhasil dimuat.",
+        Text(if (!dataAvailable) "Grafik akan terisi setelah data berhasil dimuat."
+            else if (dateScoped) "Nilai wajib terakhir setiap siswa pada tanggal laporan."
+            else if (weekly) "Setiap siswa dihitung sekali dari nilai wajib terakhir pada pekan terpilih."
+            else "Setiap siswa dihitung sekali berdasarkan nilai wajib terakhir pada bulan terpilih.",
             color = Subtle, fontSize = 11.sp)
     }
 }
@@ -111,7 +112,7 @@ internal fun SchoolMonthlyTrend(
     WhiteCard(Modifier.fillMaxWidth()) {
         Text(if (weekly) "Perkembangan rata-rata harian" else "Perkembangan rata-rata bulanan",
             color = Ink, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-        Text(if (weekly) "7 hari dalam pekan terpilih • Skala nilai 0–100"
+        Text(if (weekly) "7 hari hingga tanggal laporan • Skala nilai 0–100"
             else "6 bulan hingga periode terpilih • Skala nilai 0–100",
             color = Subtle, fontSize = 11.sp)
         val recordedMonths = if (dataAvailable) stats.trend.count { it.second != null } else 0
