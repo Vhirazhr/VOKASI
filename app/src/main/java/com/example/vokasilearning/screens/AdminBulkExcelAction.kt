@@ -7,6 +7,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.activity.compose.rememberLauncherForActivityResult
