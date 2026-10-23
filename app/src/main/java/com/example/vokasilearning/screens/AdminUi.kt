@@ -329,20 +329,6 @@ internal fun AdminDateSelect(
             Text(date, color = Ink, fontSize = 11.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            TextButton(
-                onClick = { onChange(dayKey(System.currentTimeMillis())) },
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
-            ) { Text("Hari ini", fontSize = 11.sp) }
-            TextButton(
-                onClick = {
-                    val yesterday = Calendar.getInstance(TimeZone.getTimeZone("Asia/Jakarta"))
-                        .apply { add(Calendar.DAY_OF_MONTH, -1) }
-                    onChange(dayKey(yesterday.timeInMillis))
-                },
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
-            ) { Text("Kemarin", fontSize = 11.sp) }
-        }
     }
 }
 
