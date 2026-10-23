@@ -17,6 +17,9 @@ import androidx.compose.ui.unit.sp
 import java.util.Calendar
 import com.example.vokasilearning.logic.*
 import com.example.vokasilearning.data.SchoolRosterEntry
+import com.example.vokasilearning.data.SupabaseAttemptRepository
+import kotlinx.coroutines.delay
+import java.util.Locale
 import com.example.vokasilearning.model.*
 import com.example.vokasilearning.ui.*
 
@@ -41,6 +44,33 @@ internal fun AdminHome(
         .map { it.classLabel }).distinct().sorted()
     var classroom by remember(major) { mutableStateOf("") }
     var date by remember { mutableStateOf(dayKey(System.currentTimeMillis())) }
+    // The daily overview must not depend on the slower, incremental global cache.
+    var dateAttempts by remember(date) { mutableStateOf<List<Attempt>?>(null) }
+    var dateLoading by remember(date) { mutableStateOf(true) }
+    var dateError by remember(date) { mutableStateOf("") }
+    LaunchedEffect(date, roster) {
+        while (true) {
+            dateLoading = true
+            try {
+                dateAttempts = SupabaseAttemptRepository.loadForAdminDate(
+                    date, roster = roster
+                )
+                dateError = ""
+            } catch (error: Exception) {
+                dateError = error.message ?: "Koneksi ke Supabase gagal."
+            } finally {
+                dateLoading = false
+            }
+            delay(20_000L)
+        }
+    }
+    val dateVerified = dateAttempts != null && dateError.isBlank()
+    val verifiedAttempts = dateAttempts.orEmpty()
+    val combinedHistory = attempts.filter { dayKey(it.timeMillis) != date } + verifiedAttempts
+    val uniqueServerUsers = AdminAnalytics.latestCompulsoryByStudent(verifiedAttempts, date).keys
+    val rosterUsers = students.mapTo(HashSet()) { it.username.trim().lowercase(Locale.ROOT) }
+    val matchedServerUsers = uniqueServerUsers.count { it in rosterUsers }
+    val unmatchedServerUsers = uniqueServerUsers.size - matchedServerUsers
     var statsMajor by remember { mutableStateOf("") }
     var statsGrade by remember { mutableStateOf("") }
     var statsClass by remember { mutableStateOf("") }
@@ -50,9 +80,9 @@ internal fun AdminHome(
         it.classroom.major == statsMajor &&
         (statsGrade.isBlank() || schoolGrade(it.classroom.label) == statsGrade) }
         .map { it.classroom.label }.distinct().sorted()
-    val stats = remember(students, attempts, statsMajor, statsGrade, statsClass, date) {
+    val stats = remember(students, combinedHistory, statsMajor, statsGrade, statsClass, date) {
         SchoolAnalytics.calculate(
-            students, attempts,
+            students, combinedHistory,
             SchoolScope(statsMajor, statsGrade, statsClass),
             date
         )
@@ -87,9 +117,11 @@ internal fun AdminHome(
                             Text("HASIL LATIHAN WAJIB",
                                 modifier = Modifier.weight(1f), color = NavyLight,
                                 fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                            Pill(if (scoresReady) "Supabase" else "Menunggu data",
-                                if (scoresReady) PaleGreen else PaleGold,
-                                if (scoresReady) Good else Warning)
+                            Pill(
+                                if (dateVerified) "Supabase" else if (dateLoading) "Memuat" else "Gangguan",
+                                if (dateVerified) PaleGreen else PaleGold,
+                                if (dateVerified) Good else Warning
+                            )
                         }
                         Text("Unduh Hasil Siswa", color = Ink, fontSize = 22.sp,
                             fontWeight = FontWeight.ExtraBold)
@@ -123,6 +155,28 @@ internal fun AdminHome(
                                 modifier = Modifier.height(32.dp),
                                 contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp)
                             ) { Text("Kemarin", fontSize = 11.sp) }
+                        }
+                        Text(
+                            when {
+                                dateVerified ->
+                                    "Supabase $date: ${verifiedAttempts.size} sesi wajib • " +
+                                        "${uniqueServerUsers.size} akun • " +
+                                        "$matchedServerUsers terhubung ke daftar siswa"
+                                dateLoading && dateAttempts == null ->
+                                    "Memeriksa hasil wajib untuk tanggal $date..."
+                                dateError.isNotBlank() -> "Gagal memuat data terbaru: $dateError"
+                                else -> "Belum ada data server untuk tanggal ini."
+                            },
+                            color = if (dateError.isNotBlank() || unmatchedServerUsers > 0)
+                                Warning else Subtle,
+                            fontSize = 10.sp
+                        )
+                        if (dateVerified && unmatchedServerUsers > 0) {
+                            Text(
+                                "$unmatchedServerUsers akun belum cocok dengan daftar siswa sekolah. " +
+                                    "Periksa sinkronisasi akun; nilai tetap aman di server.",
+                                color = Warning, fontSize = 10.sp
+                            )
                         }
                         VokasiButton(
                             text = "Lihat Hasil Siswa",
@@ -196,7 +250,7 @@ internal fun AdminHome(
                             Text("Tampilkan semua", color = Navy, fontSize = 12.sp)
                         }
                     }
-                    if (scoresNotice.isNotBlank()) Text(scoresNotice,
+                    if (dateError.isNotBlank()) Text("Data statistik belum terverifikasi: $dateError",
                         color = Warning, fontSize = 11.sp)
                     HorizontalDivider(color = Border)
                     Row(
@@ -210,31 +264,31 @@ internal fun AdminHome(
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("Sudah latihan", color = Subtle, fontSize = 11.sp)
-                            Text(if (scoresReady) "${stats.completed}" else "—",
+                            Text(if (dateVerified) "${stats.completed}" else "—",
                                 color = Good, fontSize = 24.sp,
                                 fontWeight = FontWeight.ExtraBold)
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Text("Rata-rata", color = Subtle, fontSize = 11.sp)
-                            Text(if (scoresReady) stats.average?.toString() ?: "—" else "—",
+                            Text(if (dateVerified) stats.average?.toString() ?: "—" else "—",
                                 color = Navy, fontSize = 24.sp,
                                 fontWeight = FontWeight.ExtraBold)
                         }
                     }
-                    Text(if (scoresReady)
+                    Text(if (dateVerified)
                         "${stats.majors} jurusan • ${stats.classes} kelas • ${stats.missing} belum tercatat di server"
                         else "${stats.majors} jurusan • ${stats.classes} kelas • Status latihan menunggu sinkronisasi",
                         color = Subtle, fontSize = 11.sp)
                 }
 
-                SchoolScoreDonut(stats, dataAvailable = scoresReady, dateScoped = true)
-                SchoolMonthlyTrend(stats, dataAvailable = scoresReady, weekly = true)
+                SchoolScoreDonut(stats, dataAvailable = dateVerified, dateScoped = true)
+                SchoolMonthlyTrend(stats, dataAvailable = dateVerified, weekly = true)
 
                 WhiteCard(Modifier.fillMaxWidth()) {
                     Text("Perubahan nilai siswa", color = Ink, fontSize = 16.sp,
                         fontWeight = FontWeight.ExtraBold)
                     Text(
-                        if (scoresReady) "Nilai $date dibanding nilai wajib sebelumnya."
+                        if (dateVerified) "Nilai $date dibanding nilai wajib sebelumnya."
                         else "Menunggu data dari Supabase.",
                         color = Subtle, fontSize = 11.sp
                     )
@@ -243,23 +297,23 @@ internal fun AdminHome(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(if (scoresReady && comparableStudents > 0) "${stats.improved}" else "—", color = Good,
+                            Text(if (dateVerified && comparableStudents > 0) "${stats.improved}" else "—", color = Good,
                                 fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
                             Text("Naik", color = Subtle, fontSize = 12.sp)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(if (scoresReady && comparableStudents > 0) "${stats.stable}" else "—", color = Navy,
+                            Text(if (dateVerified && comparableStudents > 0) "${stats.stable}" else "—", color = Navy,
                                 fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
                             Text("Tetap", color = Subtle, fontSize = 12.sp)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(if (scoresReady && comparableStudents > 0) "${stats.declined}" else "—", color = Bad,
+                            Text(if (dateVerified && comparableStudents > 0) "${stats.declined}" else "—", color = Bad,
                                 fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
                             Text("Turun", color = Subtle, fontSize = 12.sp)
                         }
                     }
                     Text(
-                        if (!scoresReady) "Rata-rata menunggu sinkronisasi"
+                        if (!dateVerified) "Rata-rata menunggu sinkronisasi"
                         else if (comparableStudents == 0)
                             "Belum ada siswa dengan nilai $date dan riwayat sebelumnya."
                         else "${comparableStudents} siswa punya nilai untuk dibandingkan. " +
