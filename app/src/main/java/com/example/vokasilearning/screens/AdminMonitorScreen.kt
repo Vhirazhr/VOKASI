@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.logic.*
 import com.example.vokasilearning.data.SupabaseAttemptRepository
+import com.example.vokasilearning.data.SchoolRosterEntry
 import kotlinx.coroutines.delay
 import java.util.Locale
 import com.example.vokasilearning.model.*
@@ -26,6 +27,7 @@ import com.example.vokasilearning.ui.*
 internal fun AdminMonitorScreen(
     students: List<Student>,
     questions: List<Question>,
+    roster: List<SchoolRosterEntry> = emptyList(),
     initialMajor: String = "",
     initialClass: String = "",
     initialDate: String = "",
@@ -62,7 +64,7 @@ internal fun AdminMonitorScreen(
         while (true) {
             fetching = true
             try {
-                fetchedForDate = SupabaseAttemptRepository.loadForAdminDate(date, questions)
+                fetchedForDate = SupabaseAttemptRepository.loadForAdminDate(date, questions, roster)
                 fetchError = ""
                 lastUpdated = java.text.SimpleDateFormat("HH:mm", Locale("id", "ID")).apply {
                     timeZone = java.util.TimeZone.getTimeZone("Asia/Jakarta")
@@ -81,6 +83,10 @@ internal fun AdminMonitorScreen(
         .mapKeys { (username, _) -> username.trim().lowercase(Locale.ROOT) }
     fun attemptFor(username: String): Attempt? =
         latest[username.trim().lowercase(Locale.ROOT)]
+    val schoolIds = students.mapTo(HashSet()) { it.username.trim().lowercase(Locale.ROOT) }
+    val serverPupils = latest.keys.size
+    val matchedPupils = latest.keys.count { it in schoolIds }
+    val unknownPupils = serverPupils - matchedPupils
     val scopeMembers = students.filter {
         (major.isBlank() || it.classroom.major == major) &&
             (classroom.isBlank() || it.classroom.label == classroom)
@@ -177,6 +183,21 @@ internal fun AdminMonitorScreen(
                             Text("Sinkronisasi gagal: $fetchError",
                                 color = Warning, fontSize = 11.sp)
                         }
+                        if (serverReady) {
+                            Text(
+                                "Server: ${displayedAttempts.size} pengerjaan wajib • " +
+                                    "$serverPupils akun • $matchedPupils cocok dengan daftar sekolah",
+                                color = if (unknownPupils > 0) Warning else Subtle,
+                                fontSize = 11.sp
+                            )
+                            if (unknownPupils > 0) {
+                                Text(
+                                    "$unknownPupils akun hasil belum cocok dengan daftar siswa. " +
+                                        "Periksa akun/roster Supabase; nilai tidak dihapus.",
+                                    color = Warning, fontSize = 11.sp
+                                )
+                            }
+                        }
                         HorizontalDivider(color = Border)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             AdminSummaryMetric("Selesai", if (serverReady) "${summary.completedCount}" else "—", Good, Modifier.weight(1f))
@@ -188,7 +209,7 @@ internal fun AdminMonitorScreen(
                             AdminExcelAction(
                                 students, displayedAttempts, major, classroom, date,
                                 modifier = Modifier.fillMaxWidth(), text = "Unduh Excel Kelas",
-                                onExport = onExcelExport
+                                roster = roster, onExport = onExcelExport
                             )
                         } else {
                             Text("Ekspor semua kelas tersedia di Ringkasan.",
