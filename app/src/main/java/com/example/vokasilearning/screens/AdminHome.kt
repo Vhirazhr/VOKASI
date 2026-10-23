@@ -41,6 +41,24 @@ internal fun AdminHome(
         .map { it.classLabel }).distinct().sorted()
     var classroom by remember(major) { mutableStateOf("") }
     var date by remember { mutableStateOf(dayKey(System.currentTimeMillis())) }
+    var statsMajor by remember { mutableStateOf("") }
+    var statsGrade by remember { mutableStateOf("") }
+    var statsClass by remember { mutableStateOf("") }
+    // Only the report date above selects the monitoring period.
+    var showScopeFilters by remember { mutableStateOf(false) }
+    val scopedClasses = students.filter { statsMajor.isNotBlank() &&
+        it.classroom.major == statsMajor &&
+        (statsGrade.isBlank() || schoolGrade(it.classroom.label) == statsGrade) }
+        .map { it.classroom.label }.distinct().sorted()
+    val stats = remember(students, attempts, statsMajor, statsGrade, statsClass, date) {
+        SchoolAnalytics.calculate(
+            students, attempts,
+            SchoolScope(statsMajor, statsGrade, statsClass),
+            date
+        )
+    }
+    val comparableStudents = stats.improved + stats.stable + stats.declined
+
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
@@ -123,5 +141,149 @@ internal fun AdminHome(
             }
         }
 
+        item {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                AdminSectionTitle("Data sekolah", "Statistik & perkembangan")
+                WhiteCard(Modifier.fillMaxWidth()) {
+                    Text(
+                        "Tanggal laporan: $date • mengikuti pilihan di Ringkasan",
+                        color = NavyLight, fontSize = 11.sp
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (statsMajor.isBlank() && statsGrade.isBlank() && statsClass.isBlank())
+                                    "Seluruh sekolah"
+                                else listOf(statsMajor, statsGrade, statsClass)
+                                    .filter { it.isNotBlank() }.joinToString(" • "),
+                                color = Navy, fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp, maxLines = 2
+                            )
+                            Text("Rekap latihan wajib pada $date",
+                                color = Subtle, fontSize = 11.sp)
+                        }
+                        OutlinedButton(
+                            onClick = { showScopeFilters = !showScopeFilters },
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(if (showScopeFilters) "Tutup filter" else "Filter jurusan",
+                                color = Navy, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (showScopeFilters) "⌃" else "⌄", color = Navy, fontSize = 14.sp)
+                        }
+                    }
+                    if (showScopeFilters) {
+                        AdminSelect("Jurusan", statsMajor, listOf("") + majors,
+                            { statsMajor = it; statsClass = "" }, Modifier.fillMaxWidth())
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AdminSelect("Tingkat", statsGrade, listOf("", "X", "XI", "XII"),
+                                { statsGrade = it; statsClass = "" }, Modifier.weight(1f))
+                            AdminSelect("Kelas", statsClass, listOf("") + scopedClasses,
+                                { statsClass = it }, Modifier.weight(1f))
+                        }
+                        if (statsMajor.isBlank()) {
+                            Text("Pilih jurusan sebelum memfilter kelas.",
+                                color = Subtle, fontSize = 11.sp)
+                        }
+                        TextButton(onClick = {
+                            statsMajor = ""; statsGrade = ""; statsClass = ""
+                            showScopeFilters = false
+                        }) {
+                            Text("Tampilkan semua", color = Navy, fontSize = 12.sp)
+                        }
+                    }
+                    if (scoresNotice.isNotBlank()) Text(scoresNotice,
+                        color = Warning, fontSize = 11.sp)
+                    HorizontalDivider(color = Border)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("Siswa", color = Subtle, fontSize = 11.sp)
+                            Text("${stats.students}", color = Ink, fontSize = 24.sp,
+                                fontWeight = FontWeight.ExtraBold)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Sudah latihan", color = Subtle, fontSize = 11.sp)
+                            Text(if (scoresReady) "${stats.completed}" else "—",
+                                color = Good, fontSize = 24.sp,
+                                fontWeight = FontWeight.ExtraBold)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Rata-rata", color = Subtle, fontSize = 11.sp)
+                            Text(if (scoresReady) stats.average?.toString() ?: "—" else "—",
+                                color = Navy, fontSize = 24.sp,
+                                fontWeight = FontWeight.ExtraBold)
+                        }
+                    }
+                    Text(if (scoresReady)
+                        "${stats.majors} jurusan • ${stats.classes} kelas • ${stats.missing} belum tercatat di server"
+                        else "${stats.majors} jurusan • ${stats.classes} kelas • Status latihan menunggu sinkronisasi",
+                        color = Subtle, fontSize = 11.sp)
+                }
+
+                SchoolScoreDonut(stats, dataAvailable = scoresReady)
+                SchoolMonthlyTrend(stats, dataAvailable = scoresReady, weekly = true)
+
+                WhiteCard(Modifier.fillMaxWidth()) {
+                    Text("Perubahan nilai siswa", color = Ink, fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold)
+                    Text(
+                        if (scoresReady) "Nilai $date dibanding nilai wajib sebelumnya."
+                        else "Menunggu data dari Supabase.",
+                        color = Subtle, fontSize = 11.sp
+                    )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(if (scoresReady && comparableStudents > 0) "${stats.improved}" else "—", color = Good,
+                                fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("Naik", color = Subtle, fontSize = 12.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(if (scoresReady && comparableStudents > 0) "${stats.stable}" else "—", color = Navy,
+                                fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("Tetap", color = Subtle, fontSize = 12.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(if (scoresReady && comparableStudents > 0) "${stats.declined}" else "—", color = Bad,
+                                fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("Turun", color = Subtle, fontSize = 12.sp)
+                        }
+                    }
+                    Text(
+                        if (!scoresReady) "Rata-rata menunggu sinkronisasi"
+                        else if (comparableStudents == 0)
+                            "Belum ada siswa dengan nilai $date dan riwayat sebelumnya."
+                        else "${comparableStudents} siswa punya nilai untuk dibandingkan. " +
+                            "Rata-rata riwayat sebelumnya: ${stats.previousAverage ?: "—"}",
+                        color = Subtle, fontSize = 11.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminStatChip(
+    label: String, value: String, accent: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier.background(Canvas, RoundedCornerShape(14.dp))
+            .padding(vertical = 11.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text(label, color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text(value, color = Ink, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
