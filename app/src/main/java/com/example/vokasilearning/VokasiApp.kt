@@ -188,8 +188,30 @@ internal fun VokasiApp(activity: ComponentActivity) {
                 SupabaseAttemptRepository.syncOwn(
                     student.username, LocalAttemptStore.load(activity)
                 )
-                if (currentId == student.username && currentAttempt?.sessionKey == attempt.sessionKey) {
-                    resultSyncStatus = "Tersimpan di Supabase"
+                // Server is authoritative for earned XP: concurrent devices may
+                // submit the same WIB day, but only the first is eligible.
+                val serverHistory = SupabaseAttemptRepository.loadForStudent(questions.toList())
+                if (isRemoteStudent && currentId == student.username) {
+                    val localHistory = LocalAttemptStore.load(activity)
+                    val ownLocal = localHistory.filter {
+                        it.studentId.equals(student.username, ignoreCase = true)
+                    }
+                    val merged = (serverHistory + ownLocal).distinctBy {
+                        it.sessionKey.ifBlank { it.studentId + ":" + it.timeMillis }
+                    }.sortedBy { it.timeMillis }
+                    attempts.clear()
+                    attempts.addAll(merged)
+                    LocalAttemptStore.save(activity,
+                        localHistory.filterNot {
+                            it.studentId.equals(student.username, ignoreCase = true)
+                        } + merged
+                    )
+                    if (currentAttempt?.sessionKey == attempt.sessionKey) {
+                        currentAttempt = serverHistory.firstOrNull {
+                            it.sessionKey == attempt.sessionKey
+                        } ?: currentAttempt
+                        resultSyncStatus = "Tersimpan di Supabase"
+                    }
                 }
             } catch (_: Exception) {
                 // Durable local history will be uploaded at next login.
@@ -612,7 +634,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                                 val localFirst = LocalAttemptStore.load(activity).filter {
                                                     it.studentId.equals(remoteStudent.username, true)
                                                 }
-                                                val restored = (localFirst + shared).distinctBy {
+                                                val restored = (shared + localFirst).distinctBy {
                                                     it.sessionKey.ifBlank {
                                                         it.studentId + ":" + it.timeMillis
                                                     }
