@@ -4,11 +4,13 @@ import com.example.vokasilearning.logic.AdminAnalytics
 import com.example.vokasilearning.model.Attempt
 import com.example.vokasilearning.model.Student
 import java.io.OutputStream
+import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /** Bulk daily grades across optional jurisdiction/class scopes; includes pending roster pupils. */
 internal object BulkStudentExcelReport {
+    private fun usernameKey(value: String) = value.trim().lowercase(Locale.ROOT)
     private const val XML = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
     private val headers = listOf("No", "Nama Siswa", "Jurusan", "Kelas", "Angkatan", "Tanggal", "Nilai", "Status")
     internal data class GradeRow(
@@ -26,11 +28,12 @@ internal object BulkStudentExcelReport {
     ): List<GradeRow> {
         require(Regex("\\d{4}-\\d{2}-\\d{2}").matches(date)) { "Tanggal wajib YYYY-MM-DD." }
         val latest = AdminAnalytics.latestCompulsoryByStudent(attempts, date)
+            .mapKeys { (username, _) -> usernameKey(username) }
         val rosterRows = roster.asSequence().filter {
             (major.isBlank() || it.major == major) &&
                 (classroom.isBlank() || it.classLabel == classroom)
         }.map { student ->
-            val grade = if (student.registered) latest[student.username] else null
+            val grade = if (student.registered) latest[usernameKey(student.username)] else null
             GradeRow(student.fullName, student.major, student.classLabel,
                 student.admissionYear, date, grade?.score, when {
                     !student.registered -> "Belum Terdaftar"
@@ -38,10 +41,10 @@ internal object BulkStudentExcelReport {
                     else -> "Selesai"
                 })
         }.toList()
-        val rosterUsers = roster.mapNotNull { it.username.takeIf(String::isNotBlank) }.toSet()
+        val rosterUsers = roster.mapNotNull { it.username.takeIf(String::isNotBlank)?.let(::usernameKey) }.toSet()
         // Keep compatibility with students created before the admin-controlled roster.
         val legacyRows = students.asSequence().filter {
-            it.username !in rosterUsers &&
+            usernameKey(it.username) !in rosterUsers &&
                 (major.isBlank() || it.classroom.major == major) &&
                 (classroom.isBlank() || it.classroom.label == classroom)
         }.map { student ->
