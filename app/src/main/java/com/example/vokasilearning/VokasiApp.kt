@@ -207,10 +207,18 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         } + merged
                     )
                     if (currentAttempt?.sessionKey == attempt.sessionKey) {
-                        currentAttempt = serverHistory.firstOrNull {
+                        val serverRecord = serverHistory.firstOrNull {
                             it.sessionKey == attempt.sessionKey
-                        } ?: currentAttempt
-                        resultSyncStatus = "Tersimpan di Supabase"
+                        }
+                        if (serverRecord != null) {
+                            currentAttempt = serverRecord
+                            resultSyncStatus = "Tersimpan di Supabase"
+                        } else {
+                            // A successful network call does not prove this particular
+                            // session was uploaded. Show its true sync state.
+                            resultSyncStatus = "Nilai masih tersimpan di HP. " +
+                                "Sesi ini belum ditemukan di Supabase; coba login ulang saat online."
+                        }
                     }
                 }
             } catch (_: Exception) {
