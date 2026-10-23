@@ -72,6 +72,45 @@ class SchoolAnalyticsTest {
         assertEquals(0, report.improved)
     }
 
+    @Test fun selectedReportDateControlsStatsAndSevenConsecutiveDays() {
+        val on21 = SchoolAnalytics.calculate(students, results, SchoolScope(), "2026-10-21")
+        assertEquals(3, on21.completed)
+        assertEquals(78, on21.average)
+        assertEquals(7, on21.trend.size)
+        assertEquals("2026-10-15", on21.trend.first().first)
+        assertEquals("2026-10-21", on21.trend.last().first)
+        assertEquals(73, on21.trend[5].second)
+        assertEquals(78, on21.trend[6].second)
+        assertNull(on21.trend[0].second)
+        val on20 = SchoolAnalytics.calculate(students, results, SchoolScope(), "2026-10-20")
+        assertEquals(4, on20.completed)
+        assertEquals(72, on20.average)
+        assertEquals(0, on20.improved + on20.declined + on20.stable)
+        assertEquals("2026-10-20", on20.trend.last().first)
+    }
+
+    @Test fun gradeDistributionIsForSelectedDateAndUsernameMatchesCaseInsensitive() {
+        val pupil = Student("Abdul_Rizal", "demo", "Abdul Rizal",
+            Classroom("X TPM 1", "Teknik Pemesinan"))
+        val records = listOf(
+            run(" ABDUL_RIZAL ", "2026-10-22", 30),
+            run("abdul_rizal", "2026-10-23", 50),
+            run("Abdul_Rizal", "2026-10-23", 100, "Perkalian")
+        )
+        val before = SchoolAnalytics.calculate(listOf(pupil), records, SchoolScope(),
+            "2026-10-22")
+        assertEquals(30, before.average)
+        assertEquals(1, before.low)
+        val after = SchoolAnalytics.calculate(listOf(pupil), records, SchoolScope(),
+            "2026-10-23")
+        assertEquals(50, after.average)
+        assertEquals(1, after.completed)
+        assertEquals(1, after.low)
+        assertEquals(1, after.improved)
+        assertEquals(0, after.declined)
+        assertEquals(30, after.previousAverage)
+    }
+
     @Test fun repeatsOnSameDayCountOnceForParticipation() {
         val extra = results + run("a", "2026-10-21", 95)
         val report = SchoolAnalytics.calculate(students, extra, SchoolScope(), "2026-10-21")
