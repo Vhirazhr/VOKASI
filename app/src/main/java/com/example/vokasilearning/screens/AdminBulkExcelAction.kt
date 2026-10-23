@@ -76,7 +76,7 @@ internal fun AdminBulkExcelAction(
                 scope.launch {
                     fetching = true
                     try {
-                        val remoteGrades = SupabaseAttemptRepository.loadForAdminDate(date)
+                        val remoteGrades = SupabaseAttemptRepository.loadForAdminDate(date, roster = roster)
                         if (remoteGrades.isEmpty()) {
                             Toast.makeText(context,
                                 "Belum ada nilai latihan wajib di Supabase untuk tanggal " + date +
