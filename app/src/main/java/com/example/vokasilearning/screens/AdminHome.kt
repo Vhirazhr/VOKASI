@@ -65,6 +65,11 @@ internal fun AdminHome(
         SchoolAnalytics.calculateMonthly(students, attempts,
             SchoolScope(statsMajor, statsGrade, statsClass), statsYear, statsMonth)
     }
+    // No shared student results across both months means growth is unavailable,
+    // not that every pupil received a zero or that the calculation failed.
+    val comparableStudents = stats.improved + stats.stable + stats.declined
+    val previousMonthTitle = monthNames[if (statsMonth == 1) 11 else statsMonth - 2]
+
 
     LazyColumn(
         Modifier.fillMaxSize().background(Canvas),
@@ -233,24 +238,28 @@ internal fun AdminHome(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(if (scoresReady) "${stats.improved}" else "—", color = Good,
+                            Text(if (scoresReady && comparableStudents > 0) "${stats.improved}" else "—", color = Good,
                                 fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
                             Text("Naik", color = Subtle, fontSize = 12.sp)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(if (scoresReady) "${stats.stable}" else "—", color = Navy,
+                            Text(if (scoresReady && comparableStudents > 0) "${stats.stable}" else "—", color = Navy,
                                 fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
                             Text("Tetap", color = Subtle, fontSize = 12.sp)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(if (scoresReady) "${stats.declined}" else "—", color = Bad,
+                            Text(if (scoresReady && comparableStudents > 0) "${stats.declined}" else "—", color = Bad,
                                 fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
                             Text("Turun", color = Subtle, fontSize = 12.sp)
                         }
                     }
                     Text(
-                        if (scoresReady) "Rata-rata bulan sebelumnya: ${stats.previousAverage?.toString() ?: "Belum ada data"}"
-                        else "Rata-rata menunggu sinkronisasi",
+                        if (!scoresReady) "Rata-rata menunggu sinkronisasi"
+                        else if (comparableStudents == 0)
+                            "Belum bisa membandingkan: belum ada siswa yang mempunyai " +
+                                "nilai wajib pada ${previousMonthTitle} dan ${monthNames[statsMonth - 1]} sekaligus."
+                        else "${comparableStudents} siswa memiliki nilai pada kedua bulan. " +
+                            "Rata-rata ${previousMonthTitle}: ${stats.previousAverage ?: "—"}",
                         color = Subtle, fontSize = 11.sp
                     )
                 }
