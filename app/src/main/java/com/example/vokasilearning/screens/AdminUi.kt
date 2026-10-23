@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.data.DailyExcelReport
 import com.example.vokasilearning.data.SupabaseAttemptRepository
+import com.example.vokasilearning.data.SchoolRosterEntry
 import com.example.vokasilearning.logic.*
 import com.example.vokasilearning.model.Attempt
 import com.example.vokasilearning.model.Student
@@ -341,6 +342,7 @@ internal fun AdminExcelAction(
     date: String,
     modifier: Modifier = Modifier,
     text: String = "Unduh Excel",
+    roster: List<SchoolRosterEntry> = emptyList(),
     onExport: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
@@ -381,7 +383,7 @@ internal fun AdminExcelAction(
             coroutineScope.launch {
                 fetching = true
                 try {
-                    val freshGrades = SupabaseAttemptRepository.loadForAdminDate(date)
+                    val freshGrades = SupabaseAttemptRepository.loadForAdminDate(date, roster = roster)
                     if (freshGrades.isEmpty()) {
                         Toast.makeText(context,
                             "Belum ada nilai wajib di Supabase untuk " + date +
