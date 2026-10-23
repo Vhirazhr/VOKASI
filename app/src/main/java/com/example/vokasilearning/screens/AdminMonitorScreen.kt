@@ -60,7 +60,8 @@ internal fun AdminMonitorScreen(
     var fetchError by remember(date) { mutableStateOf("") }
     var lastUpdated by remember(date) { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(date, refreshKey) {
+    // Refresh identity mapping if the school roster changes while this page is open.
+    LaunchedEffect(date, refreshKey, roster) {
         while (true) {
             fetching = true
             try {
