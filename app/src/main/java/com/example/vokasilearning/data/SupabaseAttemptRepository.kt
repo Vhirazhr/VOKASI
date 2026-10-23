@@ -132,11 +132,18 @@ internal object SupabaseAttemptRepository {
         return added
     }
 
-    private fun decodeRows(rows: List<StoredAttempt>, questions: List<Question>): List<Attempt> {
+    private fun decodeRows(
+        rows: List<StoredAttempt>,
+        questions: List<Question>,
+        roster: List<SchoolRosterEntry> = emptyList()
+    ): List<Attempt> {
+        val namesByAuth = AdminAttemptIdentity.rosterNames(roster)
         val questionById = questions.associateBy { it.id }
         return rows.map { row ->
             Attempt(
-                studentId = row.username,
+                studentId = AdminAttemptIdentity.resolve(
+                    row.authUserId, row.username, namesByAuth
+                ),
                 timeMillis = row.completedAtMs,
                 signature = row.signature,
                 correct = row.correct,
@@ -171,7 +178,11 @@ internal object SupabaseAttemptRepository {
      * authoritative source of an Excel report. Dates use the school's WIB
      * timezone; the end is exclusive to avoid mixing consecutive school days.
      */
-    suspend fun loadForAdminDate(date: String, questions: List<Question> = emptyList()): List<Attempt> {
+    suspend fun loadForAdminDate(
+        date: String,
+        questions: List<Question> = emptyList(),
+        roster: List<SchoolRosterEntry> = emptyList()
+    ): List<Attempt> {
         require(Regex("\\d{4}-\\d{2}-\\d{2}").matches(date)) {
             "Tanggal harus menggunakan format YYYY-MM-DD."
         }
@@ -203,7 +214,7 @@ internal object SupabaseAttemptRepository {
             rows.addAll(page)
             offset += page.size
         } while (page.size == PAGE_SIZE)
-        return decodeRows(rows.filter { it.practiceCategory == null }, questions)
+        return decodeRows(rows.filter { it.practiceCategory == null }, questions, roster)
     }
 
     /** The cursor lets the open dashboard request only newer submissions. */
@@ -212,7 +223,8 @@ internal object SupabaseAttemptRepository {
     /** Use >= for the cursor boundary so sessions with the same timestamp are not lost. */
     suspend fun loadForAdmin(
         questions: List<Question>,
-        sinceCreatedAt: String? = null
+        sinceCreatedAt: String? = null,
+        roster: List<SchoolRosterEntry> = emptyList()
     ): AdminBatch {
         val permitted = vokasiSupabase.postgrest.rpc("is_school_admin").decodeAs<Boolean>()
         check(permitted) { "Akun ini bukan admin sekolah aktif." }
@@ -230,7 +242,7 @@ internal object SupabaseAttemptRepository {
             rows.addAll(page)
             offset += page.size
         } while (page.size == PAGE_SIZE)
-        val decoded = decodeRows(rows, questions)
+        val decoded = decodeRows(rows, questions, roster)
         return AdminBatch(decoded, rows.lastOrNull()?.createdAt ?: sinceCreatedAt)
     }
 }
