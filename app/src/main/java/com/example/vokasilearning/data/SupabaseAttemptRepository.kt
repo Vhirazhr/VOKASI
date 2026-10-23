@@ -10,6 +10,9 @@ import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 import java.util.UUID
 
 /**
@@ -161,6 +164,46 @@ internal object SupabaseAttemptRepository {
         val userId = vokasiSupabase.auth.currentUserOrNull()?.id?.toString()
             ?: throw IllegalStateException("Sesi siswa berakhir.")
         return decodeRows(fetchOwnRows(userId), questions)
+    }
+
+    /**
+     * Fresh, date-scoped school export. Never use stale dashboard state as the
+     * authoritative source of an Excel report. Dates use the school's WIB
+     * timezone; the end is exclusive to avoid mixing consecutive school days.
+     */
+    suspend fun loadForAdminDate(date: String, questions: List<Question> = emptyList()): List<Attempt> {
+        require(Regex("\\d{4}-\\d{2}-\\d{2}").matches(date)) {
+            "Tanggal harus menggunakan format YYYY-MM-DD."
+        }
+        val parts = date.split("-").map { it.toInt() }
+        val calendar = Calendar.getInstance(TimeZone.getTimeZone("Asia/Jakarta"), Locale.US).apply {
+            isLenient = false
+            clear()
+            set(parts[0], parts[1] - 1, parts[2], 0, 0, 0)
+        }
+        val startMs = calendar.timeInMillis
+        calendar.add(Calendar.DAY_OF_MONTH, 1)
+        val endMs = calendar.timeInMillis
+
+        val permitted = vokasiSupabase.postgrest.rpc("is_school_admin").decodeAs<Boolean>()
+        check(permitted) { "Akun ini bukan admin sekolah aktif." }
+
+        val rows = mutableListOf<StoredAttempt>()
+        var offset = 0L
+        do {
+            val page = vokasiSupabase.from("student_attempts").select {
+                filter {
+                    gte("completed_at_ms", startMs)
+                    lt("completed_at_ms", endMs)
+                }
+                order("completed_at_ms", Order.ASCENDING)
+                order("id", Order.ASCENDING)
+                range(offset, offset + PAGE_SIZE - 1)
+            }.decodeList<StoredAttempt>()
+            rows.addAll(page)
+            offset += page.size
+        } while (page.size == PAGE_SIZE)
+        return decodeRows(rows.filter { it.practiceCategory == null }, questions)
     }
 
     /** The cursor lets the open dashboard request only newer submissions. */
