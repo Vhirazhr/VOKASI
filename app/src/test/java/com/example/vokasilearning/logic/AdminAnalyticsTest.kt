@@ -47,6 +47,30 @@ class AdminAnalyticsTest {
         assertEquals(2, summary.sessions)
     }
 
+    @Test fun adminMatchesSupabaseUsernamesWithDifferentCaseAndWhitespace() {
+        val pupil = Student("Abdul_Rizal", "demo", "Abdul Rizal",
+            Classroom("X TPM 1", "Teknik Pemesinan"))
+        val records = listOf(
+            attempt(" ABDUL_RIZAL ", "2026-10-22 08:00", 30),
+            attempt("abdul_rizal", "2026-10-23 09:00", 50),
+            attempt("Abdul_Rizal", "2026-10-23 10:00", 90, "Perkalian")
+        )
+        val yesterday = AdminAnalytics.classSummary(
+            "X TPM 1", listOf(pupil), records, "2026-10-22", "Teknik Pemesinan"
+        )
+        assertEquals(30, yesterday.averageScore)
+        assertEquals(1, yesterday.completedCount)
+        val today = AdminAnalytics.classSummary(
+            "X TPM 1", listOf(pupil), records, "2026-10-23", "Teknik Pemesinan"
+        )
+        assertEquals(50, today.averageScore)
+        assertEquals(1, today.completedCount)
+        assertEquals(1, today.sessions)
+        assertEquals(50, AdminAnalytics.latestCompulsoryByStudent(
+            records, "2026-10-23"
+        ).getValue("abdul_rizal").score)
+    }
+
     @Test fun emptyDayShowsNoAverageRatherThanFalseZero() {
         val summary = AdminAnalytics.classSummary("X TPM 1", students, emptyList(), "2026-10-21")
         assertEquals(0, summary.completedCount)
