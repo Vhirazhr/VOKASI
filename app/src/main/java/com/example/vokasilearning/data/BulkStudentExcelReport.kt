@@ -48,7 +48,7 @@ internal object BulkStudentExcelReport {
                 (major.isBlank() || it.classroom.major == major) &&
                 (classroom.isBlank() || it.classroom.label == classroom)
         }.map { student ->
-            val grade = latest[student.username]
+            val grade = latest[usernameKey(student.username)]
             GradeRow(student.name, student.classroom.major, student.classroom.label,
                 student.admissionYear, date, grade?.score,
                 if (grade == null) "Belum Mengerjakan" else "Selesai")
