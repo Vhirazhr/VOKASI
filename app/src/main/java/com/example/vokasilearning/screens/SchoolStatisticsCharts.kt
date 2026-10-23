@@ -108,7 +108,8 @@ internal fun SchoolMonthlyTrend(stats: SchoolStatistics, dataAvailable: Boolean 
             fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
         Text("6 bulan hingga periode terpilih • Skala nilai 0–100",
             color = Subtle, fontSize = 11.sp)
-        val hasData = dataAvailable && stats.trend.any { it.second != null }
+        val recordedMonths = if (dataAvailable) stats.trend.count { it.second != null } else 0
+        val hasData = recordedMonths > 0
         if (!hasData) {
             Box(Modifier.fillMaxWidth().height(140.dp), contentAlignment = Alignment.Center) {
                 Text(if (dataAvailable) "Belum ada nilai wajib untuk grafik ini."
@@ -177,7 +178,13 @@ internal fun SchoolMonthlyTrend(stats: SchoolStatistics, dataAvailable: Boolean 
                 }
             }
         }
-        Text("Tiap titik memakai nilai wajib terbaru per siswa dalam bulan tersebut.",
-            color = Subtle, fontSize = 11.sp)
+        Text(
+            if (recordedMonths == 1)
+                "Baru 1 bulan memiliki nilai wajib. Titiknya sudah dicatat; " +
+                    "garis perkembangan baru terbentuk jika ada bulan lain yang memiliki nilai."
+            else "Tiap titik memakai nilai wajib terbaru per siswa dalam bulan tersebut. " +
+                "Bulan tanpa data tidak dihitung sebagai nilai 0.",
+            color = Subtle, fontSize = 11.sp
+        )
     }
 }
