@@ -8,6 +8,7 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.util.Calendar
@@ -86,48 +87,77 @@ internal object SupabaseAttemptRepository {
         return rows
     }
 
-    /** Send only unsynced local sessions, never all accounts on this device. */
+    /**
+     * Most recent valid submissions first: a problematic older phone record
+     * must not prevent the current school exercise from being uploaded.
+     */
+    internal fun eligibleUploads(
+        username: String,
+        local: List<Attempt>,
+        storedKeys: Set<String>
+    ): List<Attempt> = local.asSequence().filter {
+        it.studentId.trim().equals(username.trim(), ignoreCase = true) &&
+            it.sessionKey.isNotBlank() &&
+            it.questionCount in listOf(10, 100) &&
+            it.answered in 0..it.questionCount &&
+            it.correct in 0..it.answered &&
+            it.sessionKey !in storedKeys &&
+            runCatching { UUID.fromString(it.sessionKey) }.isSuccess
+    }.distinctBy { it.sessionKey }.sortedByDescending { it.timeMillis }.toList()
+
+    /**
+     * Upload all eligible local sessions independently. A rejected older
+     * session is reported after newer valid sessions have been attempted.
+     * The caller must verify an exact session on the server before displaying
+     * a green 'Tersimpan di Supabase' state.
+     */
     suspend fun syncOwn(username: String, local: List<Attempt>): Int {
         val authUserId = vokasiSupabase.auth.currentUserOrNull()?.id?.toString()
             ?: throw IllegalStateException("Sesi siswa sudah berakhir.")
         val alreadyStored = fetchOwnRows(authUserId)
             .mapTo(HashSet()) { it.sessionKey }
         var added = 0
-        local.filter {
-            it.studentId.equals(username, ignoreCase = true) &&
-                it.sessionKey.isNotBlank() &&
-                it.questionCount in listOf(10, 100) &&
-                it.answered in 0..it.questionCount &&
-                it.correct in 0..it.answered
-        }.distinctBy { it.sessionKey }.forEach { run ->
-            if (run.sessionKey in alreadyStored) return@forEach
-            // QuizSession emits UUID session keys. Skip invalid old demo rows.
-            if (runCatching { UUID.fromString(run.sessionKey) }.isFailure) return@forEach
-            vokasiSupabase.from("student_attempts").insert(
-                UploadAttempt(
-                    authUserId = authUserId,
-                    username = username,
-                    sessionKey = run.sessionKey,
-                    completedAtMs = run.timeMillis,
-                    signature = run.signature,
-                    correct = run.correct,
-                    answered = run.answered,
-                    questionCount = run.questionCount,
-                    score = run.score,
-                    earnedXp = run.earnedXp,
-                    secondsSpent = run.secondsSpent,
-                    practiceCategory = run.practiceCategory,
-                    nameSnapshot = run.studentNameSnapshot,
-                    classSnapshot = run.classSnapshot,
-                    majorSnapshot = run.majorSnapshot,
-                    reviewSummary = run.review.map {
-                        CompactReview(it.question.id, it.selectedIndex,
-                            it.status.name, it.responseSeconds)
-                    }
+        var failed = 0
+        var firstFailure: Exception? = null
+        for (run in eligibleUploads(username, local, alreadyStored)) {
+            try {
+                vokasiSupabase.from("student_attempts").insert(
+                    UploadAttempt(
+                        authUserId = authUserId,
+                        username = username.trim(),
+                        sessionKey = run.sessionKey,
+                        completedAtMs = run.timeMillis,
+                        signature = run.signature,
+                        correct = run.correct,
+                        answered = run.answered,
+                        questionCount = run.questionCount,
+                        score = run.score,
+                        earnedXp = run.earnedXp,
+                        secondsSpent = run.secondsSpent,
+                        practiceCategory = run.practiceCategory,
+                        nameSnapshot = run.studentNameSnapshot,
+                        classSnapshot = run.classSnapshot,
+                        majorSnapshot = run.majorSnapshot,
+                        reviewSummary = run.review.map {
+                            CompactReview(it.question.id, it.selectedIndex,
+                                it.status.name, it.responseSeconds)
+                        }
+                    )
                 )
+                alreadyStored.add(run.sessionKey)
+                added++
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                failed++
+                if (firstFailure == null) firstFailure = error
+            }
+        }
+        if (failed > 0) {
+            throw IllegalStateException(
+                "$failed sesi lokal belum berhasil disinkronkan; $added sesi baru berhasil diunggah.",
+                firstFailure
             )
-            alreadyStored.add(run.sessionKey)
-            added++
         }
         return added
     }
