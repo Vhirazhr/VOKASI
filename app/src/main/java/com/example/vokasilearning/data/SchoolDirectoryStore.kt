@@ -19,7 +19,10 @@ internal data class SchoolRosterEntry(
     val username: String = "",
     val passwordHash: String = "",
     val remoteId: String? = null,
-    val remoteRegistered: Boolean = false
+    val remoteRegistered: Boolean = false,
+    // In-memory identity only; never persisted with credentials or displayed.
+    // Canonical join key when an attempt username differs from its roster alias.
+    val remoteAuthUserId: String? = null
 ) {
     val registered: Boolean get() =
         remoteRegistered || (username.isNotBlank() && passwordHash.isNotBlank())
