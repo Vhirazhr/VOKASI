@@ -227,7 +227,7 @@ internal fun AdminHome(
                         color = Subtle, fontSize = 11.sp)
                 }
 
-                SchoolScoreDonut(stats, dataAvailable = scoresReady)
+                SchoolScoreDonut(stats, dataAvailable = scoresReady, dateScoped = true)
                 SchoolMonthlyTrend(stats, dataAvailable = scoresReady, weekly = true)
 
                 WhiteCard(Modifier.fillMaxWidth()) {
