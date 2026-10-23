@@ -4,6 +4,7 @@ import com.example.vokasilearning.logic.AdminAnalytics
 import com.example.vokasilearning.model.Attempt
 import com.example.vokasilearning.model.Student
 import java.io.OutputStream
+import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -14,6 +15,7 @@ import java.util.zip.ZipOutputStream
  */
 internal object DailyExcelReport {
     private val header = listOf("No", "Nama Siswa", "Kelas", "Tanggal", "Nilai", "Status")
+    private fun usernameKey(value: String) = value.trim().lowercase(Locale.ROOT)
     private const val XML = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
 
     fun write(
@@ -31,8 +33,9 @@ internal object DailyExcelReport {
                 (major == null || it.classroom.major == major)
         }.sortedBy { it.name }
         val latestByStudent = AdminAnalytics.latestCompulsoryByStudent(attempts, date)
+            .mapKeys { (username, _) -> usernameKey(username) }
         val rows = members.mapIndexed { i, student ->
-            val latest = latestByStudent[student.username]
+            val latest = latestByStudent[usernameKey(student.username)]
             listOf(
                 (i + 1).toString(),
                 student.name,
