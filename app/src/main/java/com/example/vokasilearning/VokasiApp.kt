@@ -278,9 +278,14 @@ internal fun VokasiApp(activity: ComponentActivity) {
         }
     }
 
-    // 20-second incremental refresh, only within a school-admin session.
-    LaunchedEffect(isAdmin) {
+    // Rebuild grade identity joins whenever the authoritative roster changes.
+    // Reusing the old incremental cursor would leave historical grades attached
+    // to outdated usernames after a roster/account update.
+    LaunchedEffect(isAdmin, schoolDirectory.roster) {
         if (isAdmin) {
+            schoolResultsCursor = null
+            schoolScoresReady = false
+            attempts.clear()
             while (isAdmin) {
                 try {
                     val batch = SupabaseAttemptRepository.loadForAdmin(
