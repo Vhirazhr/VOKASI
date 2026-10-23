@@ -404,9 +404,9 @@ internal fun AdminExcelAction(
                     } else {
                         val members = students.filter {
                             it.classroom.label == classroom && it.classroom.major == major
-                        }.map { it.username }.toSet()
+                        }.map { it.username.trim().lowercase(Locale.ROOT) }.toSet()
                         val matched = AdminAnalytics.latestCompulsoryByStudent(freshGrades, date)
-                            .count { (username, _) -> username in members }
+                            .count { (username, _) -> username.trim().lowercase(Locale.ROOT) in members }
                         if (matched == 0) {
                             Toast.makeText(context, "Server memiliki " + freshGrades.size +
                                 " hasil wajib, tetapi tidak cocok dengan kelas " + classroom +
