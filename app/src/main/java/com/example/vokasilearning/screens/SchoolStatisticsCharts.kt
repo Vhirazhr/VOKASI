@@ -25,7 +25,9 @@ import java.util.Locale
  * All values and corresponding categories remain readable without relying on color alone.
  */
 @Composable
-internal fun SchoolScoreDonut(stats: SchoolStatistics, dataAvailable: Boolean = true) {
+internal fun SchoolScoreDonut(
+    stats: SchoolStatistics, dataAvailable: Boolean = true, weekly: Boolean = false
+) {
     val pieces = listOf(
         Triple("75–100", stats.high, Good),
         Triple("60–74", stats.middle, Warning),
@@ -93,20 +95,24 @@ internal fun SchoolScoreDonut(stats: SchoolStatistics, dataAvailable: Boolean = 
             }
         }
         Text(if (dataAvailable)
-            "Setiap siswa dihitung sekali berdasarkan nilai wajib terakhir pada bulan terpilih."
+            if (weekly) "Setiap siswa dihitung sekali dari nilai wajib terakhir pada pekan terpilih."
+            else "Setiap siswa dihitung sekali berdasarkan nilai wajib terakhir pada bulan terpilih."
             else "Grafik akan terisi setelah data berhasil dimuat.",
             color = Subtle, fontSize = 11.sp)
     }
 }
 
 @Composable
-internal fun SchoolMonthlyTrend(stats: SchoolStatistics, dataAvailable: Boolean = true) {
+internal fun SchoolMonthlyTrend(
+    stats: SchoolStatistics, dataAvailable: Boolean = true, weekly: Boolean = false
+) {
     val monthNames = listOf("Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
         "Jul", "Agu", "Sep", "Okt", "Nov", "Des")
     WhiteCard(Modifier.fillMaxWidth()) {
-        Text("Perkembangan rata-rata", color = Ink,
-            fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-        Text("6 bulan hingga periode terpilih • Skala nilai 0–100",
+        Text(if (weekly) "Perkembangan rata-rata harian" else "Perkembangan rata-rata bulanan",
+            color = Ink, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+        Text(if (weekly) "7 hari dalam pekan terpilih • Skala nilai 0–100"
+            else "6 bulan hingga periode terpilih • Skala nilai 0–100",
             color = Subtle, fontSize = 11.sp)
         val recordedMonths = if (dataAvailable) stats.trend.count { it.second != null } else 0
         val hasData = recordedMonths > 0
@@ -169,7 +175,7 @@ internal fun SchoolMonthlyTrend(stats: SchoolStatistics, dataAvailable: Boolean 
                 stats.trend.forEach { (key, value) ->
                     val monthIndex = (key.takeLast(2).toIntOrNull() ?: 1) - 1
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(monthNames[monthIndex.coerceIn(0, 11)],
+                        Text(if (weekly) key.takeLast(2) else monthNames[monthIndex.coerceIn(0, 11)],
                             color = Subtle, fontSize = 10.sp)
                         Text(value?.toString() ?: "—",
                             color = if (value == null) Subtle else Navy,
@@ -179,9 +185,15 @@ internal fun SchoolMonthlyTrend(stats: SchoolStatistics, dataAvailable: Boolean 
             }
         }
         Text(
-            if (recordedMonths == 1)
+            if (recordedMonths == 1 && weekly)
+                "Baru 1 hari memiliki nilai wajib. Grafik mencatat titiknya; " +
+                    "garis akan tampak saat ada nilai pada hari lain di pekan ini."
+            else if (recordedMonths == 1)
                 "Baru 1 bulan memiliki nilai wajib. Titiknya sudah dicatat; " +
                     "garis perkembangan baru terbentuk jika ada bulan lain yang memiliki nilai."
+            else if (weekly)
+                "Tiap titik adalah rata-rata nilai wajib pada hari tersebut. " +
+                    "Hari tanpa data bukan nilai 0."
             else "Tiap titik memakai nilai wajib terbaru per siswa dalam bulan tersebut. " +
                 "Bulan tanpa data tidak dihitung sebagai nilai 0.",
             color = Subtle, fontSize = 11.sp
