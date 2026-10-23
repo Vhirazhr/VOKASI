@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.data.DailyExcelReport
+import com.example.vokasilearning.data.SupabaseAttemptRepository
 import com.example.vokasilearning.logic.*
 import com.example.vokasilearning.model.Attempt
 import com.example.vokasilearning.model.Student
@@ -39,6 +40,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
+import kotlinx.coroutines.launch
 
 internal data class AdminHeaderActions(
     val onNotifications: () -> Unit,
@@ -327,6 +329,20 @@ internal fun AdminDateSelect(
             Text(date, color = Ink, fontSize = 11.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            TextButton(
+                onClick = { onChange(dayKey(System.currentTimeMillis())) },
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+            ) { Text("Hari ini", fontSize = 11.sp) }
+            TextButton(
+                onClick = {
+                    val yesterday = Calendar.getInstance(TimeZone.getTimeZone("Asia/Jakarta"))
+                        .apply { add(Calendar.DAY_OF_MONTH, -1) }
+                    onChange(dayKey(yesterday.timeInMillis))
+                },
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+            ) { Text("Kemarin", fontSize = 11.sp) }
+        }
     }
 }
 
@@ -342,7 +358,10 @@ internal fun AdminExcelAction(
     onExport: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var target by remember { mutableStateOf<Triple<String, String, String>?>(null) }
+    var selectedGrades by remember { mutableStateOf<List<Attempt>>(emptyList()) }
+    var fetching by remember { mutableStateOf(false) }
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument(
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -356,24 +375,56 @@ internal fun AdminExcelAction(
                     ?: error("Tidak bisa membuat berkas")
                 stream.use {
                     DailyExcelReport.write(
-                        it, selection.second, selection.third, students, attempts, selection.first
+                        it, selection.second, selection.third, students, selectedGrades,
+                        selection.first
                     )
                 }
-                Toast.makeText(context, "Excel tersimpan", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Excel tersimpan untuk " + selection.third,
+                    Toast.LENGTH_SHORT).show()
                 onExport(selection.first, selection.second, selection.third)
             } catch (ex: Exception) {
-                Toast.makeText(context, "Ekspor gagal: ${ex.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Ekspor gagal: " + ex.message, Toast.LENGTH_LONG).show()
             }
         }
     }
     VokasiButton(
-        text = text,
-        enabled = major.isNotBlank() && classroom.isNotBlank(),
+        text = if (fetching) "Mengambil nilai dari Supabase..." else text,
+        enabled = major.isNotBlank() && classroom.isNotBlank() && !fetching,
         modifier = modifier,
         onClick = {
-            target = Triple(major, classroom, date)
-            val fileClass = classroom.replace(Regex("[^A-Za-z0-9_-]"), "_")
-            launcher.launch("VOKASI_Nilai_${fileClass}_$date.xlsx")
+            coroutineScope.launch {
+                fetching = true
+                try {
+                    val freshGrades = SupabaseAttemptRepository.loadForAdminDate(date)
+                    if (freshGrades.isEmpty()) {
+                        Toast.makeText(context,
+                            "Belum ada nilai wajib di Supabase untuk " + date +
+                                ". Pilih tanggal lain atau cek sinkronisasi siswa.",
+                            Toast.LENGTH_LONG).show()
+                    } else {
+                        val members = students.filter {
+                            it.classroom.label == classroom && it.classroom.major == major
+                        }.map { it.username }.toSet()
+                        val matched = AdminAnalytics.latestCompulsoryByStudent(freshGrades, date)
+                            .count { (username, _) -> username in members }
+                        if (matched == 0) {
+                            Toast.makeText(context, "Server memiliki " + freshGrades.size +
+                                " hasil wajib, tetapi tidak cocok dengan kelas " + classroom +
+                                " pada " + date + ".", Toast.LENGTH_LONG).show()
+                        } else {
+                            target = Triple(major, classroom, date)
+                            selectedGrades = freshGrades
+                            val fileClass = classroom.replace(Regex("[^A-Za-z0-9_-]"), "_")
+                            launcher.launch("VOKASI_Nilai_" + fileClass + "_" + date + ".xlsx")
+                        }
+                    }
+                } catch (error: Exception) {
+                    Toast.makeText(context, "Gagal memuat nilai dari Supabase: " +
+                        (error.message ?: "Periksa koneksi internet."), Toast.LENGTH_LONG).show()
+                } finally {
+                    fetching = false
+                }
+            }
         }
     )
 }
