@@ -127,7 +127,8 @@ internal object SupabaseSchoolRepository {
                 username = row.username.orEmpty(),
                 passwordHash = "",
                 remoteId = row.id,
-                remoteRegistered = registered
+                remoteRegistered = registered,
+                remoteAuthUserId = row.authUserId
             )
         }
 
