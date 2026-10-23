@@ -78,6 +78,26 @@ class BulkStudentExcelReportTest {
         assertTrue(xml.contains("autoFilter ref=\"A1:H5\""))
     }
 
+    @Test fun selectedDateAndUsernameCaseDoNotHideRecordedGrades() {
+        val pupil = SchoolRosterEntry(
+            10L, "Abdul Rizal", "X TPM 1", "Pemesinan", 2026, "abdul_rizal", "hash"
+        )
+        val submission = Attempt(
+            " ABDUL_RIZAL ", time("13:30"), "actual", 30, 100, 100, 30, 20, 1450
+        )
+        val submitted = BulkStudentExcelReport.rows(
+            listOf(pupil), listOfNotNull(pupil.asStudent()), listOf(submission), date
+        ).single()
+        assertEquals(30, submitted.score)
+        assertEquals("Selesai", submitted.status)
+
+        val nextDay = BulkStudentExcelReport.rows(
+            listOf(pupil), listOfNotNull(pupil.asStudent()), listOf(submission), "2026-10-22"
+        ).single()
+        assertNull(nextDay.score)
+        assertEquals("Belum Tercatat", nextDay.status)
+    }
+
     @Test fun compatibilityForStudentNotYetRecordedInRoster() {
         val legacy = Student("legacy","hash","Siswa Lama",Classroom("X RPL 1","RPL"))
         val grades = BulkStudentExcelReport.rows(roster,students + legacy,attempts,date)
