@@ -77,7 +77,7 @@ internal fun AdminMonitorScreen(
             delay(20_000L)
         }
     }
-    val serverReady = fetchedForDate != null
+    val serverReady = fetchedForDate != null && fetchError.isBlank()
     val displayedAttempts = fetchedForDate.orEmpty()
     val latest = AdminAnalytics.latestCompulsoryByStudent(displayedAttempts, date)
         .mapKeys { (username, _) -> username.trim().lowercase(Locale.ROOT) }
