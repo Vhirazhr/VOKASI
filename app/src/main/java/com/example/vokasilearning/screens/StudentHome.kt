@@ -74,15 +74,20 @@ internal fun StudentHome(
     val todayCount = attempts.count {
         it.studentId == me.username && it.practiceCategory == null && dayKey(it.timeMillis) == today
     }
+    val latestCompulsory = attempts.filter {
+        it.studentId.equals(me.username, ignoreCase = true) && it.practiceCategory == null
+    }.maxWithOrNull(compareBy<Attempt> { it.timeMillis }.thenBy { it.sessionKey })
     val practiceInsights = PracticeInsights.forStudent(me.username, attempts)
     val seasonXp = studentSeasonXp(me, attempts)
     val streak = calculateStreak(me, attempts)
     val numberOfQuestions = if (countQuestions >= 500) QUESTIONS_PER_SESSION else 0
     val topStudents = if (schoolRankReady)
-        schoolLeaders.sortedWith(
-            compareByDescending<SchoolLeaderboardEntry> { it.seasonXp }
-                .thenBy { it.username }
-        ).take(3)
+        schoolLeaders.filter { it.mandatoryDays > 0 && it.mandatoryAverage != null }
+            .sortedWith(
+                compareByDescending<SchoolLeaderboardEntry> { it.mandatoryAverage ?: -1 }
+                    .thenByDescending { it.mandatoryDays }
+                    .thenBy { it.username }
+            ).take(3)
     else emptyList()
 
     LazyColumn(
@@ -165,6 +170,20 @@ internal fun StudentHome(
                             "4 materi • 100 soal acak",
                             color = Subtle, fontSize = 12.sp, lineHeight = 18.sp
                         )
+                        if (latestCompulsory != null) {
+                            Text(
+                                "Nilai wajib terakhir: ${latestCompulsory.score}/100  •  " +
+                                    dayKey(latestCompulsory.timeMillis),
+                                color = Navy, fontSize = 13.sp, fontWeight = FontWeight.Bold
+                            )
+                        }
+                        if (todayCount > 0) {
+                            Text(
+                                "Sudah mengerjakan hari ini. Boleh mengulang untuk memperbarui " +
+                                    "nilai, tetapi tidak mendapat XP wajib tambahan.",
+                                color = Subtle, fontSize = 11.sp, lineHeight = 16.sp
+                            )
+                        }
                         HorizontalDivider(color = Border)
                         Row(
                             Modifier.fillMaxWidth(),
@@ -174,11 +193,13 @@ internal fun StudentHome(
                                 PaleBlue, NavyLight, Modifier.weight(1f))
                             HomeQuickStat("◷", "${SESSION_TOTAL_SECONDS / 60} mnt",
                                 "waktu sesi", PaleGreen, Good, Modifier.weight(1f))
-                            HomeQuickStat("★", "+$SESSION_XP XP", "sesi valid",
+                            HomeQuickStat("★", if (todayCount == 0) "+$SESSION_XP XP" else "+0 XP",
+                                if (todayCount == 0) "wajib pertama" else "ulang hari ini",
                                 PaleGold, Warning, Modifier.weight(1f))
                         }
                         VokasiButton(
-                            text = "Mulai Latihan", onClick = onStart,
+                            text = if (todayCount > 0) "Ulangi Latihan Wajib" else "Mulai Latihan",
+                            onClick = onStart,
                             enabled = countQuestions >= 500,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -365,7 +386,7 @@ internal fun StudentHome(
                         Column(Modifier.weight(1f)) {
                             Text("PAPAN PERINGKAT", color = NavyLight,
                                 fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-                            Text(if (schoolRankReady) "Peringkat sekolah" else "Peringkat belum dimuat", color = Ink,
+                            Text(if (schoolRankReady) "Peringkat nilai wajib" else "Peringkat belum dimuat", color = Ink,
                                 fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
                         }
                         TextButton(onClick = onRanking) {
@@ -407,7 +428,7 @@ internal fun StudentHome(
                                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(student.classroom.label, color = Subtle, fontSize = 10.sp)
                                     }
-                                    Text("${entry.seasonXp} XP",
+                                    Text("${entry.mandatoryAverage ?: 0}/100",
                                         color = Navy, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                                 if (index < topStudents.lastIndex) HorizontalDivider(color = Border)
