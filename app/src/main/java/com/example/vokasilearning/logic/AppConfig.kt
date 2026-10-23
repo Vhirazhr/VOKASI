@@ -8,7 +8,7 @@ import com.example.vokasilearning.screens.*
 import com.example.vokasilearning.ui.*
 internal const val SCHOOL = "SMK Negeri 1 Singosari"
 internal const val DAILY_XP_CAP = 10_000
-internal const val SESSION_XP = 20
+internal const val SESSION_XP = 50
 internal const val QUESTIONS_PER_SESSION = 100
 internal const val SESSION_TOTAL_SECONDS = 1_800
 
