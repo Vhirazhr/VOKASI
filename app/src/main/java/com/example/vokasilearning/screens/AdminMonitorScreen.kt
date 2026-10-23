@@ -25,9 +25,7 @@ import com.example.vokasilearning.ui.*
 @Composable
 internal fun AdminMonitorScreen(
     students: List<Student>,
-    attempts: List<Attempt>,
-    questions: List<Question> = emptyList(),
-    scoresReady: Boolean = true,
+    questions: List<Question>,
     initialMajor: String = "",
     initialClass: String = "",
     initialDate: String = "",
