@@ -185,9 +185,19 @@ internal fun VokasiApp(activity: ComponentActivity) {
         resultSyncStatus = "Menyinkronkan ke Supabase..."
         if (isRemoteStudent) appScope.launch {
             try {
-                SupabaseAttemptRepository.syncOwn(
-                    student.username, LocalAttemptStore.load(activity)
-                )
+                // Do not let an older rejected session hide a newly uploaded
+                // compulsory grade. Verify this exact run even if backlog sync
+                // reported errors; the remote row is the source of truth.
+                val uploadIssue = try {
+                    SupabaseAttemptRepository.syncOwn(
+                        student.username, LocalAttemptStore.load(activity)
+                    )
+                    false
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    true
+                }
                 // Server is authoritative for earned XP: concurrent devices may
                 // submit the same WIB day, but only the first is eligible.
                 val serverHistory = SupabaseAttemptRepository.loadForStudent(questions.toList())
@@ -216,8 +226,11 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         } else {
                             // A successful network call does not prove this particular
                             // session was uploaded. Show its true sync state.
-                            resultSyncStatus = "Nilai masih tersimpan di HP. " +
-                                "Sesi ini belum ditemukan di Supabase; coba login ulang saat online."
+                            resultSyncStatus = if (uploadIssue)
+                                "Nilai tersimpan di HP, tetapi sesi ini gagal diunggah. " +
+                                    "Coba masuk ulang saat internet tersedia."
+                            else "Nilai tersimpan di HP, tetapi sesi ini belum ditemukan di Supabase. " +
+                                    "Coba masuk ulang saat online."
                         }
                     }
                 }
@@ -634,9 +647,19 @@ internal fun VokasiApp(activity: ComponentActivity) {
                                     schoolResultsCursor = null
                                     appScope.launch {
                                         try {
-                                            SupabaseAttemptRepository.syncOwn(
-                                                remoteStudent.username, LocalAttemptStore.load(activity)
-                                            )
+                                            // Upload backlog is best-effort: a corrupt
+                                            // historic session must not hide otherwise
+                                            // valid remote results on student login.
+                                            try {
+                                                SupabaseAttemptRepository.syncOwn(
+                                                    remoteStudent.username,
+                                                    LocalAttemptStore.load(activity)
+                                                )
+                                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                                throw cancelled
+                                            } catch (_: Exception) {
+                                                // Keep unsent grades on device for retry.
+                                            }
                                             val shared = SupabaseAttemptRepository.loadForStudent(questions.toList())
                                             if (isRemoteStudent && currentId == remoteStudent.username) {
                                                 val localFirst = LocalAttemptStore.load(activity).filter {
