@@ -29,7 +29,7 @@ private fun SchoolLeaderboardEntry.asDisplayStudent(me: Student): Student =
 
 @Composable
 internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardEntry>, dataReady: Boolean, dataError: String, onRetry: () -> Unit) {
-    var metric by remember { mutableStateOf(RankingMetric.XP) }
+    var metric by remember { mutableStateOf(RankingMetric.SCORE) }
     var scope by remember { mutableStateOf(RankingScope.SCHOOL) }
     var chosenMajor by remember { mutableStateOf(me.classroom.major) }
     var chosenClass by remember { mutableStateOf(me.classroom.label) }
@@ -88,8 +88,8 @@ internal fun LeaderboardScreen(me: Student, leaderboard: List<SchoolLeaderboardE
                     horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     listOf(
-                        RankingMetric.XP to "XP Season",
                         RankingMetric.SCORE to "Nilai Wajib",
+                        RankingMetric.XP to "XP Season",
                         RankingMetric.STREAK to "Daily Streak"
                     ).forEach { (option, label) ->
                         val active = metric == option
