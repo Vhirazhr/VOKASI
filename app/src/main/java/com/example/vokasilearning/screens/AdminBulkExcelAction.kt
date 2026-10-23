@@ -70,7 +70,7 @@ internal fun AdminBulkExcelAction(
             text = if (fetching) "Mengambil nilai dari Supabase..."
                 else "Unduh Hasil Siswa (" + matchCount + ")",
             enabled = matchCount > 0 && !fetching,
-            modifier = Modifier,
+            modifier = Modifier.fillMaxWidth(),
             onClick = {
                 scope.launch {
                     fetching = true
@@ -111,8 +111,8 @@ internal fun AdminBulkExcelAction(
                 }
             }
         )
-        Spacer(Modifier.height(5.dp))
-        Text("Excel berdasarkan tanggal terpilih (WIB). Nilai diambil ulang dari server saat ekspor.",
-            fontSize = 11.sp, color = Color(0xFF53667B))
+        Spacer(Modifier.height(3.dp))
+        Text("Nilai tanggal terpilih • langsung dari Supabase",
+            fontSize = 10.sp, color = Color(0xFF53667B))
     }
 }
