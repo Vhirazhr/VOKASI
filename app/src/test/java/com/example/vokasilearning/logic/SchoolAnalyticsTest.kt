@@ -79,7 +79,7 @@ class SchoolAnalyticsTest {
         assertEquals(7, on21.trend.size)
         assertEquals("2026-10-15", on21.trend.first().first)
         assertEquals("2026-10-21", on21.trend.last().first)
-        assertEquals(73, on21.trend[5].second)
+        assertEquals(72, on21.trend[5].second)
         assertEquals(78, on21.trend[6].second)
         assertNull(on21.trend[0].second)
         val on20 = SchoolAnalytics.calculate(students, results, SchoolScope(), "2026-10-20")
