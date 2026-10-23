@@ -323,20 +323,14 @@ internal class QuizSession {
         }
         val correct = review.count { it.status == AnswerStatus.BENAR }
         val now = System.currentTimeMillis()
-        val earnedToday = previous.filter {
-            it.studentId == student.username && dayKey(it.timeMillis) == dayKey(now)
-        }.sumOf { it.earnedXp }
-        val alreadyGranted = previous.any {
-            it.studentId == student.username && it.sessionKey == token
-        }
-        val alreadyPracticedToday = practiceCategory != null && previous.any {
-            it.studentId == student.username && it.practiceCategory == practiceCategory &&
-                dayKey(it.timeMillis) == dayKey(now) && it.earnedXp > 0
-        }
-        val reward = if (practiceCategory == null) SESSION_XP else 5
-        val xp = if (!alreadyGranted && !alreadyPracticedToday && correct > 0) {
-            max(0, minOf(reward, DAILY_XP_CAP - earnedToday))
-        } else 0
+        val xp = QuizRewards.earnedXp(
+            username = student.username,
+            previous = previous,
+            nowMillis = now,
+            sessionKey = token,
+            practiceCategory = practiceCategory,
+            correct = correct
+        )
         return Attempt(
             studentId = student.username,
             timeMillis = now,
