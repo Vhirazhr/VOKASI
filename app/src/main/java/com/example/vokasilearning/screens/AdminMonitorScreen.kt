@@ -96,10 +96,10 @@ internal fun AdminMonitorScreen(
             .count { it.studentId.trim().lowercase(Locale.ROOT) in scopeIds },
         major = major
     )
-    val members = scopeMembers.filter {
+    val members = (if (serverReady) scopeMembers else emptyList()).filter {
         search.isBlank() || it.name.contains(search.trim(), true) ||
             it.username.contains(search.trim(), true)
-    }.filter { !onlyMissing || (serverReady && attemptFor(it.username) == null) }
+    }.filter { !onlyMissing || attemptFor(it.username) == null }
         .sortedWith(
             compareBy<Student> { if (attemptFor(it.username) == null) 1 else 0 }.thenBy { it.name }
         )
