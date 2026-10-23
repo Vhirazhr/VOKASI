@@ -129,7 +129,7 @@ internal fun SchoolMonthlyTrend(
                 horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
                 Column(
-                    modifier = Modifier.height(150.dp),
+                    modifier = Modifier.height(120.dp),
                     verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.End
                 ) {
@@ -138,7 +138,7 @@ internal fun SchoolMonthlyTrend(
                     }
                 }
                 Canvas(
-                    Modifier.weight(1f).height(150.dp)
+                    Modifier.weight(1f).height(120.dp)
                 ) {
                     val pad = 7.dp.toPx()
                     val top = pad
@@ -186,16 +186,12 @@ internal fun SchoolMonthlyTrend(
         }
         Text(
             if (recordedMonths == 1 && weekly)
-                "Baru 1 hari memiliki nilai wajib. Grafik mencatat titiknya; " +
-                    "garis akan tampak saat ada nilai pada hari lain di pekan ini."
+                "Baru 1 hari tercatat; grafik akan tersambung saat ada nilai pada hari lain."
             else if (recordedMonths == 1)
-                "Baru 1 bulan memiliki nilai wajib. Titiknya sudah dicatat; " +
-                    "garis perkembangan baru terbentuk jika ada bulan lain yang memiliki nilai."
+                "Baru 1 bulan tercatat; grafik akan tersambung saat ada bulan berikutnya."
             else if (weekly)
-                "Tiap titik adalah rata-rata nilai wajib pada hari tersebut. " +
-                    "Hari tanpa data bukan nilai 0."
-            else "Tiap titik memakai nilai wajib terbaru per siswa dalam bulan tersebut. " +
-                "Bulan tanpa data tidak dihitung sebagai nilai 0.",
+                "Rata-rata nilai wajib harian • tanda — berarti belum ada nilai."
+            else "Rata-rata nilai wajib bulanan • tanda — berarti belum ada nilai.",
             color = Subtle, fontSize = 11.sp
         )
     }
