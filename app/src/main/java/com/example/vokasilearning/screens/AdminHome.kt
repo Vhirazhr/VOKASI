@@ -93,14 +93,14 @@ internal fun AdminHome(
                 Card(
                     modifier = Modifier.fillMaxWidth()
                         .padding(horizontal = 18.dp)
-                        .padding(top = 245.dp)
+                        .padding(top = 225.dp)
                         .shadow(14.dp, RoundedCornerShape(28.dp)),
                     shape = RoundedCornerShape(28.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
                     Column(
-                        Modifier.fillMaxWidth().padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(13.dp)
+                        Modifier.fillMaxWidth().padding(17.dp),
+                        verticalArrangement = Arrangement.spacedBy(9.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("HASIL LATIHAN WAJIB",
@@ -110,16 +110,38 @@ internal fun AdminHome(
                                 if (scoresReady) PaleGreen else PaleGold,
                                 if (scoresReady) Good else Warning)
                         }
-                        Text("Unduh Hasil Siswa", color = Ink, fontSize = 25.sp,
+                        Text("Unduh Hasil Siswa", color = Ink, fontSize = 22.sp,
                             fontWeight = FontWeight.ExtraBold)
-                        Text("Pilih tanggal atau filter yang diperlukan.",
-                            color = Subtle, fontSize = 12.sp)
+                        Text("Pilih tanggal dan filter untuk laporan nilai wajib.",
+                            color = Subtle, fontSize = 11.sp)
                         AdminSelect("Jurusan", major, listOf("") + majors, { major = it },
                             Modifier.fillMaxWidth())
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             AdminSelect("Kelas", classroom, listOf("") + classOptions, { classroom = it },
                                 Modifier.weight(1f))
                             AdminDateSelect(date, { date = it }, Modifier.weight(1f))
+                        }
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Tanggal cepat:", color = Subtle, fontSize = 11.sp)
+                            TextButton(
+                                onClick = { date = dayKey(System.currentTimeMillis()) },
+                                modifier = Modifier.height(32.dp),
+                                contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp)
+                            ) { Text("Hari ini", fontSize = 11.sp) }
+                            TextButton(
+                                onClick = {
+                                    val yesterday = wibCalendar().apply {
+                                        add(Calendar.DAY_OF_MONTH, -1)
+                                    }
+                                    date = dayKey(yesterday.timeInMillis)
+                                },
+                                modifier = Modifier.height(32.dp),
+                                contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp)
+                            ) { Text("Kemarin", fontSize = 11.sp) }
                         }
                         VokasiButton(
                             text = "Lihat Hasil Siswa",
@@ -133,9 +155,6 @@ internal fun AdminHome(
                             modifier = Modifier.fillMaxWidth(), onExport = onExcelExport,
                             scoresReady = scoresReady
                         )
-                        Text(if (scoresReady) "Data hasil latihan tersinkron dari Supabase."
-                            else "Menyiapkan koneksi nilai sekolah.",
-                            color = Subtle, fontSize = 11.sp)
                     }
                 }
             }
@@ -256,8 +275,9 @@ internal fun AdminHome(
                 WhiteCard(Modifier.fillMaxWidth()) {
                     Text("Perubahan nilai siswa", color = Ink, fontSize = 16.sp,
                         fontWeight = FontWeight.ExtraBold)
-                    Text(if (scoresReady) "Perbandingan ${selectedPeriod} dengan ${previousPeriod}."
-                        else "Menunggu data nilai sekolah.",
+                    Text(if (!scoresReady) "Menunggu data dari Supabase."
+                        else if (weeklyStats) "Pekan terpilih dibanding pekan sebelumnya."
+                        else "Bulan terpilih dibanding bulan sebelumnya.",
                         color = Subtle, fontSize = 11.sp)
                     Row(
                         Modifier.fillMaxWidth(),
@@ -282,10 +302,10 @@ internal fun AdminHome(
                     Text(
                         if (!scoresReady) "Rata-rata menunggu sinkronisasi"
                         else if (comparableStudents == 0)
-                            "Belum bisa membandingkan: belum ada siswa dengan nilai wajib " +
-                                "pada ${previousPeriod} dan ${selectedPeriod} sekaligus."
-                        else "${comparableStudents} siswa memiliki nilai pada kedua bulan. " +
-                            "Rata-rata ${previousPeriod}: ${stats.previousAverage ?: "—"}",
+                            if (weeklyStats) "Belum ada siswa dengan nilai wajib di kedua pekan."
+                            else "Belum ada siswa dengan nilai wajib di kedua bulan."
+                        else "${comparableStudents} siswa punya nilai pada kedua periode. " +
+                            "Rata-rata sebelumnya: ${stats.previousAverage ?: "—"}",
                         color = Subtle, fontSize = 11.sp
                     )
                 }
