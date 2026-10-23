@@ -1,12 +1,22 @@
 package com.example.vokasilearning.screens
 
 import android.widget.Toast
+import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import com.example.vokasilearning.data.BulkStudentExcelReport
+import com.example.vokasilearning.data.SupabaseAttemptRepository
 import com.example.vokasilearning.data.SchoolRosterEntry
 import com.example.vokasilearning.model.Student
 import com.example.vokasilearning.model.Attempt
@@ -27,6 +37,9 @@ internal fun AdminBulkExcelAction(
 ) {
     val context = LocalContext.current
     var selection by remember { mutableStateOf<Triple<String, String, String>?>(null) }
+    var selectedGrades by remember { mutableStateOf<List<Attempt>>(emptyList()) }
+    var fetching by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val matchCount = BulkStudentExcelReport.rows(
         roster, students, attempts, date, major, classroom
     ).size
@@ -41,7 +54,7 @@ internal fun AdminBulkExcelAction(
             try {
                 context.contentResolver.openOutputStream(uri)?.use { out ->
                     BulkStudentExcelReport.write(
-                        out, roster, students, attempts, scope.third, scope.first, scope.second
+                        out, roster, students, selectedGrades, scope.third, scope.first, scope.second
                     )
                 } ?: error("Tidak bisa menyimpan berkas.")
                 onExport(scope.first, scope.second, scope.third)
@@ -52,17 +65,54 @@ internal fun AdminBulkExcelAction(
             }
         }
     }
-    VokasiButton(
-        text = "Unduh Hasil Siswa (" + matchCount + ")",
-        enabled = scoresReady && matchCount > 0,
-        modifier = modifier,
-        onClick = {
-            selection = Triple(major, classroom, date)
-            fun part(s: String) = s.ifBlank { "Semua" }
-                .replace(Regex("[^A-Za-z0-9_-]"), "_")
-                .take(50)
-            launcher.launch("VOKASI_Hasil_" + part(major) + "_" + part(classroom) +
-                "_" + date + ".xlsx")
-        }
-    )
+    Column(modifier) {
+        VokasiButton(
+            text = if (fetching) "Mengambil nilai dari Supabase..."
+                else "Unduh Hasil Siswa (" + matchCount + ")",
+            enabled = matchCount > 0 && !fetching,
+            modifier = Modifier,
+            onClick = {
+                scope.launch {
+                    fetching = true
+                    try {
+                        val remoteGrades = SupabaseAttemptRepository.loadForAdminDate(date)
+                        if (remoteGrades.isEmpty()) {
+                            Toast.makeText(context,
+                                "Belum ada nilai latihan wajib di Supabase untuk tanggal " + date +
+                                    ". Periksa status sinkronisasi di akun siswa.",
+                                Toast.LENGTH_LONG).show()
+                        } else {
+                            val matched = BulkStudentExcelReport.rows(
+                                roster, students, remoteGrades, date, major, classroom
+                            ).count { it.score != null }
+                            if (matched == 0) {
+                                Toast.makeText(context,
+                                    "Server memiliki " + remoteGrades.size +
+                                        " hasil wajib pada " + date +
+                                        ", tetapi tidak cocok dengan siswa/filter. Periksa jurusan, kelas, dan username.",
+                                    Toast.LENGTH_LONG).show()
+                            } else {
+                                selectedGrades = remoteGrades
+                                selection = Triple(major, classroom, date)
+                                fun part(s: String) = s.ifBlank { "Semua" }
+                                    .replace(Regex("[^A-Za-z0-9_-]"), "_").take(50)
+                                launcher.launch("VOKASI_Hasil_" + part(major) + "_" +
+                                    part(classroom) + "_" + date + ".xlsx")
+                            }
+                        }
+                    } catch (error: Exception) {
+                        Toast.makeText(context,
+                            "Gagal mengambil nilai dari Supabase: " +
+                                (error.message ?: "Periksa internet dan login admin."),
+                            Toast.LENGTH_LONG).show()
+                    } finally {
+                        fetching = false
+                    }
+                }
+            }
+        )
+        Spacer(Modifier.height(5.dp))
+        Text("Excel berdasarkan tanggal terpilih (WIB). Nilai diambil ulang dari server saat ekspor.",
+            fontSize = 11.sp, color = Color(0xFF53667B))
+    }
 }
