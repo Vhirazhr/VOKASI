@@ -46,9 +46,10 @@ internal fun AdminStudentsScreen(
     var pagingActivated by remember { mutableStateOf(false) }
     var reviewing by remember { mutableStateOf<Attempt?>(null) }
     val lazyState = rememberLazyListState()
+    fun usernameKey(value: String) = value.trim().lowercase(Locale.ROOT)
     val latestCompulsory = remember(attempts) {
         attempts.asSequence().filter { it.practiceCategory == null }
-            .groupBy { it.studentId }
+            .groupBy { usernameKey(it.studentId) }
             .mapValues { (_, list) -> list.maxByOrNull { it.timeMillis }!! }
     }
     val majors = students.groupBy { it.classroom.major }.toSortedMap()
@@ -98,7 +99,10 @@ internal fun AdminStudentsScreen(
     }
 
     val history = selectedStudent?.let { student ->
-        attempts.filter { it.studentId == student.username && it.practiceCategory == null }
+        attempts.filter {
+            usernameKey(it.studentId) == usernameKey(student.username) &&
+                it.practiceCategory == null
+        }
             .sortedWith(compareByDescending<Attempt> { it.timeMillis }.thenByDescending { it.sessionKey })
     }.orEmpty()
     val listingSize = when {
@@ -206,7 +210,7 @@ internal fun AdminStudentsScreen(
             } else {
                 items(visible, key = { "search_${it.username}" }) { student ->
                     AdminDirectoryStudentRow(
-                        student = student, grade = if (scoresReady) latestCompulsory[student.username] else null,
+                        student = student, grade = if (scoresReady) latestCompulsory[usernameKey(student.username)] else null,
                         onClick = { selectStudent(student) }
                     )
                 }
@@ -230,7 +234,7 @@ internal fun AdminStudentsScreen(
                             }
                         }
                     }
-                    val latest = latestCompulsory[student.username]
+                    val latest = latestCompulsory[usernameKey(student.username)]
                     HorizontalDivider(color = Border)
                     Text("Nilai wajib terakhir", color = Subtle, fontSize = 11.sp)
                     Text(if (!scoresReady) "Menunggu sinkronisasi"
@@ -277,7 +281,7 @@ internal fun AdminStudentsScreen(
             } else {
                 items(classmates.drop(activePage * pageSize).take(pageSize), key = { it.username }) { student ->
                     AdminDirectoryStudentRow(
-                        student = student, grade = latestCompulsory[student.username],
+                        student = student, grade = latestCompulsory[usernameKey(student.username)],
                         onClick = { selectStudent(student) }
                     )
                 }
@@ -366,7 +370,7 @@ internal fun AdminStudentsScreen(
     }
 
     reviewing?.let { attempt ->
-        val owner = students.firstOrNull { it.username == attempt.studentId }
+        val owner = students.firstOrNull { usernameKey(it.username) == usernameKey(attempt.studentId) }
         AdminAnswerReviewDialog(
             attempt = attempt,
             studentName = owner?.name ?: attempt.studentNameSnapshot,
