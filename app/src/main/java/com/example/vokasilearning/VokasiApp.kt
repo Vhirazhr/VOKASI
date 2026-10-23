@@ -263,7 +263,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
             while (isAdmin) {
                 try {
                     val batch = SupabaseAttemptRepository.loadForAdmin(
-                        questions.toList(), schoolResultsCursor
+                        questions.toList(), schoolResultsCursor, schoolDirectory.roster
                     )
                     val existing = attempts.toList().associateBy {
                         it.studentId to it.sessionKey
@@ -890,6 +890,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                     )
                     Page.ADMIN_MONITOR -> AdminMonitorScreen(
                         students.toList(), questions.toList(),
+                        roster = schoolDirectory.roster,
                         initialMajor = adminMajorFilter,
                         initialClass = adminClassFilter,
                         initialDate = adminDateFilter,
