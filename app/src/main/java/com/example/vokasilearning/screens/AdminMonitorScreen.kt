@@ -15,6 +15,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vokasilearning.logic.*
+import com.example.vokasilearning.data.SupabaseAttemptRepository
+import kotlinx.coroutines.delay
+import java.util.Locale
 import com.example.vokasilearning.model.*
 import com.example.vokasilearning.ui.*
 
@@ -23,6 +26,7 @@ import com.example.vokasilearning.ui.*
 internal fun AdminMonitorScreen(
     students: List<Student>,
     attempts: List<Attempt>,
+    questions: List<Question> = emptyList(),
     scoresReady: Boolean = true,
     initialMajor: String = "",
     initialClass: String = "",
@@ -49,29 +53,57 @@ internal fun AdminMonitorScreen(
     var pagingActivated by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     var reviewing by remember { mutableStateOf<Attempt?>(null) }
+    var refreshKey by remember { mutableIntStateOf(0) }
+    // Query authoritative results for the selected WIB date, not cached home data.
+    var fetchedForDate by remember(date) { mutableStateOf<List<Attempt>?>(null) }
+    var fetching by remember(date) { mutableStateOf(true) }
+    var fetchError by remember(date) { mutableStateOf("") }
+    var lastUpdated by remember(date) { mutableStateOf<String?>(null) }
 
-    val latest = AdminAnalytics.latestCompulsoryByStudent(attempts, date)
+    LaunchedEffect(date, refreshKey) {
+        while (true) {
+            fetching = true
+            try {
+                fetchedForDate = SupabaseAttemptRepository.loadForAdminDate(date, questions)
+                fetchError = ""
+                lastUpdated = java.text.SimpleDateFormat("HH:mm", Locale("id", "ID")).apply {
+                    timeZone = java.util.TimeZone.getTimeZone("Asia/Jakarta")
+                }.format(java.util.Date())
+            } catch (error: Exception) {
+                fetchError = error.message ?: "Koneksi Supabase gagal."
+            } finally {
+                fetching = false
+            }
+            delay(20_000L)
+        }
+    }
+    val serverReady = fetchedForDate != null
+    val displayedAttempts = fetchedForDate.orEmpty()
+    val latest = AdminAnalytics.latestCompulsoryByStudent(displayedAttempts, date)
+        .mapKeys { (username, _) -> username.trim().lowercase(Locale.ROOT) }
+    fun attemptFor(username: String): Attempt? =
+        latest[username.trim().lowercase(Locale.ROOT)]
     val scopeMembers = students.filter {
         (major.isBlank() || it.classroom.major == major) &&
             (classroom.isBlank() || it.classroom.label == classroom)
     }
-    val scopeIds = scopeMembers.mapTo(HashSet()) { it.username }
-    val scores = scopeMembers.mapNotNull { latest[it.username]?.score }
+    val scopeIds = scopeMembers.mapTo(HashSet()) { it.username.trim().lowercase(Locale.ROOT) }
+    val scores = scopeMembers.mapNotNull { attemptFor(it.username)?.score }
     val summary = ClassDailySummary(
         classroom = classroom,
         studentCount = scopeMembers.size,
         completedCount = scores.size,
         averageScore = scores.takeIf { it.isNotEmpty() }?.average()?.toInt(),
-        sessions = AdminAnalytics.compulsoryOnDate(attempts, date)
-            .count { it.studentId in scopeIds },
+        sessions = AdminAnalytics.compulsoryOnDate(displayedAttempts, date)
+            .count { it.studentId.trim().lowercase(Locale.ROOT) in scopeIds },
         major = major
     )
     val members = scopeMembers.filter {
         search.isBlank() || it.name.contains(search.trim(), true) ||
             it.username.contains(search.trim(), true)
-    }.filter { !onlyMissing || latest[it.username] == null }
+    }.filter { !onlyMissing || (serverReady && attemptFor(it.username) == null) }
         .sortedWith(
-            compareBy<Student> { if (latest[it.username] == null) 1 else 0 }.thenBy { it.name }
+            compareBy<Student> { if (attemptFor(it.username) == null) 1 else 0 }.thenBy { it.name }
         )
     val pageSize = AdminPagination.PAGE_SIZE
     val pageCount = AdminPagination.count(members.size, pageSize)
@@ -105,9 +137,15 @@ internal fun AdminMonitorScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("HASIL LATIHAN WAJIB", color = NavyLight, fontSize = 11.sp,
                                 fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
-                            Pill(if (scoresReady) "Supabase" else "Menunggu",
-                                if (scoresReady) PaleGreen else PaleGold,
-                                if (scoresReady) Good else Warning)
+                            Pill(
+                                when {
+                                    !serverReady && fetching -> "Memuat..."
+                                    fetchError.isNotBlank() -> "Gangguan"
+                                    else -> "Supabase"
+                                },
+                                if (serverReady && fetchError.isBlank()) PaleGreen else PaleGold,
+                                if (serverReady && fetchError.isBlank()) Good else Warning
+                            )
                         }
                         AdminSelect("Jurusan", major, listOf("") + majors, { major = it },
                             Modifier.fillMaxWidth())
@@ -116,16 +154,41 @@ internal fun AdminMonitorScreen(
                                 Modifier.weight(1f))
                             AdminDateSelect(date, { date = it }, Modifier.weight(1f))
                         }
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                when {
+                                    fetching && !serverReady -> "Mengambil nilai tanggal $date..."
+                                    fetchError.isNotBlank() -> "Data terbaru belum berhasil dimuat."
+                                    serverReady -> "Sinkron WIB: ${lastUpdated ?: "—"} • $date"
+                                    else -> "Menunggu Supabase"
+                                },
+                                modifier = Modifier.weight(1f), fontSize = 11.sp,
+                                color = if (fetchError.isNotBlank()) Warning else Subtle
+                            )
+                            TextButton(
+                                onClick = { refreshKey++ },
+                                enabled = !fetching,
+                                contentPadding = PaddingValues(horizontal = 6.dp)
+                            ) { Text("Segarkan", fontSize = 11.sp, color = Navy) }
+                        }
+                        if (fetchError.isNotBlank()) {
+                            Text("Sinkronisasi gagal: $fetchError",
+                                color = Warning, fontSize = 11.sp)
+                        }
                         HorizontalDivider(color = Border)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AdminSummaryMetric("Selesai", if (scoresReady) "${summary.completedCount}" else "—", Good, Modifier.weight(1f))
-                            AdminSummaryMetric("Belum", if (scoresReady) "${summary.missingCount}" else "—", Warning, Modifier.weight(1f))
-                            AdminSummaryMetric("Rata-rata", if (scoresReady) summary.averageScore?.toString() ?: "—" else "—",
+                            AdminSummaryMetric("Selesai", if (serverReady) "${summary.completedCount}" else "—", Good, Modifier.weight(1f))
+                            AdminSummaryMetric("Belum", if (serverReady) "${summary.missingCount}" else "—", Warning, Modifier.weight(1f))
+                            AdminSummaryMetric("Rata-rata", if (serverReady) summary.averageScore?.toString() ?: "—" else "—",
                                 Navy, Modifier.weight(1f))
                         }
-                        if (scoresReady && major.isNotBlank() && classroom.isNotBlank()) {
+                        if (serverReady && major.isNotBlank() && classroom.isNotBlank()) {
                             AdminExcelAction(
-                                students, attempts, major, classroom, date,
+                                students, displayedAttempts, major, classroom, date,
                                 modifier = Modifier.fillMaxWidth(), text = "Unduh Excel Kelas",
                                 onExport = onExcelExport
                             )
@@ -133,8 +196,9 @@ internal fun AdminMonitorScreen(
                             Text("Ekspor semua kelas tersedia di Ringkasan.",
                                 color = Subtle, fontSize = 11.sp)
                         }
-                        Text(if (scoresReady) "Data nilai tersinkron • ${summary.studentCount} siswa"
-                            else "Menunggu sinkronisasi nilai • ${summary.studentCount} siswa",
+                        Text(if (serverReady && fetchError.isBlank())
+                                "Nilai server terverifikasi • ${summary.studentCount} siswa"
+                            else "Belum bisa memastikan nilai terbaru • ${summary.studentCount} siswa",
                             color = Subtle, fontSize = 11.sp)
                     }
                 }
@@ -161,7 +225,7 @@ internal fun AdminMonitorScreen(
                     FilterChip(
                         selected = onlyMissing,
                         onClick = { onlyMissing = true; pagingActivated = false },
-                        label = { Text(if (scoresReady) "Belum tercatat" else "Belum tersinkron", fontSize = 12.sp) }
+                        label = { Text(if (serverReady) "Belum tercatat" else "Belum tersinkron", fontSize = 12.sp) }
                     )
                     Spacer(Modifier.weight(1f))
                     Text("${members.size} siswa", color = Subtle, fontSize = 11.sp)
@@ -171,12 +235,14 @@ internal fun AdminMonitorScreen(
         if (members.isEmpty()) {
             item {
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                    Text("Tidak ada hasil yang cocok.", color = Subtle, fontSize = 12.sp)
+                    Text(if (!serverReady) "Belum berhasil mengambil nilai dari Supabase."
+                        else "Tidak ada siswa yang cocok dengan filter.",
+                        color = Subtle, fontSize = 12.sp)
                 }
             }
         } else {
             items(visibleMembers, key = { it.username }) { student ->
-                val result = latest[student.username]
+                val result = attemptFor(student.username)
                 WhiteCard(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -187,7 +253,7 @@ internal fun AdminMonitorScreen(
                             Text(student.classroom.label, color = Subtle, fontSize = 11.sp)
                         }
                         Pill(
-                            if (!scoresReady) "—" else result?.let { "${it.score}/100" } ?: "Belum",
+                            if (!serverReady) "Memuat" else result?.let { "${it.score}/100" } ?: "Belum",
                             when {
                                 result == null -> PaleGold
                                 result.score < 60 -> Color(0xFFFFE7EA)
@@ -227,7 +293,7 @@ internal fun AdminMonitorScreen(
         }
     }
     reviewing?.let { result ->
-        val owner = students.firstOrNull { it.username == result.studentId }
+        val owner = students.firstOrNull { it.username.equals(result.studentId, ignoreCase = true) }
         AdminAnswerReviewDialog(
             attempt = result,
             studentName = owner?.name ?: result.studentNameSnapshot,
