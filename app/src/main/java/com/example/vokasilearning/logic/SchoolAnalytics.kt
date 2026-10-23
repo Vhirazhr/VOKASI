@@ -43,45 +43,69 @@ internal object SchoolAnalytics {
         (scope.classroom.isBlank() || it.classroom.label == scope.classroom)
     }
 
+    /**
+     * Date-driven admin dashboard, anchored to the existing report date.
+     * Participation, distribution and average use the latest compulsory result
+     * ON that date. Growth compares each pupil with their previous result
+     * (not with a synthetic zero when no earlier submission exists).
+     * Chart always shows seven consecutive WIB calendar days ending on date.
+     */
     fun calculate(
         students: List<Student>,
         attempts: List<Attempt>,
         scope: SchoolScope,
         date: String
     ): SchoolStatistics {
-        val members = members(students, scope)
-        val ids = members.mapTo(HashSet()) { it.username }
-        val all = attempts.filter { it.practiceCategory == null && it.studentId in ids &&
-            dayKey(it.timeMillis) <= date }
-        val days = all.map { dayKey(it.timeMillis) }.distinct().sorted()
-        val today = all.filter { dayKey(it.timeMillis) == date }
-            .groupBy { it.studentId }.mapValues { (_, list) -> list.maxByOrNull { it.timeMillis }!! }
-        val previous = all.filter { dayKey(it.timeMillis) < date }
-            .groupBy { it.studentId }.mapValues { (_, list) -> list.maxByOrNull { it.timeMillis }!! }
-        val scores = today.values.map { it.score }
-        val withHistory = today.keys.filter { it in previous.keys }
-        val improved = withHistory.count { today.getValue(it).score > previous.getValue(it).score }
-        val declined = withHistory.count { today.getValue(it).score < previous.getValue(it).score }
-        val stable = withHistory.size - improved - declined
-        val trend = days.takeLast(7).map { day ->
-            val latest = all.filter { dayKey(it.timeMillis) == day }
-                .groupBy { it.studentId }.values.mapNotNull { it.maxByOrNull { run -> run.timeMillis }?.score }
-            day to latest.takeIf { it.isNotEmpty() }?.average()?.toInt()
+        require(Regex("\\d{4}-\\d{2}-\\d{2}").matches(date))
+        val group = members(students, scope)
+        fun key(value: String) = value.trim().lowercase(Locale.ROOT)
+        val ids = group.mapTo(HashSet()) { key(it.username) }
+        val all = attempts.filter {
+            it.practiceCategory == null &&
+                key(it.studentId) in ids &&
+                dayKey(it.timeMillis) <= date
         }
+
+        fun latest(runs: List<Attempt>) = runs.groupBy { key(it.studentId) }
+            .mapValues { (_, values) ->
+                values.maxWithOrNull(compareBy<Attempt> { it.timeMillis }
+                    .thenBy { it.sessionKey })!!
+            }
+
+        val today = latest(all.filter { dayKey(it.timeMillis) == date })
+        val previous = latest(all.filter { dayKey(it.timeMillis) < date })
+        val scores = today.values.map { it.score }
+        val comparable = today.keys.intersect(previous.keys)
+
+        val dateParts = date.split("-").map { it.toInt() }
+        val endDay = Calendar.getInstance(TimeZone.getTimeZone("Asia/Jakarta"), Locale.US).apply {
+            isLenient = false
+            clear()
+            set(dateParts[0], dateParts[1] - 1, dateParts[2], 12, 0, 0)
+        }
+        val trend = (6 downTo 0).map { daysBefore ->
+            val dayCal = endDay.clone() as Calendar
+            dayCal.add(Calendar.DAY_OF_MONTH, -daysBefore)
+            val day = dayKey(dayCal.timeInMillis)
+            val daily = latest(all.filter { dayKey(it.timeMillis) == day }).values
+                .map { it.score }
+            day to daily.takeIf { it.isNotEmpty() }?.average()?.toInt()
+        }
+
         return SchoolStatistics(
-            students = members.size,
-            classes = members.map { it.classroom.major to it.classroom.label }.distinct().size,
-            majors = members.map { it.classroom.major }.distinct().size,
+            students = group.size,
+            classes = group.map { it.classroom.major to it.classroom.label }.distinct().size,
+            majors = group.map { it.classroom.major }.distinct().size,
             completed = today.size,
             average = scores.takeIf { it.isNotEmpty() }?.average()?.toInt(),
             high = scores.count { it >= 75 },
             middle = scores.count { it in 60..74 },
             low = scores.count { it < 60 },
-            previousAverage = previous.values.map { it.score }.takeIf { it.isNotEmpty() }
-                ?.average()?.toInt(),
-            improved = improved,
-            declined = declined,
-            stable = stable,
+            previousAverage = comparable.takeIf { it.isNotEmpty() }
+                ?.map { previous.getValue(it).score }?.average()?.toInt(),
+            improved = comparable.count { today.getValue(it).score > previous.getValue(it).score },
+            declined = comparable.count { today.getValue(it).score < previous.getValue(it).score },
+            stable = comparable.count { today.getValue(it).score == previous.getValue(it).score },
             trend = trend
         )
     }
