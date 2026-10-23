@@ -47,6 +47,8 @@ internal fun AdminHome(
     var statsClass by remember { mutableStateOf("") }
     val currentYear = wibCalendar().get(Calendar.YEAR)
     val currentMonth = wibCalendar().get(Calendar.MONTH) + 1
+    var weeklyStats by remember { mutableStateOf(true) }
+    var statsWeekAnchor by remember { mutableStateOf(dayKey(System.currentTimeMillis())) }
     var statsMonth by remember { mutableIntStateOf(currentMonth) }
     var statsYear by remember { mutableIntStateOf(currentYear) }
     var showScopeFilters by remember { mutableStateOf(false) }
@@ -61,14 +63,20 @@ internal fun AdminHome(
         it.classroom.major == statsMajor &&
         (statsGrade.isBlank() || schoolGrade(it.classroom.label) == statsGrade) }
         .map { it.classroom.label }.distinct().sorted()
-    val stats = remember(students, attempts, statsMajor, statsGrade, statsClass, statsMonth, statsYear) {
-        SchoolAnalytics.calculateMonthly(students, attempts,
-            SchoolScope(statsMajor, statsGrade, statsClass), statsYear, statsMonth)
+    val stats = remember(students, attempts, statsMajor, statsGrade, statsClass,
+        statsMonth, statsYear, statsWeekAnchor, weeklyStats) {
+        val scope = SchoolScope(statsMajor, statsGrade, statsClass)
+        if (weeklyStats) SchoolAnalytics.calculateWeekly(students, attempts, scope, statsWeekAnchor)
+        else SchoolAnalytics.calculateMonthly(students, attempts, scope, statsYear, statsMonth)
     }
     // No shared student results across both months means growth is unavailable,
     // not that every pupil received a zero or that the calculation failed.
     val comparableStudents = stats.improved + stats.stable + stats.declined
     val previousMonthTitle = monthNames[if (statsMonth == 1) 11 else statsMonth - 2]
+    val weekRange = SchoolAnalytics.weekRange(statsWeekAnchor)
+    val selectedPeriod = if (weeklyStats) "pekan ${weekRange.first} – ${weekRange.second}"
+        else "${monthNames[statsMonth - 1]} ${statsYear}"
+    val previousPeriod = if (weeklyStats) "pekan sebelumnya" else previousMonthTitle
 
 
     LazyColumn(
@@ -141,13 +149,31 @@ internal fun AdminHome(
                 AdminSectionTitle("Data sekolah", "Statistik & perkembangan")
                 WhiteCard(Modifier.fillMaxWidth()) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AdminSelect(
-                            "Bulan", monthNames[statsMonth - 1], monthNames,
-                            { statsMonth = monthNames.indexOf(it) + 1 },
-                            Modifier.weight(1f)
+                        FilterChip(
+                            selected = weeklyStats,
+                            onClick = { weeklyStats = true },
+                            label = { Text("Mingguan") }
                         )
-                        AdminSelect("Tahun", statsYear.toString(), years,
-                            { statsYear = it.toInt() }, Modifier.weight(1f))
+                        FilterChip(
+                            selected = !weeklyStats,
+                            onClick = { weeklyStats = false },
+                            label = { Text("Bulanan") }
+                        )
+                    }
+                    if (weeklyStats) {
+                        AdminDateSelect(statsWeekAnchor, { statsWeekAnchor = it }, Modifier.fillMaxWidth())
+                        Text("Pekan Senin–Minggu: ${weekRange.first} s.d. ${weekRange.second}",
+                            color = NavyLight, fontSize = 11.sp)
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AdminSelect(
+                                "Bulan", monthNames[statsMonth - 1], monthNames,
+                                { statsMonth = monthNames.indexOf(it) + 1 },
+                                Modifier.weight(1f)
+                            )
+                            AdminSelect("Tahun", statsYear.toString(), years,
+                                { statsYear = it.toInt() }, Modifier.weight(1f))
+                        }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
@@ -159,7 +185,7 @@ internal fun AdminHome(
                                 color = Navy, fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp, maxLines = 2
                             )
-                            Text("Rekap latihan wajib per bulan",
+                            Text(if (weeklyStats) "Rekap latihan wajib mingguan" else "Rekap latihan wajib bulanan",
                                 color = Subtle, fontSize = 11.sp)
                         }
                         OutlinedButton(
@@ -224,13 +250,13 @@ internal fun AdminHome(
                         color = Subtle, fontSize = 11.sp)
                 }
 
-                SchoolScoreDonut(stats, dataAvailable = scoresReady)
-                SchoolMonthlyTrend(stats, dataAvailable = scoresReady)
+                SchoolScoreDonut(stats, dataAvailable = scoresReady, weekly = weeklyStats)
+                SchoolMonthlyTrend(stats, dataAvailable = scoresReady, weekly = weeklyStats)
 
                 WhiteCard(Modifier.fillMaxWidth()) {
                     Text("Perubahan nilai siswa", color = Ink, fontSize = 16.sp,
                         fontWeight = FontWeight.ExtraBold)
-                    Text(if (scoresReady) "Perbandingan bulan ini dan sebelumnya."
+                    Text(if (scoresReady) "Perbandingan ${selectedPeriod} dengan ${previousPeriod}."
                         else "Menunggu data nilai sekolah.",
                         color = Subtle, fontSize = 11.sp)
                     Row(
@@ -256,10 +282,10 @@ internal fun AdminHome(
                     Text(
                         if (!scoresReady) "Rata-rata menunggu sinkronisasi"
                         else if (comparableStudents == 0)
-                            "Belum bisa membandingkan: belum ada siswa yang mempunyai " +
-                                "nilai wajib pada ${previousMonthTitle} dan ${monthNames[statsMonth - 1]} sekaligus."
+                            "Belum bisa membandingkan: belum ada siswa dengan nilai wajib " +
+                                "pada ${previousPeriod} dan ${selectedPeriod} sekaligus."
                         else "${comparableStudents} siswa memiliki nilai pada kedua bulan. " +
-                            "Rata-rata ${previousMonthTitle}: ${stats.previousAverage ?: "—"}",
+                            "Rata-rata ${previousPeriod}: ${stats.previousAverage ?: "—"}",
                         color = Subtle, fontSize = 11.sp
                     )
                 }
