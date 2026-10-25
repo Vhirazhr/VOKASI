@@ -197,10 +197,17 @@ internal fun StudentHome(
                                 if (todayCount == 0) "wajib pertama" else "ulang hari ini",
                                 PaleGold, Warning, Modifier.weight(1f))
                         }
+                        if (!BankPolicy.NEW_BANK_PUBLISHED) {
+                            Text(
+                                "500 soal lama sudah dihapus. Latihan baru belum tersedia sampai soal bergambar diverifikasi.",
+                                color = Subtle, fontSize = 11.sp, lineHeight = 16.sp
+                            )
+                        }
                         VokasiButton(
-                            text = if (todayCount > 0) "Ulangi Latihan Wajib" else "Mulai Latihan",
+                            text = if (!BankPolicy.NEW_BANK_PUBLISHED) "Bank baru belum aktif"
+                                else if (todayCount > 0) "Ulangi Latihan Wajib" else "Mulai Latihan",
                             onClick = onStart,
-                            enabled = countQuestions >= 500,
+                            enabled = countQuestions >= 500 && BankPolicy.NEW_BANK_PUBLISHED,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -277,8 +284,9 @@ internal fun StudentHome(
                                         fontSize = 10.sp, lineHeight = 14.sp
                                     )
                                     VokasiButton(
-                                    text = "Mulai Latihan",
+                                    text = if (BankPolicy.NEW_BANK_PUBLISHED) "Mulai Latihan" else "Belum tersedia",
                                     onClick = { onPractice(insight.category) },
+                                    enabled = BankPolicy.NEW_BANK_PUBLISHED && countQuestions >= 500,
                                     modifier = Modifier.fillMaxWidth()
                                 )
                                 }

@@ -15,7 +15,8 @@ internal object BankPolicy {
         "P1" to 8, "P2" to 15, "P3" to 22, "P4" to 30, "P5" to 30,
         "J" to 8, "S1" to 16, "S2" to 28
     )
-    const val BANK_VERSION = "2026-10-v1"
+    const val NEW_BANK_PUBLISHED = false
+    const val BANK_VERSION = "VOKASI-NEW-PENDING"
     const val QUESTION_COUNT = 100
     const val TOTAL_SECONDS = 1_800
 

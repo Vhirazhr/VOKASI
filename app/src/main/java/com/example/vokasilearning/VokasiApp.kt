@@ -73,8 +73,8 @@ internal fun VokasiApp(activity: ComponentActivity) {
     val bundledIds = remember { bundledQuestions.map { it.id }.toSet() }
     val questions = remember {
         mutableStateListOf<Question>().apply {
-            addAll(bundledQuestions)
-            addAll(LocalAdminQuestionStore.load(activity).filter { it.id !in bundledIds })
+            // Legacy bundled and device-local questions must never be silently restored.
+            if (BankPolicy.NEW_BANK_PUBLISHED) addAll(bundledQuestions)
         }
     }
     // Load attempt history only after authentication; no cross-account leakage.
@@ -162,6 +162,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
         }
     }
     fun startQuiz(category: String? = null) {
+        if (!BankPolicy.NEW_BANK_PUBLISHED || questions.size < 500) return
         if (quizSession.start(questions.toList(), category)) {
             saveQuizCheckpoint()
             page = Page.QUIZ
@@ -169,6 +170,10 @@ internal fun VokasiApp(activity: ComponentActivity) {
     }
     fun restoreQuiz(owner: String): Boolean {
         val stored = QuizProgressStore.load(activity, owner) ?: return false
+        if (!BankPolicy.NEW_BANK_PUBLISHED || stored.optString("bankVersion") != BankPolicy.BANK_VERSION) {
+            QuizProgressStore.clear(activity, owner)
+            return false
+        }
         val restored = quizSession.restore(stored)
         if (!restored) QuizProgressStore.clear(activity, owner)
         return restored
@@ -721,7 +726,7 @@ internal fun VokasiApp(activity: ComponentActivity) {
                         }
                     )
                     Page.HOME -> if (me != null) StudentHome(
-                        me, students.toList(), attempts.toList(), questions.size,
+                        me, students.toList(), attempts.toList(), if (BankPolicy.NEW_BANK_PUBLISHED) questions.size else 0,
                         schoolLeaders = schoolLeaders.toList(),
                         schoolRankReady = schoolRankReady,
                         onStart = { startQuiz() }, onRanking = { page = Page.LEADERBOARD },
